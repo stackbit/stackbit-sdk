@@ -1,4 +1,4 @@
-import {StackbitConfig} from "./config";
+import { ISchema } from './config-schema';
 
 const path = require('path');
 const fse = require('fs-extra');
@@ -20,16 +20,18 @@ export async function loadConfig({ dirPath }: LoadConfigOptions) {
         return {
             config: null,
             errors: [{ message: 'Error loading Stackbit configuration', details: error }]
-        }
+        };
     }
 
     if (!config) {
         return {
             config: null,
-            errors: [{
-                message: 'Stackbit configuration not found, please refer Stackbit documentation: https://www.stackbit.com/docs/stackbit-yaml/'
-            }]
-        }
+            errors: [
+                {
+                    message: 'Stackbit configuration not found, please refer Stackbit documentation: https://www.stackbit.com/docs/stackbit-yaml/'
+                }
+            ]
+        };
     }
     const validationResult = validate(config);
     const normalizedConfig = normalizeConfig(config);
@@ -94,7 +96,7 @@ async function loadConfigFromDotStackbit(dirPath: string) {
     return _.isEmpty(config) ? null : config;
 }
 
-function normalizeConfig(config: any): StackbitConfig {
+function normalizeConfig(config: any): ISchema {
     config = _.cloneDeep(config);
     // in stackbit.yaml models are defined as object with keys,
     // convert them to arrays while setting the key to name property
