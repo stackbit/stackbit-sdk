@@ -354,7 +354,10 @@ describe('"data" model with "isList: true"', () => {
                         label: 'Author',
                         file: 'data/author.json',
                         isList: true,
-                        items: {},
+                        items: {
+                            type: 'object',
+                            fields: []
+                        },
                         fields: []
                     }
                 }

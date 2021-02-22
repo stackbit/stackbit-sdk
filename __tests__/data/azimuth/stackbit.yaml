@@ -245,6 +245,9 @@ models:
             - section_pricing
             - section_reviews
             - section_contact
+      - type: string
+        name: layout
+        const: landing
   blog:
     type: page
     urlPath: "/blog"
@@ -276,6 +279,9 @@ models:
         label: No Index
         default: false
         description: Tell search engines not to index this page
+      - type: string
+        name: layout
+        const: blog
   page:
     type: page
     label: Page
@@ -316,6 +322,9 @@ models:
         label: No Index
         default: false
         description: Tell search engines not to index this page
+      - type: string
+        name: layout
+        const: page
   post:
     type: page
     urlPath: "/blog/{slug}"
@@ -377,6 +386,9 @@ models:
         label: No Index
         default: false
         description: Tell search engines not to index this post
+      - type: string
+        name: layout
+        const: post
   section:
     type: object
     label: Section

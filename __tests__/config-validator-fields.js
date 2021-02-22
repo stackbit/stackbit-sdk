@@ -137,9 +137,9 @@ describe('enum field', () => {
             },
             [
                 {
-                    type: 'array.base',
+                    type: 'alternatives.types',
                     path: ['models', 'button', 'fields', 0, 'options'],
-                    message: 'models.button.fields[0].options must be an array'
+                    message: 'models.button.fields[0].options must be an array of strings or numbers, or array of objects with label and value properties'
                 }
             ]
         );
