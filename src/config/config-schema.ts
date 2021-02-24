@@ -1,5 +1,6 @@
 import Joi from 'joi';
 import _ from 'lodash';
+import { StricterUnion } from '../utils';
 
 // SSGs Stackbit Stuio supports
 const SSG_NAMES = ['unibit', 'jekyll', 'hugo', 'gatsby', 'nextjs', 'custom', 'eleventy', 'vuepress', 'gridsome', 'nuxt', 'sapper', 'hexo'] as const;
@@ -119,7 +120,7 @@ export interface IRelativeAssetsModal {
     uploadDir?: string;
 }
 
-export type IAssetsModel = IStaticAssetsModal | IRelativeAssetsModal;
+export type IAssetsModel = StricterUnion<IStaticAssetsModal | IRelativeAssetsModal>;
 
 const AssetsModel = Joi.object<IAssetsModel>({
     referenceType: Joi.string().valid('static', 'relative').required(),
@@ -141,16 +142,21 @@ const AssetsModel = Joi.object<IAssetsModel>({
 const PartialFieldSchema = Joi.object({
     options: Joi.when('type', {
         is: 'enum',
-        then: Joi.alternatives().try(
-            Joi.array().items(Joi.string(), Joi.number()),
-            Joi.array().items(Joi.object({
-                label: Joi.string().required(),
-                value: Joi.alternatives().try(Joi.string(), Joi.number()).required()
-            }))
-        ).required().prefs({
-            messages: { 'alternatives.types': '{{#label}} must be an array of strings or numbers, or array of objects with label and value properties' },
-            errors: { wrap: { label: false } }
-        }),
+        then: Joi.alternatives()
+            .try(
+                Joi.array().items(Joi.string(), Joi.number()),
+                Joi.array().items(
+                    Joi.object({
+                        label: Joi.string().required(),
+                        value: Joi.alternatives().try(Joi.string(), Joi.number()).required()
+                    })
+                )
+            )
+            .required()
+            .prefs({
+                messages: { 'alternatives.types': '{{#label}} must be an array of strings or numbers, or array of objects with label and value properties' },
+                errors: { wrap: { label: false } }
+            }),
         otherwise: Joi.forbidden()
     }),
     labelField: Joi.string().when('type', {
@@ -260,13 +266,9 @@ export interface IFieldSimpleNoProps {
 //
 // export type IListItems = Exclude<IField, IFieldListProps & IFieldCommonProps>;
 
-export type IFieldPartialProps =
-    IFieldEnumProps |
-    IFieldObjectProps |
-    IFieldListProps |
-    IFieldNumberProps |
-    IFieldPartialModelOrReference |
-    IFieldSimpleNoProps;
+export type IFieldPartialProps = StricterUnion<
+    IFieldEnumProps | IFieldObjectProps | IFieldListProps | IFieldNumberProps | IFieldPartialModelOrReference | IFieldSimpleNoProps
+>;
 
 export type IListItems = Exclude<IFieldPartialProps, IFieldListProps>;
 
@@ -358,7 +360,7 @@ export interface IBaseDataModelMatchList extends Omit<IBaseDataModel, 'fields'>,
     items: IListItems;
 }
 
-export type IYamlDataModel = IBaseDataModelFileSingle | IBaseDataModelFileList | IBaseDataModelMatchSingle | IBaseDataModelMatchList;
+export type IYamlDataModel = StricterUnion<IBaseDataModelFileSingle | IBaseDataModelFileList | IBaseDataModelMatchSingle | IBaseDataModelMatchList>;
 
 const DataModel: Joi.ObjectSchema<IYamlDataModel> = BaseModel.concat(
     Joi.object({
@@ -397,7 +399,7 @@ export interface IYamlConfigModel extends IBaseModel {
 const ConfigModel: Joi.ObjectSchema<IYamlConfigModel> = BaseModel.concat(
     Joi.object({
         type: Joi.string().valid('config').required(),
-        file: Joi.string(),
+        file: Joi.string()
     })
 );
 
@@ -416,10 +418,9 @@ export interface IPageModelSingle extends IBasePageModel {
 
 export interface IPageModelMatch extends IBasePageModel, IBaseMatch {
     singleInstance?: false;
-    file: undefined;
 }
 
-export type IYamlPageModel = IPageModelSingle | IPageModelMatch;
+export type IYamlPageModel = StricterUnion<IPageModelSingle | IPageModelMatch>;
 
 const PageModel: Joi.ObjectSchema<IYamlPageModel> = BaseModel.concat(
     Joi.object({
@@ -446,7 +447,7 @@ const PageModel: Joi.ObjectSchema<IYamlPageModel> = BaseModel.concat(
     })
     .when('.singleInstance', { is: true, then: { file: Joi.required() } });
 
-export type IYamlModel = IYamlObjectModel | IYamlDataModel | IYamlConfigModel | IYamlPageModel;
+export type IYamlModel = StricterUnion<IYamlObjectModel | IYamlDataModel | IYamlConfigModel | IYamlPageModel>;
 
 const Model = Joi.object<IYamlModel>({
     type: Joi.string().valid('page', 'data', 'config', 'object').required()
