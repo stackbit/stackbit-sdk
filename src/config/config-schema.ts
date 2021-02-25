@@ -266,11 +266,17 @@ export interface IFieldSimpleNoProps {
 //
 // export type IListItems = Exclude<IField, IFieldListProps & IFieldCommonProps>;
 
-export type IFieldPartialProps = StricterUnion<
-    IFieldEnumProps | IFieldObjectProps | IFieldListProps | IFieldNumberProps | IFieldPartialModelOrReference | IFieldSimpleNoProps
->;
+type INonStrictFieldPartialProps =
+    | IFieldEnumProps
+    | IFieldObjectProps
+    | IFieldListProps
+    | IFieldNumberProps
+    | IFieldPartialModelOrReference
+    | IFieldSimpleNoProps;
 
-export type IListItems = Exclude<IFieldPartialProps, IFieldListProps>;
+export type IFieldPartialProps = StricterUnion<INonStrictFieldPartialProps>;
+
+export type IListItems = StricterUnion<Exclude<INonStrictFieldPartialProps, IFieldListProps>>;
 
 const ListItems = PartialFieldSchema.concat(
     Joi.object({
