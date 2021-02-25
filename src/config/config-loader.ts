@@ -1,15 +1,24 @@
-import { ISchema } from './config-schema';
-
 const path = require('path');
 const fse = require('fs-extra');
 const yaml = require('js-yaml');
 const _ = require('lodash');
 const { extendModels, iterateModelFieldsRecursively, isListField } = require('@stackbit/schema');
 
-const { validate } = require('./config-validator');
+import { validate } from './config-validator';
+import { IField, IYamlConfigModel, IYamlDataModel, IYamlModel, IYamlObjectModel, IYamlPageModel, IYamlConfig } from './config-schema';
 
 interface LoadConfigOptions {
     dirPath: string;
+}
+
+export type IObjectModel = IYamlObjectModel & { name: string };
+export type IDataModel = IYamlDataModel & { name: string };
+export type IConfigModel = IYamlConfigModel & { name: string };
+export type IPageModel = IYamlPageModel & { name: string };
+export type IModel = IObjectModel | IDataModel | IConfigModel | IPageModel;
+
+export interface IConfig extends Omit<IYamlConfig, 'models'> {
+    models: IModel[];
 }
 
 export async function loadConfig({ dirPath }: LoadConfigOptions) {
@@ -96,21 +105,37 @@ async function loadConfigFromDotStackbit(dirPath: string) {
     return _.isEmpty(config) ? null : config;
 }
 
-function normalizeConfig(config: any): ISchema {
+function normalizeConfig(config: IYamlConfig): IConfig {
     config = _.cloneDeep(config);
-    // in stackbit.yaml models are defined as object with keys,
-    // convert them to arrays while setting the key to name property
+
+    // in stackbit.yaml 'models' are defined as object where keys are model names,
+    // convert 'models' to array of objects while 'name' property set to the
+    // model name
     const modelMap = config.models ?? {};
-    let models = _.map(modelMap, (model: any, modelName: string) => {
-        model.name = modelName;
-        return model;
-    });
+    let models: IModel[] = _.map(
+        modelMap,
+        (yamlModel: IYamlModel, modelName: string): IModel => {
+            const model: IModel = {
+                name: modelName,
+                ...yamlModel
+            };
+            if (model.type === 'page' && !model.hideContent && model.fields) {
+                model.fields.push({
+                    type: 'markdown',
+                    name: 'markdown_content',
+                    label: 'Content',
+                    description: 'Page content'
+                });
+            }
+            return model;
+        }
+    );
     models = extendModels(models);
-    _.forEach(models, (model: any) => {
-        iterateModelFieldsRecursively(model, (field: any, fieldPath: string[]) => {
+    _.forEach(models, (model: IModel) => {
+        iterateModelFieldsRecursively(model, (field: IField) => {
             // add field label if label is not set but name is set
             // 'name' can be unset for nested 'object' fields or list items fields
-            if (!_.has(field, 'label') && _.has(field, 'name')) {
+            if (!_.has(field, 'label')) {
                 field.label = _.startCase(field.name);
             }
 
@@ -119,6 +144,8 @@ function normalizeConfig(config: any): ISchema {
             }
         });
     });
-    config.models = models;
-    return config;
+    return {
+        ...config,
+        models: models
+    };
 }
