@@ -199,14 +199,14 @@ export interface IFieldCommonProps {
     readOnly?: boolean;
 }
 
-export type IFieldSchemaEnumValue = string | number;
+export type IFieldEnumValue = string | number;
 
-export interface IFieldSchemaEnumOptionWithLabel {
+export interface IFieldEnumOptionWithLabel {
     label: string;
-    value: IFieldSchemaEnumValue;
+    value: IFieldEnumValue;
 }
 
-export type IFieldSchemaEnumOptions = IFieldSchemaEnumValue[] | IFieldSchemaEnumOptionWithLabel[];
+export type IFieldSchemaEnumOptions = IFieldEnumValue[] | IFieldEnumOptionWithLabel[];
 
 export interface IFieldEnumProps {
     type: 'enum';
@@ -221,17 +221,12 @@ export interface IFieldObjectProps {
 
 export interface IFieldListProps {
     type: 'list';
-    items?: IListItems;
+    items?: IFieldListItems;
 }
 
 export interface IFieldNumberProps {
     type: 'number';
     subtype?: 'int' | 'float';
-}
-
-export interface IFieldPartialModelOrReference {
-    type: 'model' | 'reference';
-    models: string[];
 }
 
 export interface IFieldModelProps {
@@ -264,19 +259,20 @@ export interface IFieldSimpleNoProps {
 //     IFieldList |
 //     IFieldSimpleNoProps;
 //
-// export type IListItems = Exclude<IField, IFieldListProps & IFieldCommonProps>;
+// export type IFieldListItems = Exclude<IField, IFieldListProps & IFieldCommonProps>;
 
 type INonStrictFieldPartialProps =
     | IFieldEnumProps
     | IFieldObjectProps
     | IFieldListProps
     | IFieldNumberProps
-    | IFieldPartialModelOrReference
+    | IFieldModelProps
+    | IFieldReferenceProps
     | IFieldSimpleNoProps;
 
 export type IFieldPartialProps = StricterUnion<INonStrictFieldPartialProps>;
 
-export type IListItems = StricterUnion<Exclude<INonStrictFieldPartialProps, IFieldListProps>>;
+export type IFieldListItems = StricterUnion<Exclude<INonStrictFieldPartialProps, IFieldListProps>>;
 
 const ListItems = PartialFieldSchema.concat(
     Joi.object({
@@ -354,7 +350,7 @@ export interface IBaseDataModelFileSingle extends IBaseDataModel {
 export interface IBaseDataModelFileList extends Omit<IBaseDataModel, 'fields'> {
     file: string;
     isList: true;
-    items: IListItems;
+    items: IFieldListItems;
 }
 
 export interface IBaseDataModelMatchSingle extends IBaseDataModel, IBaseMatch {
@@ -363,7 +359,7 @@ export interface IBaseDataModelMatchSingle extends IBaseDataModel, IBaseMatch {
 
 export interface IBaseDataModelMatchList extends Omit<IBaseDataModel, 'fields'>, IBaseMatch {
     isList: true;
-    items: IListItems;
+    items: IFieldListItems;
 }
 
 export type IYamlDataModel = StricterUnion<IBaseDataModelFileSingle | IBaseDataModelFileList | IBaseDataModelMatchSingle | IBaseDataModelMatchList>;

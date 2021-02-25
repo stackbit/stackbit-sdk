@@ -6,13 +6,16 @@ import { IllegalModelField, ModelNotFound } from './content-errors';
 import {
     FieldType,
     IField,
-    IFieldEnumProps,
-    IFieldSchemaEnumValue,
-    IFieldPartialModelOrReference,
+    IFieldSimpleNoProps,
     IFieldNumberProps,
+    IFieldEnumProps,
+    IFieldEnumValue,
+    IFieldEnumOptionWithLabel,
     IFieldObjectProps,
+    IFieldModelProps,
+    IFieldReferenceProps,
     IFieldListProps,
-    IListItems
+    IFieldListItems
 } from '..';
 import { isDataModel, isObjectModel } from '../schema-utils';
 
@@ -50,9 +53,16 @@ function joiSchemaForModelFields(fields: IField[] | undefined, fieldPath: FieldP
     );
 }
 
-function joiSchemaForField(field: IField | IListItems, fieldPath: FieldPath, models: IModel[]) {
+function joiSchemaForField(field: IField | IFieldListItems, fieldPath: FieldPath, models: IModel[]) {
+    // switch (field.type) {
+    //     case "boolean":
+    //         break;
+    //     case "color":
+    //         break;
+    //
+    // }
     const fieldSchemaGenerator = FieldSchemas[field.type];
-    let fieldSchema = fieldSchemaGenerator(field, fieldPath, models);
+    let fieldSchema = fieldSchemaGenerator(field as any, fieldPath, models);
     if ('const' in field) {
         fieldSchema = fieldSchema.valid(field.const).invalid(null, '').required();
     } else if ('required' in field && field.required === true) {
@@ -83,8 +93,28 @@ function joiSchemaForObjectModelForModelName(modelName: string, fieldPath: Field
 
 const StringWithEmptyAndNull = Joi.string().allow('', null);
 
-// TODO: is there a way not to pass field: any?
-const FieldSchemas: Record<FieldType, (field: any, fieldPath: FieldPath, models: IModel[]) => Joi.Schema> = {
+export type IFieldPropsByType = {
+    enum: IFieldEnumProps;
+    object: IFieldObjectProps;
+    list: IFieldListProps;
+    number: IFieldNumberProps;
+    model: IFieldModelProps;
+    reference: IFieldReferenceProps;
+    string: IFieldSimpleNoProps;
+    url: IFieldSimpleNoProps;
+    slug: IFieldSimpleNoProps;
+    text: IFieldSimpleNoProps;
+    markdown: IFieldSimpleNoProps;
+    html: IFieldSimpleNoProps;
+    boolean: IFieldSimpleNoProps;
+    date: IFieldSimpleNoProps;
+    datetime: IFieldSimpleNoProps;
+    color: IFieldSimpleNoProps;
+    image: IFieldSimpleNoProps;
+    file: IFieldSimpleNoProps;
+};
+
+const FieldSchemas: { [t in FieldType]: (field: IFieldPropsByType[t], fieldPath: FieldPath, models: IModel[]) => Joi.Schema } = {
     string: () => StringWithEmptyAndNull,
     url: () => StringWithEmptyAndNull,
     slug: () => StringWithEmptyAndNull,
@@ -97,11 +127,11 @@ const FieldSchemas: Record<FieldType, (field: any, fieldPath: FieldPath, models:
     boolean: () => Joi.boolean(),
     date: () => Joi.date(),
     datetime: () => Joi.date(),
-    enum: (field: IFieldEnumProps) => {
+    enum: (field) => {
         if (field.options) {
-            // TODO: how to deal with this?
-            // @ts-ignore
-            const values = field.options.map((option): IFieldSchemaEnumValue => (_.isPlainObject(option) ? option.value : option));
+            const values = (field.options as (IFieldEnumValue | IFieldEnumOptionWithLabel)[]).map((option) =>
+                typeof option === 'number' || typeof option === 'string' ? option : option.value
+            );
             return Joi.valid(...values);
         }
         return Joi.any().forbidden();
@@ -122,17 +152,17 @@ const FieldSchemas: Record<FieldType, (field: any, fieldPath: FieldPath, models:
         // }
         return result;
     },
-    object: (field: IFieldObjectProps, fieldPath: FieldPath, models: IModel[]) => {
+    object: (field, fieldPath: FieldPath, models: IModel[]) => {
         const childFieldPath = fieldPath.concat('fields');
         return joiSchemaForModelFields(field.fields, childFieldPath, models);
     },
-    model: (field: IFieldPartialModelOrReference, fieldPath: FieldPath, models: IModel[]) => {
+    model: (field, fieldPath: FieldPath, models: IModel[]) => {
         if (field.models.length === 0) {
             return Joi.any().forbidden();
         }
-        let typeSchema = Joi.string().valid(...field.models);
-        if (field.models.length === 1) {
-            const modelName = field.models[0]!;
+        const typeSchema = Joi.string().valid(...field.models);
+        if (field.models.length === 1 && field.models[0]) {
+            const modelName = field.models[0];
             return Joi.object({
                 type: typeSchema
             }).concat(joiSchemaForObjectModelForModelName(modelName, fieldPath, models));
