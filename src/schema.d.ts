@@ -15,6 +15,7 @@ declare module '@stackbit/schema' {
     export function iterateModelFieldsRecursively(model: IModel, iterator: (field: IField, fieldPath: string[]) => void): void;
     export function getModelsByQuery(query: ModelQuery, models: IModel[]): IModel[];
     export function extendModels(models: IModel[]): IModel[];
+    export function isListField(field: { type: string }): boolean;
 }
 
 declare module '@stackbit/utils' {

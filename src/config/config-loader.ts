@@ -1,8 +1,9 @@
-const path = require('path');
-const fse = require('fs-extra');
-const yaml = require('js-yaml');
-const _ = require('lodash');
-const { extendModels, iterateModelFieldsRecursively, isListField } = require('@stackbit/schema');
+import path from 'path';
+import fse from 'fs-extra';
+import yaml from 'js-yaml';
+import _ from 'lodash';
+import { extendModels, iterateModelFieldsRecursively, isListField } from '@stackbit/schema';
+import { StricterUnion } from '../utils';
 
 import { validate } from './config-validator';
 import { IField, IYamlConfigModel, IYamlDataModel, IYamlModel, IYamlObjectModel, IYamlPageModel, IYamlConfig } from './config-schema';
@@ -15,7 +16,7 @@ export type IObjectModel = IYamlObjectModel & { name: string };
 export type IDataModel = IYamlDataModel & { name: string };
 export type IConfigModel = IYamlConfigModel & { name: string };
 export type IPageModel = IYamlPageModel & { name: string };
-export type IModel = IObjectModel | IDataModel | IConfigModel | IPageModel;
+export type IModel = StricterUnion<IObjectModel | IDataModel | IConfigModel | IPageModel>;
 
 export interface IConfig extends Omit<IYamlConfig, 'models'> {
     models: IModel[];
@@ -43,7 +44,7 @@ export async function loadConfig({ dirPath }: LoadConfigOptions) {
         };
     }
     const validationResult = validate(config);
-    const normalizedConfig = normalizeConfig(config);
+    const normalizedConfig = normalizeConfig(config as any); // @Simon: There's no reason to believe this would work. We didn't even check if it's valid.
     return {
         config: normalizedConfig,
         errors: validationResult.errors
@@ -69,7 +70,7 @@ async function loadConfigFromStackbitYaml(dirPath: string) {
         return null;
     }
     const stackbitYaml = await fse.readFile(stackbitYamlPath);
-    return yaml.load(stackbitYaml, { schema: yaml.JSON_SCHEMA });
+    return yaml.load(stackbitYaml.toString('utf8'), { schema: yaml.JSON_SCHEMA });
 }
 
 async function loadConfigFromDotStackbit(dirPath: string) {

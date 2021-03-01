@@ -41,6 +41,7 @@
     },
     "devDependencies": {
         "@types/fs-extra": "^9.0.7",
+        "@types/js-yaml": "^4.0.0",
         "@types/lodash": "^4.14.168",
         "@types/micromatch": "^4.0.1",
         "@types/yargs": "^16.0.0",
