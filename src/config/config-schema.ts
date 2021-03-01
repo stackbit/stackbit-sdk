@@ -91,17 +91,42 @@ export interface IContentfulImport {
     accessTokenEnvVar?: string;
 }
 
-const ContentfulImport = Joi.object<IContentfulImport>({
+const contentfulImportSchema = Joi.object<IContentfulImport>({
     type: Joi.string().valid('contentful').required(),
     contentFile: Joi.string().required(),
     spaceIdEnvVar: Joi.string(),
     accessTokenEnvVar: Joi.string()
 });
 
-export type IImport = IContentfulImport | { type: '_undefined' };
+export interface ISanityImport {
+    type: 'sanity';
+    contentFile: string;
+    sanityStudioPath: string;
+    deployStudio?: boolean;
+    deployGraphql?: boolean;
+    projectIdEnvVar?: string;
+    datasetEnvVar?: string;
+    tokenEnvVar?: string;
+}
 
-const Import = Joi.alternatives().conditional('.type', {
-    switch: [{ is: 'contentful', then: ContentfulImport }]
+const sanityImportSchema = Joi.object<ISanityImport>({
+    type: Joi.string().valid('sanity').required(),
+    contentFile: Joi.string().required(),
+    sanityStudioPath: Joi.string().required(),
+    deployStudio: Joi.boolean(),
+    deployGraphql: Joi.boolean(),
+    projectIdEnvVar: Joi.string(),
+    datasetEnvVar: Joi.string(),
+    tokenEnvVar: Joi.string()
+});
+
+export type IImport = IContentfulImport | ISanityImport;
+
+const importSchema = Joi.alternatives().conditional('.type', {
+    switch: [
+        { is: 'contentful', then: contentfulImportSchema },
+        { is: 'contentful', then: sanityImportSchema }
+    ]
 });
 
 export interface IStaticAssetsModal {
@@ -122,7 +147,7 @@ export interface IRelativeAssetsModal {
 
 export type IAssetsModel = StricterUnion<IStaticAssetsModal | IRelativeAssetsModal>;
 
-const AssetsModel = Joi.object<IAssetsModel>({
+const assetsSchema = Joi.object<IAssetsModel>({
     referenceType: Joi.string().valid('static', 'relative').required(),
     assetsDir: Joi.string().allow('').when('referenceType', {
         is: 'relative',
@@ -137,55 +162,6 @@ const AssetsModel = Joi.object<IAssetsModel>({
         then: Joi.required()
     }),
     uploadDir: Joi.string().allow('')
-});
-
-const PartialFieldSchema = Joi.object({
-    options: Joi.when('type', {
-        is: 'enum',
-        then: Joi.alternatives()
-            .try(
-                Joi.array().items(Joi.string(), Joi.number()),
-                Joi.array().items(
-                    Joi.object({
-                        label: Joi.string().required(),
-                        value: Joi.alternatives().try(Joi.string(), Joi.number()).required()
-                    })
-                )
-            )
-            .required()
-            .prefs({
-                messages: { 'alternatives.types': '{{#label}} must be an array of strings or numbers, or array of objects with label and value properties' },
-                errors: { wrap: { label: false } }
-            }),
-        otherwise: Joi.forbidden()
-    }),
-    labelField: Joi.string().when('type', {
-        is: 'object',
-        then: inFields,
-        otherwise: Joi.forbidden()
-    }),
-    subtype: Joi.string().valid('int', 'float').when('type', {
-        not: 'number',
-        then: Joi.forbidden()
-    }),
-    fields: Joi.when('type', {
-        is: 'object',
-        then: Joi.array().items(Joi.link('#field')).required().unique('name'),
-        otherwise: Joi.forbidden()
-    }),
-    models: Joi.when('type', {
-        switch: [
-            {
-                is: 'model',
-                then: Joi.array().items(validObjectModelNames).required()
-            },
-            {
-                is: 'reference',
-                then: Joi.array().items(validPageOrDataModelNames).required()
-            }
-        ],
-        otherwise: Joi.forbidden()
-    })
 });
 
 export interface IFieldCommonProps {
@@ -227,6 +203,9 @@ export interface IFieldListProps {
 export interface IFieldNumberProps {
     type: 'number';
     subtype?: 'int' | 'float';
+    min?: number;
+    max?: number;
+    step?: number;
 }
 
 export interface IFieldModelProps {
@@ -240,26 +219,8 @@ export interface IFieldReferenceProps {
 }
 
 export interface IFieldSimpleNoProps {
-    type: Exclude<FieldType, 'enum' | 'object' | 'list' | 'number' | 'model' | 'reference'>;
+    type: Exclude<FieldType, 'enum' | 'number' | 'object' | 'model' | 'reference' | 'list'>;
 }
-
-// export type IFieldEnum = IFieldEnumProps & IFieldCommonProps;
-// export type IFieldNumber = IFieldNumberProps & IFieldCommonProps;
-// export type IFieldObject = IFieldObjectProps & IFieldCommonProps;
-// export type IFieldModel = IFieldModelProps & IFieldCommonProps;
-// export type IFieldReference = IFieldReferenceProps & IFieldCommonProps;
-// export type IFieldList = IFieldListProps & IFieldCommonProps;
-//
-// export type IField =
-//     IFieldEnum |
-//     IFieldNumber |
-//     IFieldObject |
-//     IFieldModel |
-//     IFieldReference |
-//     IFieldList |
-//     IFieldSimpleNoProps;
-//
-// export type IFieldListItems = Exclude<IField, IFieldListProps & IFieldCommonProps>;
 
 type INonStrictFieldPartialProps =
     | IFieldEnumProps
@@ -274,36 +235,92 @@ export type IFieldPartialProps = StricterUnion<INonStrictFieldPartialProps>;
 
 export type IFieldListItems = StricterUnion<Exclude<INonStrictFieldPartialProps, IFieldListProps>>;
 
-const ListItems = PartialFieldSchema.concat(
-    Joi.object({
-        type: Joi.string()
-            .valid(..._.without(FIELD_TYPES, 'list'))
-            .required()
-    })
-);
-
 export type IField = IFieldPartialProps & IFieldCommonProps;
 
-const Field: Joi.ObjectSchema<IField> = PartialFieldSchema.concat(
-    Joi.object({
-        type: Joi.string()
-            .valid(...FIELD_TYPES)
-            .required(),
-        name: fieldNameSchema,
-        label: Joi.string(),
-        description: Joi.string().allow(''),
-        required: Joi.boolean(),
-        default: Joi.any(),
-        const: Joi.any(),
-        hidden: Joi.boolean(),
-        readOnly: Joi.boolean(),
-        items: Joi.when('type', {
-            is: 'list',
-            then: ListItems,
-            otherwise: Joi.forbidden()
+const fieldCommonPropsSchema = Joi.object({
+    type: Joi.string()
+        .valid(...FIELD_TYPES)
+        .required(),
+    name: fieldNameSchema,
+    label: Joi.string(),
+    description: Joi.string().allow(''),
+    required: Joi.boolean(),
+    default: Joi.any(),
+    const: Joi.any(),
+    hidden: Joi.boolean(),
+    readOnly: Joi.boolean()
+}).oxor('const', 'default');
+
+const numberFieldPartialSchema = Joi.object({
+    type: Joi.string().valid('number').required(),
+    subtype: Joi.string().valid('int', 'float'),
+    min: Joi.number(),
+    max: Joi.number(),
+    step: Joi.number()
+});
+
+const enumFieldPartialSchema = Joi.object({
+    type: Joi.string().valid('enum').required(),
+    options: Joi.alternatives()
+        .try(
+            Joi.array().items(Joi.string(), Joi.number()),
+            Joi.array().items(
+                Joi.object({
+                    label: Joi.string().required(),
+                    value: Joi.alternatives().try(Joi.string(), Joi.number()).required()
+                })
+            )
+        )
+        .required()
+        .prefs({
+            messages: { 'alternatives.types': '{{#label}} must be an array of strings or numbers, or array of objects with label and value properties' },
+            errors: { wrap: { label: false } }
         })
-    }).oxor('const', 'default')
-).id('field');
+});
+
+const objectFieldPartialSchema = Joi.object({
+    type: Joi.string().valid('object').required(),
+    labelField: inFields,
+    fields: Joi.link('#fieldsSchema').required()
+});
+
+const modelFieldPartialSchema = Joi.object({
+    type: Joi.string().valid('model').required(),
+    models: Joi.array().items(validObjectModelNames).required()
+});
+
+const referenceFieldPartialSchema = Joi.object({
+    type: Joi.string().valid('reference').required(),
+    models: Joi.array().items(validPageOrDataModelNames).required()
+});
+
+const partialFieldSchema = Joi.object().when('.type', {
+    switch: [
+        { is: 'number', then: numberFieldPartialSchema },
+        { is: 'enum', then: enumFieldPartialSchema },
+        { is: 'object', then: objectFieldPartialSchema },
+        { is: 'model', then: modelFieldPartialSchema },
+        { is: 'reference', then: referenceFieldPartialSchema }
+    ]
+});
+
+const listItemsSchema = Joi.object({
+    type: Joi.string()
+        .valid(..._.without(FIELD_TYPES, 'list'))
+        .required()
+}).concat(partialFieldSchema);
+
+const listFieldPartialSchema = Joi.object({
+    type: Joi.string().valid('list').required(),
+    items: listItemsSchema
+});
+
+const partialFieldWithListSchema = partialFieldSchema
+    .when('.type', { is: 'list', then: listFieldPartialSchema })
+
+const fieldSchema: Joi.ObjectSchema<IField> = fieldCommonPropsSchema.concat(partialFieldWithListSchema);
+
+const fieldsSchema = Joi.array().items(fieldSchema).unique('name').id('fieldsSchema');
 
 export interface IBaseModel {
     label: string;
@@ -319,20 +336,20 @@ interface IBaseMatch {
     exclude?: string | string[];
 }
 
-const BaseModel = Joi.object({
+const baseModelSchema = Joi.object({
     type: Joi.string().valid('page', 'data', 'config', 'object').required(),
     label: Joi.string().required(),
     description: Joi.string(),
     extends: Joi.array().items(validObjectModelNames).single(),
     labelField: inFields,
-    fields: Joi.array().items(Field).unique('name')
+    fields: Joi.link('#fieldsSchema')
 });
 
 export interface IYamlObjectModel extends IBaseModel {
     type: 'object';
 }
 
-const ObjectModel = BaseModel.concat(
+const objectModelSchema = baseModelSchema.concat(
     Joi.object({
         type: Joi.string().valid('object').required()
     })
@@ -364,25 +381,21 @@ export interface IBaseDataModelMatchList extends Omit<IBaseDataModel, 'fields'>,
 
 export type IYamlDataModel = StricterUnion<IBaseDataModelFileSingle | IBaseDataModelFileList | IBaseDataModelMatchSingle | IBaseDataModelMatchList>;
 
-const DataModel: Joi.ObjectSchema<IYamlDataModel> = BaseModel.concat(
+const dataModelSchema: Joi.ObjectSchema<IYamlDataModel> = baseModelSchema.concat(
     Joi.object({
         type: Joi.string().valid('data').required(),
         file: Joi.string(),
         folder: Joi.string(),
         match: Joi.array().items(Joi.string()).single(),
         exclude: Joi.array().items(Joi.string()).single(),
-        isList: Joi.boolean(),
-        items: ListItems
+        isList: Joi.boolean()
     })
 )
     .when('.isList', {
         is: true,
         then: Joi.object({
-            items: Joi.required(),
+            items: listItemsSchema.required(),
             fields: Joi.forbidden()
-        }),
-        otherwise: Joi.object({
-            items: Joi.forbidden()
         })
     })
     .when('.file', {
@@ -398,7 +411,7 @@ export interface IYamlConfigModel extends IBaseModel {
     type: 'config';
     file?: string;
 }
-const ConfigModel: Joi.ObjectSchema<IYamlConfigModel> = BaseModel.concat(
+const configModelSchema: Joi.ObjectSchema<IYamlConfigModel> = baseModelSchema.concat(
     Joi.object({
         type: Joi.string().valid('config').required(),
         file: Joi.string()
@@ -424,7 +437,7 @@ export interface IPageModelMatch extends IBasePageModel, IBaseMatch {
 
 export type IYamlPageModel = StricterUnion<IPageModelSingle | IPageModelMatch>;
 
-const PageModel: Joi.ObjectSchema<IYamlPageModel> = BaseModel.concat(
+const pageModelSchema: Joi.ObjectSchema<IYamlPageModel> = baseModelSchema.concat(
     Joi.object({
         type: Joi.string().valid('page').required(),
         layout: Joi.string().when(Joi.ref('/pageLayoutKey'), { is: Joi.exist(), then: Joi.required() }),
@@ -451,14 +464,14 @@ const PageModel: Joi.ObjectSchema<IYamlPageModel> = BaseModel.concat(
 
 export type IYamlModel = StricterUnion<IYamlObjectModel | IYamlDataModel | IYamlConfigModel | IYamlPageModel>;
 
-const Model = Joi.object<IYamlModel>({
+const modelSchema = Joi.object<IYamlModel>({
     type: Joi.string().valid('page', 'data', 'config', 'object').required()
 }).when('.type', {
     switch: [
-        { is: 'object', then: ObjectModel },
-        { is: 'data', then: DataModel },
-        { is: 'config', then: ConfigModel },
-        { is: 'page', then: PageModel }
+        { is: 'object', then: objectModelSchema },
+        { is: 'data', then: dataModelSchema },
+        { is: 'config', then: configModelSchema },
+        { is: 'page', then: pageModelSchema }
     ]
 });
 
@@ -472,8 +485,8 @@ const fieldNameUnique = 'field.name.unique';
 
 export type IYamlModels = Record<string, IYamlModel>;
 
-const Models = Joi.object<IYamlModels>()
-    .pattern(modelNamePattern, Model)
+const modelsSchema = Joi.object<IYamlModels>()
+    .pattern(modelNamePattern, modelSchema)
     .error(((errors: Joi.ErrorReport[]): Joi.ErrorReport[] => {
         return _.map(errors, (error) => {
             if (error.code === 'object.unknown' && error.path.length === 2 && error.path[0] === 'models') {
@@ -490,7 +503,7 @@ const Models = Joi.object<IYamlModels>()
                 error.code = modelIsListItemsRequiredErrorCode;
             } else if (error.code === 'any.unknown' && error.path.length === 3 && error.path[0] === 'models' && error.path[2] === 'fields') {
                 error.code = modelIsListFieldsForbiddenErrorCode;
-            } else if (error.code === 'any.unknown' && error.path.length === 3 && error.path[0] === 'models' && error.path[2] === 'items') {
+            } else if (error.code === 'object.unknown' && error.path.length === 3 && error.path[0] === 'models' && error.path[2] === 'items') {
                 error.code = modelListForbiddenErrorCode;
             } else if (error.code === 'array.unique' && error.path.length > 3 && error.path[0] === 'models' && _.nth(error.path, -2) === 'fields') {
                 error.code = fieldNameUnique;
@@ -538,19 +551,19 @@ const schema = Joi.object<IYamlConfig>({
     ssgName: Joi.string().valid(...SSG_NAMES),
     ssgVersion: Joi.string(),
     cmsName: Joi.string().valid(...CMS_NAMES),
-    import: Import,
+    import: importSchema,
     buildCommand: Joi.string(),
     publishDir: Joi.string(),
     staticDir: Joi.string().allow(''),
     uploadDir: Joi.string(),
-    assets: AssetsModel,
+    assets: assetsSchema,
     pagesDir: Joi.string().allow('', null),
     dataDir: Joi.string().allow('', null),
     pageLayoutKey: Joi.string().allow(null),
     objectTypeKey: Joi.string(),
     excludePages: Joi.array().items(Joi.string()).single(),
     logicFields: Joi.array().items(logicFields),
-    models: Models
+    models: modelsSchema
 })
     .unknown(true)
     .without('assets', ['staticDir', 'uploadDir'])
@@ -564,6 +577,7 @@ const schema = Joi.object<IYamlConfig>({
             dataDir: Joi.forbidden(),
             excludePages: Joi.forbidden()
         })
-    });
+    })
+    .shared(fieldsSchema);
 
 export const stackbitConfigSchema = schema;

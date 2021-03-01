@@ -33,7 +33,7 @@
         "@stackbit/schema": "^0.1.4",
         "@stackbit/utils": "^0.1.2",
         "fs-extra": "^9.1.0",
-        "joi": "^17.3.0",
+        "joi": "^17.4.0",
         "js-yaml": "^4.0.0",
         "lodash": "^4.17.20",
         "micromatch": "^4.0.2",

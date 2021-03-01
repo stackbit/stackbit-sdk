@@ -97,7 +97,7 @@ describe('enum field', () => {
                 ]
             },
             [{
-                type: 'any.unknown',
+                type: 'object.unknown',
                 path: ['models', 'button', 'fields', 0, 'options'],
                 message: 'models.button.fields[0].options is not allowed'
             }]
@@ -175,7 +175,7 @@ describe('number field', () => {
                 ]
             },
             [{
-                type: 'any.unknown',
+                type: 'object.unknown',
                 path: ['models', 'button', 'fields', 0, 'subtype'],
                 message: 'models.button.fields[0].subtype is not allowed'
             }]
@@ -267,7 +267,7 @@ describe('object field', () => {
                 ]
             },
             [{
-                type: 'any.unknown',
+                type: 'object.unknown',
                 path: ['models', 'button', 'fields', 0, 'fields'],
                 message: 'models.button.fields[0].fields is not allowed'
             }]
@@ -288,7 +288,7 @@ describe('object field', () => {
                 ]
             },
             [{
-                type: 'any.unknown',
+                type: 'object.unknown',
                 path: ['models', 'button', 'fields', 0, 'labelField'],
                 message: 'models.button.fields[0].labelField is not allowed'
             }]
@@ -342,7 +342,29 @@ describe('object field', () => {
                     type: 'object',
                     name: 'header',
                     labelField: 'title',
-                    fields: [{ type: 'string', name: 'title' }]
+                    fields: [
+                        { type: 'string', name: 'title' }
+                    ]
+                }
+            ]
+        });
+    });
+
+    test('"object" field with nexted "object" field should pass validation', () => {
+        expectModelPassingValidation({
+            fields: [
+                {
+                    type: 'object',
+                    name: 'header',
+                    fields: [
+                        {
+                            type: 'object',
+                            name: 'subheader',
+                            fields: [
+                                { type: 'string', name: 'title' }
+                            ]
+                        }
+                    ]
                 }
             ]
         });
@@ -421,7 +443,7 @@ describe('list field', () => {
                 ]
             },
             [{
-                type: 'any.unknown',
+                type: 'object.unknown',
                 path: ['models', 'button', 'fields', 0, 'items'],
                 message: 'models.button.fields[0].items is not allowed'
             }]
@@ -525,7 +547,7 @@ describe('model and reference fields', () => {
                 ]
             },
             [{
-                type: 'any.unknown',
+                type: 'object.unknown',
                 path: ['models', 'button', 'fields', 0, 'models'],
                 message: 'models.button.fields[0].models is not allowed'
             }]
