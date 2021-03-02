@@ -7,6 +7,7 @@ export function validate(config: any) {
     const joiErrors = validationResult.error?.details || [];
     const errors = joiErrors.map((validationError) => {
         return {
+            type: validationError.type,
             message: validationError.message,
             path: validationError.path,
             value: validationError.context?.value

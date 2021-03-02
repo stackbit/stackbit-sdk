@@ -2,7 +2,7 @@ const _ = require('lodash');
 const util = require('util');
 const { expect } = require('@jest/globals');
 
-const { stackbitConfigSchema } = require('../src/config/config-schema');
+const { validate } = require('../src/config/config-validator');
 
 const minimalValidConfig = {
     stackbitVersion: '0.3.0'
@@ -19,9 +19,9 @@ module.exports = {
 
 function expectPassingValidation(validatedConfig) {
     const config = _.assign(validatedConfig, minimalValidConfig);
-    const validationResult = stackbitConfigSchema.validate(config, {abortEarly: false});
-    const errors = _.get(validationResult, 'error.details', []);
-    expect(errors).toHaveLength(0);
+    const result = validate(config);
+    expect(result.errors).toHaveLength(0);
+    expect(result.valid).toBeTruthy();
 }
 
 function expectValidationResultToIncludeSingleError(value, error, options) {
@@ -30,12 +30,12 @@ function expectValidationResultToIncludeSingleError(value, error, options) {
 
 function expectValidationResultToMatchAllErrors(value, expectedErrors, { inspectErrors = false } = {}) {
     const config = _.assign(value, minimalValidConfig);
-    const validationResult = stackbitConfigSchema.validate(config, {abortEarly: false});
-    const errors = _.get(validationResult, 'error.details', []);
+    const result = validate(config);
     if (inspectErrors) {
-        inspectValidationResultErrors(validationResult);
+        inspectValidationResultErrors(result);
     }
-    expect(errors).toMatchObject(expectedErrors);
+    expect(result.errors).toMatchObject(expectedErrors);
+    expect(result.valid).toBeFalsy();
 }
 
 function expectArrayToIncludeObjectContaining(array, object) {
@@ -46,7 +46,6 @@ function expectArrayToIncludeObjectContaining(array, object) {
     );
 }
 
-function inspectValidationResultErrors(validationResult) {
-    const errors = _.get(validationResult, 'error.details', []);
-    console.log('error.details: ', util.inspect(errors, { showHidden: true, depth: 5, colors: true, compact: false }));
+function inspectValidationResultErrors(result) {
+    console.log('error.details: ', util.inspect(result.errors, { showHidden: true, depth: 5, colors: true, compact: false }));
 }
