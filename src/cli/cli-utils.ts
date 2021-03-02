@@ -1,4 +1,4 @@
-import {IConfig, loadConfig} from '../config/config-loader';
+import {Config, loadConfig} from '../config/config-loader';
 import {loadContent} from "../content/content-loader";
 
 export async function validate({ inputDir, configOnly }: { inputDir: string, configOnly: boolean }) {
@@ -26,7 +26,7 @@ export async function validate({ inputDir, configOnly }: { inputDir: string, con
 
 interface ValidateContentOptions {
     dirPath: string;
-    config: IConfig;
+    config: Config;
     skipUnmodeledContent: boolean;
 }
 

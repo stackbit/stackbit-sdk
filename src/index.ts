@@ -1,3 +1,3 @@
 export * from './config/config-schema';
-export { IObjectModel, IDataModel, IConfigModel, IPageModel, IModel, IConfig } from './config/config-loader';
+export { ObjectModel, DataModel, ConfigModel, PageModel, Model, Config } from './config/config-loader';
 export * as ConfigLoader from './config/config-loader';

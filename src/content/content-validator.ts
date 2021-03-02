@@ -1,13 +1,13 @@
 import _ from 'lodash';
 
-import { IContentItem } from './content-loader';
-import { IConfig } from '../config/config-loader';
+import { ContentItem } from './content-loader';
+import { Config } from '../config/config-loader';
 import { joiSchemaForModelName } from './content-schema';
 import { ContentValidationError } from './content-errors';
 
 interface ValidateContentOptions {
-    contentItems: IContentItem[];
-    config: IConfig;
+    contentItems: ContentItem[];
+    config: Config;
 }
 
 export function validate({ contentItems, config }: ValidateContentOptions) {
