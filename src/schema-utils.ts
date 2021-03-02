@@ -1,10 +1,8 @@
-import {
-    Model,
-    ConfigModel,
-    DataModel,
-    PageModel,
-    ObjectModel
-} from './config/config-loader';
+import { Model, ConfigModel, DataModel, PageModel, ObjectModel } from './config/config-loader';
+
+export function getModelByName(modelName: string, models: Model[]): Model | undefined {
+    return models.find((model) => model.name === modelName);
+}
 
 export function isConfigModel(model: Model): model is ConfigModel {
     return model.type === 'config';

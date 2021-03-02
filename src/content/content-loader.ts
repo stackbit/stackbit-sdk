@@ -2,7 +2,7 @@ import _ from 'lodash';
 import fse from 'fs-extra';
 import path from 'path';
 import micromatch from 'micromatch';
-import { getFirstExistingFile, parseFile, readDirRecursively, forEachPromise } from '@stackbit/utils';
+import { parseFile, readDirRecursively, forEachPromise, findPromise } from '@stackbit/utils';
 const { getModelsByQuery } = require('@stackbit/schema');
 
 import { ConfigModel, Model, Config } from '../config/config-loader';
@@ -358,4 +358,11 @@ async function inferConfigFileFromSSGName(config: Config, dirPath: string) {
         return;
     }
     return getFirstExistingFile(configFiles, dirPath);
+}
+
+function getFirstExistingFile(fileNames: string[], inputDir: string) {
+    return findPromise(fileNames, (fileName) => {
+        const absPath = path.resolve(inputDir, fileName);
+        return fse.pathExists(absPath);
+    });
 }
