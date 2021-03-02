@@ -1,23 +1,23 @@
 import {
-    IModel,
-    IConfigModel,
-    IDataModel,
-    IPageModel,
-    IObjectModel
+    Model,
+    ConfigModel,
+    DataModel,
+    PageModel,
+    ObjectModel
 } from './config/config-loader';
 
-export function isConfigModel(model: IModel): model is IConfigModel {
+export function isConfigModel(model: Model): model is ConfigModel {
     return model.type === 'config';
 }
 
-export function isDataModel(model: IModel): model is IDataModel {
+export function isDataModel(model: Model): model is DataModel {
     return model.type === 'data';
 }
 
-export function isPageModel(model: IModel): model is IPageModel {
+export function isPageModel(model: Model): model is PageModel {
     return model.type === 'page';
 }
 
-export function isObjectModel(model: IModel): model is IObjectModel {
+export function isObjectModel(model: Model): model is ObjectModel {
     return model.type === 'object';
 }

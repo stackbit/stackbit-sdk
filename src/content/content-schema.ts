@@ -1,27 +1,26 @@
 import Joi from 'joi';
 import _ from 'lodash';
 
-import { IModel } from '../config/config-loader';
+import { Model } from '../config/config-loader';
 import { IllegalModelField, ModelNotFound } from './content-errors';
 import {
-    FieldType,
-    IField,
-    IFieldSimpleNoProps,
-    IFieldNumberProps,
-    IFieldEnumProps,
-    IFieldEnumValue,
-    IFieldEnumOptionWithLabel,
-    IFieldObjectProps,
-    IFieldModelProps,
-    IFieldReferenceProps,
-    IFieldListProps,
-    IFieldListItems
+    Field,
+    FieldSimpleNoProps,
+    FieldNumberProps,
+    FieldEnumProps,
+    FieldEnumValue,
+    FieldEnumOptionWithLabel,
+    FieldObjectProps,
+    FieldModelProps,
+    FieldReferenceProps,
+    FieldListProps,
+    FieldListItems
 } from '..';
 import { isDataModel, isObjectModel } from '../schema-utils';
 
 type FieldPath = (string | number)[];
 
-export function joiSchemaForModelName(modelName: string, models: IModel[]) {
+export function joiSchemaForModelName(modelName: string, models: Model[]) {
     const model = getModelByName(modelName, models);
     if (!model) {
         throw new Error(`model ${modelName} not found`);
@@ -29,7 +28,7 @@ export function joiSchemaForModelName(modelName: string, models: IModel[]) {
     return joiSchemaForModel(model, models);
 }
 
-export function joiSchemaForModel(model: IModel, models: IModel[]) {
+export function joiSchemaForModel(model: Model, models: Model[]) {
     if (isDataModel(model) && model.isList) {
         return Joi.object({
             items: Joi.array().items(joiSchemaForField(model.items, [model.name, 'items'], models))
@@ -39,7 +38,7 @@ export function joiSchemaForModel(model: IModel, models: IModel[]) {
     }
 }
 
-function joiSchemaForModelFields(fields: IField[] | undefined, fieldPath: FieldPath, models: IModel[]) {
+function joiSchemaForModelFields(fields: Field[] | undefined, fieldPath: FieldPath, models: Model[]) {
     return Joi.object(
         _.reduce(
             fields,
@@ -53,16 +52,47 @@ function joiSchemaForModelFields(fields: IField[] | undefined, fieldPath: FieldP
     );
 }
 
-function joiSchemaForField(field: IField | IFieldListItems, fieldPath: FieldPath, models: IModel[]) {
-    // switch (field.type) {
-    //     case "boolean":
-    //         break;
-    //     case "color":
-    //         break;
-    //
-    // }
-    const fieldSchemaGenerator = FieldSchemas[field.type];
-    let fieldSchema = fieldSchemaGenerator(field as any, fieldPath, models);
+function joiSchemaForField(field: Field | FieldListItems, fieldPath: FieldPath, models: Model[]) {
+    let fieldSchema;
+    switch (field.type) {
+        case "string":
+        case "url":
+        case "slug":
+        case "text":
+        case "markdown":
+        case "html":
+        case "image":
+        case "file":
+        case "color":
+            fieldSchema = Joi.string().allow('', null);
+            break;
+        case "boolean":
+            fieldSchema = Joi.boolean();
+            break;
+        case "date":
+        case "datetime":
+            fieldSchema = Joi.date();
+            break;
+        case "enum":
+            fieldSchema = FieldSchemas.enum(field, fieldPath, models);
+            break;
+        case "number":
+            fieldSchema = FieldSchemas.number(field, fieldPath, models);
+            break;
+        case "object":
+            fieldSchema = FieldSchemas.object(field, fieldPath, models);
+            break;
+        case "model":
+            fieldSchema = FieldSchemas.model(field, fieldPath, models);
+            break;
+        case "reference":
+            fieldSchema = Joi.string();
+            break;
+        case "list":
+            fieldSchema = FieldSchemas.list(field, fieldPath, models);
+            break;
+
+    }
     if ('const' in field) {
         fieldSchema = fieldSchema.valid(field.const).invalid(null, '').required();
     } else if ('required' in field && field.required === true) {
@@ -71,11 +101,11 @@ function joiSchemaForField(field: IField | IFieldListItems, fieldPath: FieldPath
     return fieldSchema;
 }
 
-function getModelByName(modelName: string, models: IModel[]): IModel | undefined {
+function getModelByName(modelName: string, models: Model[]): Model | undefined {
     return models.find((model) => model.name === modelName);
 }
 
-function joiSchemaForObjectModelForModelName(modelName: string, fieldPath: FieldPath, models: IModel[]) {
+function joiSchemaForObjectModelForModelName(modelName: string, fieldPath: FieldPath, models: Model[]) {
     const model = getModelByName(modelName, models);
     // errors below should never happen if schema was validated
     // - schema validation always checks that all models listed in field.models exist
@@ -91,72 +121,49 @@ function joiSchemaForObjectModelForModelName(modelName: string, fieldPath: Field
     return joiSchemaForModelFields(model.fields, childFieldPath, models);
 }
 
-const StringWithEmptyAndNull = Joi.string().allow('', null);
-
-export type IFieldPropsByType = {
-    enum: IFieldEnumProps;
-    object: IFieldObjectProps;
-    list: IFieldListProps;
-    number: IFieldNumberProps;
-    model: IFieldModelProps;
-    reference: IFieldReferenceProps;
-    string: IFieldSimpleNoProps;
-    url: IFieldSimpleNoProps;
-    slug: IFieldSimpleNoProps;
-    text: IFieldSimpleNoProps;
-    markdown: IFieldSimpleNoProps;
-    html: IFieldSimpleNoProps;
-    boolean: IFieldSimpleNoProps;
-    date: IFieldSimpleNoProps;
-    datetime: IFieldSimpleNoProps;
-    color: IFieldSimpleNoProps;
-    image: IFieldSimpleNoProps;
-    file: IFieldSimpleNoProps;
+export type FieldPropsByType = {
+    boolean: FieldSimpleNoProps;
+    date: FieldSimpleNoProps;
+    datetime: FieldSimpleNoProps;
+    enum: FieldEnumProps;
+    number: FieldNumberProps;
+    object: FieldObjectProps;
+    model: FieldModelProps;
+    reference: FieldReferenceProps;
+    list: FieldListProps;
 };
 
-const FieldSchemas: { [t in FieldType]: (field: IFieldPropsByType[t], fieldPath: FieldPath, models: IModel[]) => Joi.Schema } = {
-    string: () => StringWithEmptyAndNull,
-    url: () => StringWithEmptyAndNull,
-    slug: () => StringWithEmptyAndNull,
-    text: () => StringWithEmptyAndNull,
-    markdown: () => StringWithEmptyAndNull,
-    html: () => StringWithEmptyAndNull,
-    image: () => StringWithEmptyAndNull,
-    file: () => StringWithEmptyAndNull,
-    color: () => StringWithEmptyAndNull,
+const FieldSchemas: { [fieldType in keyof FieldPropsByType]: (field: FieldPropsByType[fieldType], fieldPath: FieldPath, models: Model[]) => Joi.Schema } = {
     boolean: () => Joi.boolean(),
     date: () => Joi.date(),
     datetime: () => Joi.date(),
     enum: (field) => {
         if (field.options) {
-            const values = (field.options as (IFieldEnumValue | IFieldEnumOptionWithLabel)[]).map((option) =>
+            const values = (field.options as (FieldEnumValue | FieldEnumOptionWithLabel)[]).map((option) =>
                 typeof option === 'number' || typeof option === 'string' ? option : option.value
             );
             return Joi.valid(...values);
         }
         return Joi.any().forbidden();
     },
-    number: (field: IFieldNumberProps) => {
+    number: (field) => {
         let result = Joi.number();
         if (field.subtype !== 'float') {
             result = result.integer();
         }
-        // if (field.min) {
-        //     result = result.min(field.min);
-        // }
-        // if (field.max) {
-        //     result = result.max(field.max);
-        // }
-        // if (field.step) {
-        //
-        // }
+        if (field.min) {
+            result = result.min(field.min);
+        }
+        if (field.max) {
+            result = result.max(field.max);
+        }
         return result;
     },
-    object: (field, fieldPath: FieldPath, models: IModel[]) => {
+    object: (field, fieldPath: FieldPath, models: Model[]) => {
         const childFieldPath = fieldPath.concat('fields');
         return joiSchemaForModelFields(field.fields, childFieldPath, models);
     },
-    model: (field, fieldPath: FieldPath, models: IModel[]) => {
+    model: (field, fieldPath: FieldPath, models: Model[]) => {
         if (field.models.length === 0) {
             return Joi.any().forbidden();
         }
@@ -185,7 +192,7 @@ const FieldSchemas: { [t in FieldType]: (field: IFieldPropsByType[t], fieldPath:
         }
     },
     reference: () => Joi.string(),
-    list: (field: IFieldListProps, fieldPath: FieldPath, models: IModel[]) => {
+    list: (field, fieldPath: FieldPath, models: Model[]) => {
         if (field.items) {
             const childFieldPath = fieldPath.concat('items');
             const itemsSchema = joiSchemaForField(field.items, childFieldPath, models);

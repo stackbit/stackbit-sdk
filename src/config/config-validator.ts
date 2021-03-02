@@ -1,5 +1,4 @@
 import _ from 'lodash';
-
 import { stackbitConfigSchema } from './config-schema';
 
 export function validate(config: any) {
@@ -10,11 +9,12 @@ export function validate(config: any) {
         return {
             message: validationError.message,
             path: validationError.path,
-            value: validationError.context?.value,
+            value: validationError.context?.value
         };
     });
+    const valid = _.isEmpty(errors);
     return {
-        valid: _.isEmpty(errors),
+        valid,
         errors
     };
 }

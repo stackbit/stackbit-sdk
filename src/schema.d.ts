@@ -1,5 +1,5 @@
 declare module '@stackbit/schema' {
-    import { IModel } from './config/config-loader';
+    import { Model } from './config/config-loader';
 
     interface BaseModelQuery {
         filePath: string;
@@ -12,9 +12,10 @@ declare module '@stackbit/schema' {
 
     type ModelQuery = BaseModelQuery | TypedModelQuery;
 
-    export function iterateModelFieldsRecursively(model: IModel, iterator: (field: IField, fieldPath: string[]) => void): void;
-    export function getModelsByQuery(query: ModelQuery, models: IModel[]): IModel[];
-    export function extendModels(models: IModel[]): IModel[];
+    export function iterateModelFieldsRecursively(model: Model, iterator: (field: Field, fieldPath: string[]) => void): void;
+    export function getModelsByQuery(query: ModelQuery, models: Model[]): Model[];
+    export function extendModels(models: Model[]): Model[];
+    export function isListField(field: { type: string }): boolean;
 }
 
 declare module '@stackbit/utils' {

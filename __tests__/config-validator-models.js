@@ -276,7 +276,7 @@ describe('"data" model with "file" property', () => {
             },
             [
                 {
-                    type: 'any.unknown',
+                    type: 'object.unknown',
                     path: ['models', 'author', 'fields', 0, 'labelField'],
                     message: 'models.author.fields[0].labelField is not allowed'
                 }
@@ -514,7 +514,7 @@ describe('"page" model "file" and "singleInstance" properties are mutual exclusi
             }
         }, [
             {
-                type: 'any.unknown',
+                type: 'object.unknown',
                 path: ['models', 'post', 'fields', 0, 'labelField'],
                 message: 'models.post.fields[0].labelField is not allowed'
             }

@@ -5,50 +5,50 @@ import micromatch from 'micromatch';
 import { getFirstExistingFile, parseFile, readDirRecursively, forEachPromise } from '@stackbit/utils';
 const { getModelsByQuery } = require('@stackbit/schema');
 
-import { IConfigModel, IModel, IConfig } from '../config/config-loader';
+import { ConfigModel, Model, Config } from '../config/config-loader';
 import { FileNotMatchedModel, FileMatchedMultipleModels, FileReadError, FileForModelNotFound, FolderReadError } from './content-errors';
 import { isConfigModel, isDataModel, isPageModel } from '../schema-utils';
 import { validate } from './content-validator';
 
-interface IBaseMetadata {
+interface BaseMetadata {
     filePath: string;
 }
 
-interface IModeledMetadata extends IBaseMetadata {
+interface ModeledMetadata extends BaseMetadata {
     modelName: string;
 }
 
-interface IUnmodeledMetadata extends IBaseMetadata {
+interface UnmodeledMetadata extends BaseMetadata {
     modelName: null;
 }
 
-type IMetadata = IModeledMetadata | IUnmodeledMetadata;
+type Metadata = ModeledMetadata | UnmodeledMetadata;
 
-export interface IContentItem {
+export interface ContentItem {
     [index: string]: any;
-    __metadata: IMetadata;
+    __metadata: Metadata;
 }
 
 /*
-interface IBaseContentItem {
+interface BaseContentItem {
     filePath: string;
     data: any;
 }
 
-interface IModeledContentItem extends IBaseContentItem {
+interface ModeledContentItem extends BaseContentItem {
     modelName: string;
 }
 
-interface IUnmodeledContentItem extends IBaseContentItem {
+interface UnmodeledContentItem extends BaseContentItem {
     modelName: null;
 }
 
-type IContentItem = IModeledContentItem | IUnmodeledContentItem;
+type ContentItem = ModeledContentItem | UnmodeledContentItem;
 */
 
 interface LoadContentOptions {
     dirPath: string;
-    config: IConfig;
+    config: Config;
     skipUnmodeledContent: boolean;
 }
 
@@ -64,7 +64,7 @@ export async function loadContent({ dirPath, config, skipUnmodeledContent }: Loa
 }
 
 async function loadDataFiles({ dirPath, config, skipUnmodeledContent }: LoadContentOptions) {
-    const contentItems: IContentItem[] = [];
+    const contentItems: ContentItem[] = [];
     const errors: Error[] = [];
 
     // 'config' is a deprecated model type used to describe the models of
@@ -132,7 +132,7 @@ async function loadDataFiles({ dirPath, config, skipUnmodeledContent }: LoadCont
 }
 
 async function loadPageFiles({ dirPath, config, skipUnmodeledContent }: LoadContentOptions) {
-    const contentItems: IContentItem[] = [];
+    const contentItems: ContentItem[] = [];
     const errors: Error[] = [];
 
     // if user specifically set pagesDir to null, opt-out from loading page files all-together
@@ -180,7 +180,7 @@ async function loadPageFiles({ dirPath, config, skipUnmodeledContent }: LoadCont
     return { contentItems, errors };
 }
 
-async function loadDataItemForConfigModel(dirPath: string, configModel: IConfigModel, config: IConfig) {
+async function loadDataItemForConfigModel(dirPath: string, configModel: ConfigModel, config: Config) {
     let filePath;
     if ('file' in configModel) {
         filePath = configModel.file;
@@ -236,7 +236,7 @@ interface LoadContentItemsOptions {
     projectDir: string;
     contentDir: string;
     filePaths: string[];
-    models: IModel[];
+    models: Model[];
     objectTypeKeyPath?: string | string[] | null;
     modelTypeKeyPath?: string | string[];
     skipUnmodeledContent: boolean;
@@ -265,7 +265,7 @@ async function loadContentItems({
     skipUnmodeledContent
 }: LoadContentItemsOptions) {
     const absContentDir = path.join(projectDir, contentDir);
-    const contentItems: IContentItem[] = [];
+    const contentItems: ContentItem[] = [];
     const errors: Error[] = [];
     await forEachPromise(filePaths, async (filePath) => {
         const absFilePath = path.join(absContentDir, filePath);
@@ -314,7 +314,7 @@ async function loadFile(filePath: string) {
     return data;
 }
 
-function modeledDataItem(filePath: string, model: IModel, data: any): IContentItem {
+function modeledDataItem(filePath: string, model: Model, data: any): ContentItem {
     if (isDataModel(model) && model.isList && _.isArray(data)) {
         data = { items: data };
     } else if (isPageModel(model)) {
@@ -331,7 +331,7 @@ function modeledDataItem(filePath: string, model: IModel, data: any): IContentIt
     };
 }
 
-function unmodeledDataItem(filePath: string, data: any): IContentItem {
+function unmodeledDataItem(filePath: string, data: any): ContentItem {
     return {
         __metadata: {
             filePath,
@@ -348,7 +348,7 @@ const configFilesSSGMap: Record<string, string[]> = {
     gatsby: ['site-metadata.json']
 };
 
-async function inferConfigFileFromSSGName(config: IConfig, dirPath: string) {
+async function inferConfigFileFromSSGName(config: Config, dirPath: string) {
     const ssgName = config.ssgName;
     if (!ssgName || !(ssgName in configFilesSSGMap)) {
         return;

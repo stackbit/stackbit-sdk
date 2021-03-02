@@ -1,24 +1,25 @@
-const path = require('path');
-const fse = require('fs-extra');
-const yaml = require('js-yaml');
-const _ = require('lodash');
-const { extendModels, iterateModelFieldsRecursively, isListField } = require('@stackbit/schema');
+import path from 'path';
+import fse from 'fs-extra';
+import yaml from 'js-yaml';
+import _ from 'lodash';
+import { extendModels, iterateModelFieldsRecursively, isListField } from '@stackbit/schema';
+import { StricterUnion } from '../utils';
 
 import { validate } from './config-validator';
-import { IField, IYamlConfigModel, IYamlDataModel, IYamlModel, IYamlObjectModel, IYamlPageModel, IYamlConfig } from './config-schema';
+import { Field, YamlConfigModel, YamlDataModel, YamlModel, YamlObjectModel, YamlPageModel, YamlConfig } from './config-schema';
 
 interface LoadConfigOptions {
     dirPath: string;
 }
 
-export type IObjectModel = IYamlObjectModel & { name: string };
-export type IDataModel = IYamlDataModel & { name: string };
-export type IConfigModel = IYamlConfigModel & { name: string };
-export type IPageModel = IYamlPageModel & { name: string };
-export type IModel = IObjectModel | IDataModel | IConfigModel | IPageModel;
+export type ObjectModel = YamlObjectModel & { name: string };
+export type DataModel = YamlDataModel & { name: string };
+export type ConfigModel = YamlConfigModel & { name: string };
+export type PageModel = YamlPageModel & { name: string };
+export type Model = StricterUnion<ObjectModel | DataModel | ConfigModel | PageModel>;
 
-export interface IConfig extends Omit<IYamlConfig, 'models'> {
-    models: IModel[];
+export interface Config extends Omit<YamlConfig, 'models'> {
+    models: Model[];
 }
 
 export async function loadConfig({ dirPath }: LoadConfigOptions) {
@@ -43,7 +44,7 @@ export async function loadConfig({ dirPath }: LoadConfigOptions) {
         };
     }
     const validationResult = validate(config);
-    const normalizedConfig = normalizeConfig(config);
+    const normalizedConfig = normalizeConfig(config as any); // @Simon: There's no reason to believe this would work. We didn't even check if it's valid.
     return {
         config: normalizedConfig,
         errors: validationResult.errors
@@ -69,7 +70,7 @@ async function loadConfigFromStackbitYaml(dirPath: string) {
         return null;
     }
     const stackbitYaml = await fse.readFile(stackbitYamlPath);
-    return yaml.load(stackbitYaml, { schema: yaml.JSON_SCHEMA });
+    return yaml.load(stackbitYaml.toString('utf8'), { schema: yaml.JSON_SCHEMA });
 }
 
 async function loadConfigFromDotStackbit(dirPath: string) {
@@ -105,17 +106,17 @@ async function loadConfigFromDotStackbit(dirPath: string) {
     return _.isEmpty(config) ? null : config;
 }
 
-function normalizeConfig(config: IYamlConfig): IConfig {
+function normalizeConfig(config: YamlConfig): Config {
     config = _.cloneDeep(config);
 
     // in stackbit.yaml 'models' are defined as object where keys are model names,
     // convert 'models' to array of objects while 'name' property set to the
     // model name
     const modelMap = config.models ?? {};
-    let models: IModel[] = _.map(
+    let models: Model[] = _.map(
         modelMap,
-        (yamlModel: IYamlModel, modelName: string): IModel => {
-            const model: IModel = {
+        (yamlModel: YamlModel, modelName: string): Model => {
+            const model: Model = {
                 name: modelName,
                 ...yamlModel
             };
@@ -131,8 +132,8 @@ function normalizeConfig(config: IYamlConfig): IConfig {
         }
     );
     models = extendModels(models);
-    _.forEach(models, (model: IModel) => {
-        iterateModelFieldsRecursively(model, (field: IField) => {
+    _.forEach(models, (model: Model) => {
+        iterateModelFieldsRecursively(model, (field: Field) => {
             // add field label if label is not set but name is set
             // 'name' can be unset for nested 'object' fields or list items fields
             if (!_.has(field, 'label')) {
