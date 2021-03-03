@@ -3,7 +3,7 @@ import fse from 'fs-extra';
 import path from 'path';
 import micromatch from 'micromatch';
 import { parseFile, readDirRecursively, forEachPromise, findPromise } from '@stackbit/utils';
-const { getModelsByQuery } = require('@stackbit/schema');
+import { getModelsByQuery } from '@stackbit/schema';
 
 import { ConfigModel, Model, Config } from '../config/config-loader';
 import { FileNotMatchedModel, FileMatchedMultipleModels, FileReadError, FileForModelNotFound, FolderReadError } from './content-errors';
