@@ -2,7 +2,6 @@ import Joi from 'joi';
 import _ from 'lodash';
 
 import { Model } from '../config/config-loader';
-import { IllegalModelField, ModelNotFound } from './content-errors';
 import {
     Field,
     FieldSimpleNoProps,
@@ -16,35 +15,78 @@ import {
     FieldListProps,
     FieldListItems
 } from '..';
-import { isDataModel, isObjectModel } from '../schema-utils';
+import { isDataModel, isPageModel } from '../schema-utils';
 
 type FieldPath = (string | number)[];
 
-export function joiSchemaForModelName(modelName: string, models: Model[]) {
-    const model = getModelByName(modelName, models);
-    if (!model) {
-        throw new Error(`model ${modelName} not found`);
-    }
-    return joiSchemaForModel(model, models);
+type ModelSchemaMap = Record<string, Joi.ObjectSchema>;
+
+export function joiSchemasForModels(models: Model[]) {
+    const modelSchemas = _.reduce(
+        models,
+        (modelSchemas: ModelSchemaMap, model: Model) => {
+            let joiSchema;
+            if (model.invalid) {
+                // if root model is invalid, replace the label with "file" otherwise joi outputs "value" which is not descriptive
+                let objectLabel = '{{#label}}';
+                if (isDataModel(model) || isPageModel(model)) {
+                    objectLabel = 'file';
+                }
+                joiSchema = Joi.object()
+                    .forbidden()
+                    .messages({
+                        'any.unknown': `${objectLabel} can not be validated, the model "${model.name}" is invalid. Fix the model to validate the content.`
+                    });
+            } else {
+                joiSchema = joiSchemaForModel(model);
+            }
+            modelSchemas[model.name] = joiSchema.id(`${model.name}_model_schema`);
+            return modelSchemas;
+        },
+        {}
+    );
+
+    // Allow linking between recursive schemas by calling shared() on every schema with every other schema
+    // https://joi.dev/api/?v=17.4.0#anysharedschema
+    // Example: given three schemas: pageSchema, sectionSchema, authorSchema
+    //   pageSchema.shared(sectionSchema).shared(authorSchema)
+    //   sectionSchema.shared(pageSchema).shared(authorSchema)
+    //   authorSchema.shared(pageSchema).shared(sectionSchema)
+    // Future optimization - no need to link between all schemas, but only these that have internal links
+    return _.reduce(
+        modelSchemas,
+        (accum: ModelSchemaMap, modelSchema: Joi.ObjectSchema, modelName: string) => {
+            const otherModelSchemas = _.omit(modelSchemas, modelName);
+            accum[modelName] = _.reduce(
+                otherModelSchemas,
+                (modelSchema: Joi.ObjectSchema, otherModelSchema: Joi.ObjectSchema) => {
+                    return modelSchema.shared(otherModelSchema);
+                },
+                modelSchema
+            );
+            return accum;
+        },
+        {}
+    );
 }
 
-export function joiSchemaForModel(model: Model, models: Model[]) {
+export function joiSchemaForModel(model: Model) {
     if (isDataModel(model) && model.isList) {
         return Joi.object({
-            items: Joi.array().items(joiSchemaForField(model.items, [model.name, 'items'], models))
+            items: Joi.array().items(joiSchemaForField(model.items, [model.name, 'items']))
         });
     } else {
-        return joiSchemaForModelFields(model.fields, [model.name], models).id(model.name);
+        return joiSchemaForModelFields(model.fields, [model.name]);
     }
 }
 
-function joiSchemaForModelFields(fields: Field[] | undefined, fieldPath: FieldPath, models: Model[]) {
+function joiSchemaForModelFields(fields: Field[] | undefined, fieldPath: FieldPath) {
     return Joi.object(
         _.reduce(
             fields,
             (schema: Record<string, Joi.Schema>, field) => {
                 const childFieldPath = fieldPath.concat(`[name='${field.name}']`);
-                schema[field.name] = joiSchemaForField(field, childFieldPath, models);
+                schema[field.name] = joiSchemaForField(field, childFieldPath);
                 return schema;
             },
             {}
@@ -52,46 +94,45 @@ function joiSchemaForModelFields(fields: Field[] | undefined, fieldPath: FieldPa
     );
 }
 
-function joiSchemaForField(field: Field | FieldListItems, fieldPath: FieldPath, models: Model[]) {
+function joiSchemaForField(field: Field | FieldListItems, fieldPath: FieldPath) {
     let fieldSchema;
     switch (field.type) {
-        case "string":
-        case "url":
-        case "slug":
-        case "text":
-        case "markdown":
-        case "html":
-        case "image":
-        case "file":
-        case "color":
+        case 'string':
+        case 'url':
+        case 'slug':
+        case 'text':
+        case 'markdown':
+        case 'html':
+        case 'image':
+        case 'file':
+        case 'color':
             fieldSchema = Joi.string().allow('', null);
             break;
-        case "boolean":
+        case 'boolean':
             fieldSchema = Joi.boolean();
             break;
-        case "date":
-        case "datetime":
+        case 'date':
+        case 'datetime':
             fieldSchema = Joi.date();
             break;
-        case "enum":
-            fieldSchema = FieldSchemas.enum(field, fieldPath, models);
+        case 'enum':
+            fieldSchema = FieldSchemas.enum(field, fieldPath);
             break;
-        case "number":
-            fieldSchema = FieldSchemas.number(field, fieldPath, models);
+        case 'number':
+            fieldSchema = FieldSchemas.number(field, fieldPath);
             break;
-        case "object":
-            fieldSchema = FieldSchemas.object(field, fieldPath, models);
+        case 'object':
+            fieldSchema = FieldSchemas.object(field, fieldPath);
             break;
-        case "model":
-            fieldSchema = FieldSchemas.model(field, fieldPath, models);
+        case 'model':
+            fieldSchema = FieldSchemas.model(field, fieldPath);
             break;
-        case "reference":
+        case 'reference':
             fieldSchema = Joi.string();
             break;
-        case "list":
-            fieldSchema = FieldSchemas.list(field, fieldPath, models);
+        case 'list':
+            fieldSchema = FieldSchemas.list(field, fieldPath);
             break;
-
     }
     if ('const' in field) {
         fieldSchema = fieldSchema.valid(field.const).invalid(null, '').required();
@@ -99,26 +140,6 @@ function joiSchemaForField(field: Field | FieldListItems, fieldPath: FieldPath, 
         fieldSchema = fieldSchema.required();
     }
     return fieldSchema;
-}
-
-function getModelByName(modelName: string, models: Model[]): Model | undefined {
-    return models.find((model) => model.name === modelName);
-}
-
-function joiSchemaForObjectModelForModelName(modelName: string, fieldPath: FieldPath, models: Model[]) {
-    const model = getModelByName(modelName, models);
-    // errors below should never happen if schema was validated
-    // - schema validation always checks that all models listed in field.models exist
-    // - schema validation always checks that all models listed in field.models
-    //   for field.type === model are models of type 'object'
-    if (!model) {
-        throw new ModelNotFound({ modelName, fieldPath });
-    }
-    if (!isObjectModel(model)) {
-        throw new IllegalModelField({ modelName, modelType: model.type, fieldPath });
-    }
-    const childFieldPath = fieldPath.concat('fields');
-    return joiSchemaForModelFields(model.fields, childFieldPath, models);
 }
 
 export type FieldPropsByType = {
@@ -133,7 +154,7 @@ export type FieldPropsByType = {
     list: FieldListProps;
 };
 
-const FieldSchemas: { [fieldType in keyof FieldPropsByType]: (field: FieldPropsByType[fieldType], fieldPath: FieldPath, models: Model[]) => Joi.Schema } = {
+const FieldSchemas: { [fieldType in keyof FieldPropsByType]: (field: FieldPropsByType[fieldType], fieldPath: FieldPath) => Joi.Schema } = {
     boolean: () => Joi.boolean(),
     date: () => Joi.date(),
     datetime: () => Joi.date(),
@@ -159,43 +180,55 @@ const FieldSchemas: { [fieldType in keyof FieldPropsByType]: (field: FieldPropsB
         }
         return result;
     },
-    object: (field, fieldPath: FieldPath, models: Model[]) => {
+    object: (field, fieldPath: FieldPath) => {
         const childFieldPath = fieldPath.concat('fields');
-        return joiSchemaForModelFields(field.fields, childFieldPath, models);
+        return joiSchemaForModelFields(field.fields, childFieldPath);
     },
-    model: (field, fieldPath: FieldPath, models: Model[]) => {
+    model: (field, fieldPath: FieldPath) => {
         if (field.models.length === 0) {
             return Joi.any().forbidden();
         }
         const typeSchema = Joi.string().valid(...field.models);
         if (field.models.length === 1 && field.models[0]) {
             const modelName = field.models[0];
-            return Joi.object({
-                type: typeSchema
-            }).concat(joiSchemaForObjectModelForModelName(modelName, fieldPath, models));
+            return Joi.link()
+                .ref(`#${modelName}_model_schema`)
+                .concat(
+                    Joi.object({
+                        type: typeSchema
+                    })
+                );
         } else {
             // if there is more than one model in models, then 'type' field is
             // required to identify the object
-            return Joi.object({
-                type: typeSchema.required()
-            }).when('.type', {
-                switch: _.map(field.models, (modelName) => {
-                    return {
-                        is: modelName,
-                        then: joiSchemaForObjectModelForModelName(modelName, fieldPath, models)
-                    };
-                }),
-                // if 'type' was invalid, no need to show 'forbidden' error
-                // messages for every field in the un-identified object.
-                otherwise: Joi.object().unknown()
-            });
+            return Joi.alternatives()
+                .conditional('.type', {
+                    switch: _.map(field.models, (modelName) => {
+                        return {
+                            is: modelName,
+                            then: Joi.link()
+                                .ref(`#${modelName}_model_schema`)
+                                .concat(
+                                    Joi.object({
+                                        type: Joi.string()
+                                    })
+                                )
+                        };
+                    })
+                })
+                .prefs({
+                    messages: {
+                        'alternatives.any': `"{{#label}}.type" is required and must be one of [${field.models.join(', ')}].`
+                    },
+                    errors: { wrap: { label: false } }
+                });
         }
     },
     reference: () => Joi.string(),
-    list: (field, fieldPath: FieldPath, models: Model[]) => {
+    list: (field, fieldPath: FieldPath) => {
         if (field.items) {
             const childFieldPath = fieldPath.concat('items');
-            const itemsSchema = joiSchemaForField(field.items, childFieldPath, models);
+            const itemsSchema = joiSchemaForField(field.items, childFieldPath);
             return Joi.array().items(itemsSchema);
         }
         return Joi.array().items(Joi.string());

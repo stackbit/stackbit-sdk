@@ -20,8 +20,8 @@ declare module '@stackbit/schema' {
 
 declare module '@stackbit/utils' {
     import fs from 'fs';
-    export function getFirstExistingFile(fileNames: string[], inputDir: string): Promise<string | undefined>;
     export function parseFile(filePath: string): Promise<any>;
     export function readDirRecursively(dir: string, options?: { filter: (filePath: string, stats: fs.Stats) => boolean }): Promise<string[]>;
     export function forEachPromise<T>(array: T[], callback: (value: T, index: number, array: T[]) => Promise<void>, thisArg?: any): Promise<void>;
+    export function findPromise<T>(array: T[], callback: (value: T, index: number, array: T[]) => Promise<boolean>, thisArg?: any): Promise<T | undefined>;
 }

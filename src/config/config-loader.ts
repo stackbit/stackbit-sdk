@@ -5,17 +5,25 @@ import _ from 'lodash';
 import { extendModels, iterateModelFieldsRecursively, isListField } from '@stackbit/schema';
 import { StricterUnion } from '../utils';
 
-import { validate } from './config-validator';
+import {
+    validate,
+    ConfigValidationResult,
+    ConfigValidationError
+} from './config-validator';
 import { Field, YamlConfigModel, YamlDataModel, YamlModel, YamlObjectModel, YamlPageModel, YamlConfig } from './config-schema';
 
 interface LoadConfigOptions {
     dirPath: string;
 }
 
-export type ObjectModel = YamlObjectModel & { name: string };
-export type DataModel = YamlDataModel & { name: string };
-export type ConfigModel = YamlConfigModel & { name: string };
-export type PageModel = YamlPageModel & { name: string };
+export type BaseModel = {
+    name: string;
+    invalid?: boolean;
+};
+export type ObjectModel = YamlObjectModel & BaseModel;
+export type DataModel = YamlDataModel & BaseModel;
+export type ConfigModel = YamlConfigModel & BaseModel;
+export type PageModel = YamlPageModel & BaseModel;
 export type Model = StricterUnion<ObjectModel | DataModel | ConfigModel | PageModel>;
 
 export interface Config extends Omit<YamlConfig, 'models'> {
@@ -44,7 +52,7 @@ export async function loadConfig({ dirPath }: LoadConfigOptions) {
         };
     }
     const validationResult = validate(config);
-    const normalizedConfig = normalizeConfig(config as any); // @Simon: There's no reason to believe this would work. We didn't even check if it's valid.
+    const normalizedConfig = normalizeConfig(validationResult); // @Simon: There's no reason to believe this would work. We didn't even check if it's valid.
     return {
         config: normalizedConfig,
         errors: validationResult.errors
@@ -106,8 +114,16 @@ async function loadConfigFromDotStackbit(dirPath: string) {
     return _.isEmpty(config) ? null : config;
 }
 
-function normalizeConfig(config: YamlConfig): Config {
-    config = _.cloneDeep(config);
+function normalizeConfig(validationResult: ConfigValidationResult): Config {
+    const config = _.cloneDeep(validationResult.value);
+
+    const invalidModelNames = _.reduce(validationResult.errors, (modelNames: string[], error: ConfigValidationError) => {
+        if (error.path[0] === 'models' && typeof error.path[1] == 'string') {
+            const modelName = error.path[1];
+            modelNames.push(modelName);
+        }
+        return modelNames;
+    }, []);
 
     // in stackbit.yaml 'models' are defined as object where keys are model names,
     // convert 'models' to array of objects while 'name' property set to the
@@ -120,6 +136,9 @@ function normalizeConfig(config: YamlConfig): Config {
                 name: modelName,
                 ...yamlModel
             };
+            if (invalidModelNames.includes(modelName)) {
+                model.invalid = true;
+            }
             if (model.type === 'page' && !model.hideContent && model.fields) {
                 model.fields.push({
                     type: 'markdown',

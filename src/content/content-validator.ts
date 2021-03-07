@@ -2,8 +2,10 @@ import _ from 'lodash';
 
 import { ContentItem } from './content-loader';
 import { Config } from '../config/config-loader';
-import { joiSchemaForModelName } from './content-schema';
+import { joiSchemasForModels } from './content-schema';
 import { ContentValidationError } from './content-errors';
+import { getModelByName, isConfigModel } from '../schema-utils';
+import Joi from 'joi';
 
 interface ValidateContentOptions {
     contentItems: ContentItem[];
@@ -12,16 +14,39 @@ interface ValidateContentOptions {
 
 export function validate({ contentItems, config }: ValidateContentOptions) {
     const errors: ContentValidationError[] = [];
+
+    const joiModelSchemas = joiSchemasForModels(config.models);
+
     _.forEach(contentItems, (contentItem) => {
         const modelName = contentItem.__metadata.modelName;
         if (!modelName) {
             return;
         }
-        const modelSchema = joiSchemaForModelName(modelName, config.models);
-        const validationOptions = { abortEarly: false };
+        let modelSchema = joiModelSchemas[modelName];
+        if (!modelSchema) {
+            return;
+        }
+        const validationOptions = {
+            abortEarly: false,
+            context: {
+                filePath: contentItem.__metadata.filePath
+            }
+        };
+
+        const model = getModelByName(modelName, config.models);
+        if (model && isConfigModel(model)) {
+            if (config.ssgName === 'unibit') {
+                // in Unibit, config model defines the model of the params
+                modelSchema = Joi.object({ params: modelSchema });
+            }
+            // in config models allow skip root fields
+            modelSchema = modelSchema.unknown();
+        }
+
         const validationResult = modelSchema.validate(_.omit(contentItem, '__metadata'), validationOptions);
         const validationErrors = validationResult.error?.details.map((validationError) => {
             return new ContentValidationError({
+                type: validationError.type,
                 message: validationError.message,
                 fieldPath: validationError.path,
                 value: validationError.context?.value,
@@ -32,8 +57,9 @@ export function validate({ contentItems, config }: ValidateContentOptions) {
             errors.push(...validationErrors);
         }
     });
+    const valid = _.isEmpty(errors);
     return {
-        valid: _.isEmpty(errors),
+        valid,
         errors
     };
 }
