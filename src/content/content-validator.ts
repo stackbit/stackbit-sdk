@@ -4,7 +4,7 @@ import { ContentItem } from './content-loader';
 import { Config } from '../config/config-loader';
 import { joiSchemasForModels } from './content-schema';
 import { ContentValidationError } from './content-errors';
-import { getModelByName, isConfigModel } from '../schema-utils';
+import { getModelByName, isConfigModel, isPageModel } from '../schema-utils';
 import Joi from 'joi';
 
 interface ValidateContentOptions {
@@ -34,13 +34,20 @@ export function validate({ contentItems, config }: ValidateContentOptions) {
         };
 
         const model = getModelByName(modelName, config.models);
-        if (model && isConfigModel(model)) {
-            if (config.ssgName === 'unibit') {
-                // in Unibit, config model defines the model of the params
-                modelSchema = Joi.object({ params: modelSchema });
+        if (model) {
+            if (isConfigModel(model)) {
+                if (config.ssgName === 'unibit') {
+                    // in Unibit, config model defines the model of the params
+                    modelSchema = Joi.object({ params: modelSchema });
+                }
+                // in config models allow skip root fields
+                modelSchema = modelSchema.unknown();
+            } else if (isPageModel(model)) {
+                if (config.ssgName === 'unibit') {
+                    // in Unibit, every page has implicit layout field which must be equal to model name
+                    modelSchema = modelSchema.keys({ layout: Joi.string().valid(modelName).required() });
+                }
             }
-            // in config models allow skip root fields
-            modelSchema = modelSchema.unknown();
         }
 
         const validationResult = modelSchema.validate(_.omit(contentItem, '__metadata'), validationOptions);
