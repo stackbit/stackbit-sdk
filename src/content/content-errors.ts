@@ -81,12 +81,14 @@ export class IllegalModelField extends Error {
 
 export class ContentValidationError extends Error {
     type: string;
+    modelName: string;
     filePath: string;
     value: any;
     fieldPath: FieldPath;
-    constructor({ type, message, filePath, value, fieldPath }: { type: string; message: string; filePath: string; value: any; fieldPath: FieldPath }) {
+    constructor({ type, message, modelName, filePath, value, fieldPath }: { type: string, message: string; modelName: string, filePath: string; value: any; fieldPath: FieldPath }) {
         super(message);
         this.type = type;
+        this.modelName = modelName;
         this.filePath = filePath;
         this.fieldPath = fieldPath;
         this.value = value;

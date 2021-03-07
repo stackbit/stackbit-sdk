@@ -49,6 +49,7 @@ export function validate({ contentItems, config }: ValidateContentOptions) {
                 type: validationError.type,
                 message: validationError.message,
                 fieldPath: validationError.path,
+                modelName: modelName,
                 value: validationError.context?.value,
                 filePath: contentItem.__metadata.filePath
             });
