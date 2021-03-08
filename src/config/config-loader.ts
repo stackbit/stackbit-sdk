@@ -11,6 +11,7 @@ import {
     ConfigValidationError
 } from './config-validator';
 import { Field, YamlConfigModel, YamlDataModel, YamlModel, YamlObjectModel, YamlPageModel, YamlConfig } from './config-schema';
+import { isPageModel } from '../schema-utils';
 
 interface LoadConfigOptions {
     dirPath: string;
@@ -139,7 +140,7 @@ function normalizeConfig(validationResult: ConfigValidationResult): Config {
             if (invalidModelNames.includes(modelName)) {
                 model.invalid = true;
             }
-            if (model.type === 'page' && !model.hideContent && model.fields) {
+            if (isPageModel(model) && !model.hideContent && model.fields) {
                 model.fields.push({
                     type: 'markdown',
                     name: 'markdown_content',
