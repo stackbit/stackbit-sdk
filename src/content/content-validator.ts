@@ -17,14 +17,14 @@ export function validate({ contentItems, config }: ValidateContentOptions) {
 
     const joiModelSchemas = joiSchemasForModels(config.models);
 
-    _.forEach(contentItems, (contentItem) => {
+    const value = _.map(contentItems, (contentItem) => {
         const modelName = contentItem.__metadata.modelName;
         if (!modelName) {
-            return;
+            return contentItem;
         }
         let modelSchema = joiModelSchemas[modelName];
         if (!modelSchema) {
-            return;
+            return contentItem;
         }
         const validationOptions = {
             abortEarly: false,
@@ -48,9 +48,15 @@ export function validate({ contentItems, config }: ValidateContentOptions) {
                     modelSchema = modelSchema.keys({ layout: Joi.string().valid(modelName).required() });
                 }
             }
+            modelSchema = modelSchema.keys({
+                __metadata: Joi.object({
+                    filePath: Joi.string().required(),
+                    modelName: Joi.string().valid(model.name).required()
+                }).required()
+            });
         }
 
-        const validationResult = modelSchema.validate(_.omit(contentItem, '__metadata'), validationOptions);
+        const validationResult = modelSchema.validate(contentItem, validationOptions);
         const validationErrors = validationResult.error?.details.map((validationError) => {
             return new ContentValidationError({
                 type: validationError.type,
@@ -64,9 +70,11 @@ export function validate({ contentItems, config }: ValidateContentOptions) {
         if (validationErrors) {
             errors.push(...validationErrors);
         }
+        return validationResult.value;
     });
     const valid = _.isEmpty(errors);
     return {
+        value,
         valid,
         errors
     };

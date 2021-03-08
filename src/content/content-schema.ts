@@ -184,7 +184,7 @@ const FieldSchemas: { [fieldType in keyof FieldPropsByType]: (field: FieldPropsB
         const childFieldPath = fieldPath.concat('fields');
         return joiSchemaForModelFields(field.fields, childFieldPath);
     },
-    model: (field, fieldPath: FieldPath) => {
+    model: (field) => {
         if (field.models.length === 0) {
             return Joi.any().forbidden();
         }
@@ -195,6 +195,9 @@ const FieldSchemas: { [fieldType in keyof FieldPropsByType]: (field: FieldPropsB
                 .ref(`#${modelName}_model_schema`)
                 .concat(
                     Joi.object({
+                        __metadata: Joi.object().default({
+                            modelName: modelName
+                        }),
                         type: typeSchema
                     })
                 );
@@ -210,6 +213,9 @@ const FieldSchemas: { [fieldType in keyof FieldPropsByType]: (field: FieldPropsB
                                 .ref(`#${modelName}_model_schema`)
                                 .concat(
                                     Joi.object({
+                                        __metadata: Joi.object().default({
+                                            modelName: modelName
+                                        }),
                                         type: Joi.string()
                                     })
                                 )

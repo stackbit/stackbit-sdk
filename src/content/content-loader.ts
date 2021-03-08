@@ -58,7 +58,7 @@ export async function loadContent({ dirPath, config, skipUnmodeledContent }: Loa
     const contentItems = _.concat(dataItems, pageItems);
     const validationResult = validate({ contentItems, config });
     return {
-        contentItems: contentItems,
+        contentItems: validationResult.value,
         errors: _.concat(dataErrors, pageErrors, validationResult.errors)
     };
 }
