@@ -4,7 +4,7 @@ import { stackbitConfigSchema } from './config-schema';
 export interface ConfigValidationError {
     type: string;
     message: string;
-    path: (string | number)[];
+    fieldPath: (string | number)[];
     value?: any
 }
 
@@ -23,7 +23,7 @@ export function validate(config: any): ConfigValidationResult {
         return {
             type: validationError.type,
             message: validationError.message,
-            path: validationError.path,
+            fieldPath: validationError.path,
             value: validationError.context?.value
         };
     });

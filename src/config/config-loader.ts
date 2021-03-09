@@ -31,12 +31,17 @@ export interface Config extends Omit<YamlConfig, 'models'> {
     models: Model[];
 }
 
+export interface ConfigValidatorNormalizedError extends ConfigValidationError {
+    normFieldPath: (string | number)[];
+}
+
 export async function loadConfig({ dirPath }: LoadConfigOptions) {
     let config;
     try {
         config = await loadConfigFromDir(dirPath);
     } catch (error) {
         return {
+            valid: false,
             config: null,
             errors: [{ message: 'Error loading Stackbit configuration', details: error }]
         };
@@ -44,6 +49,7 @@ export async function loadConfig({ dirPath }: LoadConfigOptions) {
 
     if (!config) {
         return {
+            valid: false,
             config: null,
             errors: [
                 {
@@ -53,10 +59,12 @@ export async function loadConfig({ dirPath }: LoadConfigOptions) {
         };
     }
     const validationResult = validate(config);
-    const normalizedConfig = normalizeConfig(validationResult); // @Simon: There's no reason to believe this would work. We didn't even check if it's valid.
+    const normalizedConfig = normalizeConfig(validationResult);
+    const normalizedErrors = normalizeErrors(normalizedConfig, validationResult.errors)
     return {
+        valid: validationResult.valid,
         config: normalizedConfig,
-        errors: validationResult.errors
+        errors: normalizedErrors
     };
 }
 
@@ -119,8 +127,8 @@ function normalizeConfig(validationResult: ConfigValidationResult): Config {
     const config = _.cloneDeep(validationResult.value);
 
     const invalidModelNames = _.reduce(validationResult.errors, (modelNames: string[], error: ConfigValidationError) => {
-        if (error.path[0] === 'models' && typeof error.path[1] == 'string') {
-            const modelName = error.path[1];
+        if (error.fieldPath[0] === 'models' && typeof error.fieldPath[1] == 'string') {
+            const modelName = error.fieldPath[1];
             modelNames.push(modelName);
         }
         return modelNames;
@@ -169,4 +177,23 @@ function normalizeConfig(validationResult: ConfigValidationResult): Config {
         ...config,
         models: models
     };
+}
+
+function normalizeErrors(config: Config, errors: ConfigValidationError[]): ConfigValidatorNormalizedError[] {
+    return _.map(errors, (error: ConfigValidationError) => {
+        if (error.fieldPath[0] === 'models' && typeof error.fieldPath[1] == 'string') {
+            const modelName = error.fieldPath[1];
+            const modelIndex = _.findIndex(config.models, {name: modelName});
+            const normFieldPath = error.fieldPath.slice();
+            normFieldPath[1] = modelIndex;
+            return {
+                ...error,
+                normFieldPath
+            };
+        }
+        return {
+            ...error,
+            normFieldPath: error.fieldPath
+        };
+    });
 }

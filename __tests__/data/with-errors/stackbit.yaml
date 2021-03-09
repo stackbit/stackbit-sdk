@@ -1,0 +1,31 @@
+stackbitVersion: ~0.3.0
+ssgName: jekyll
+dataDir: null
+pagesDir: null
+models:
+  page:
+    type: page
+    label: Page
+    fields:
+      - type: invalid_type
+        name: field_name
+      - type: string
+        label: No name
+  post:
+    type: page
+    label: Post
+    fields:
+      - type: object
+        name: object_field
+        fields:
+          - type: string
+            name: nested_field_name
+            illegal: field
+      - type: list
+        name: list_field
+        items:
+          type: object
+          fields:
+            - type: string
+              name: nested_field_name
+              illegal: field

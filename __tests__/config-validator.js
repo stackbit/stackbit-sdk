@@ -12,7 +12,7 @@ test('invalid ssgName validation', () => {
         { ssgName: 'invalid' },
         {
             type: 'any.only',
-            path: ['ssgName'],
+            fieldPath: ['ssgName'],
             message: expect.stringContaining('"ssgName" must be one of')
         }
     );
@@ -63,7 +63,7 @@ describe('assets with "static" referenceType require "staticDir" and "publicPath
             }
         }, {
             type: 'any.required',
-            path: ['assets', 'staticDir']
+            fieldPath: ['assets', 'staticDir']
         });
     });
 
@@ -75,7 +75,7 @@ describe('assets with "static" referenceType require "staticDir" and "publicPath
             }
         }, {
             type: 'any.required',
-            path: ['assets', 'publicPath']
+            fieldPath: ['assets', 'publicPath']
         });
     });
 });
@@ -97,7 +97,7 @@ describe('assets with "relative" referenceType require "assetsDir" property', ()
             }
         }, {
             type: 'any.required',
-            path: ['assets', 'assetsDir']
+            fieldPath: ['assets', 'assetsDir']
         });
     });
 });
@@ -116,16 +116,16 @@ describe('mutual exclusive properties with api-based cms', () => {
         [
             { cmsName: 'contentful', staticDir: '', uploadDir: '' },
             [
-                { type: 'any.unknown', path: ['staticDir'] },
-                { type: 'any.unknown', path: ['uploadDir'] }
+                { type: 'any.unknown', fieldPath: ['staticDir'] },
+                { type: 'any.unknown', fieldPath: ['uploadDir'] }
             ]
         ],
         [
             { cmsName: 'sanity', pagesDir: '', dataDir: '', excludePages: [] },
             [
-                { type: 'any.unknown', path: ['pagesDir'] },
-                { type: 'any.unknown', path: ['dataDir'] },
-                { type: 'any.unknown', path: ['excludePages'] }
+                { type: 'any.unknown', fieldPath: ['pagesDir'] },
+                { type: 'any.unknown', fieldPath: ['dataDir'] },
+                { type: 'any.unknown', fieldPath: ['excludePages'] }
             ]
         ]
     ])('api-based CMS with file-based schema properties should fail validation', (config, expectedErrors) => {

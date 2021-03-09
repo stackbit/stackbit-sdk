@@ -46,7 +46,7 @@ describe('model fields base rules', () => {
             [
                 {
                     type: 'field.name.unique',
-                    path: ['models', 'button', 'fields', 1],
+                    fieldPath: ['models', 'button', 'fields', 1],
                     message: '"models.button.fields[1]" contains a duplicate field name "label"'
                 }
             ]
@@ -72,7 +72,7 @@ describe('model fields base rules', () => {
             [
                 {
                     type: 'string.pattern.base',
-                    path: ['models', 'button', 'fields', 0, 'name'],
+                    fieldPath: ['models', 'button', 'fields', 0, 'name'],
                     message: 'Invalid field name "_label" at "models.button.fields[0].name". A field name must contain only alphanumeric characters, hyphens and underscores, must start and end with an alphanumeric character.'
                 }
             ]
@@ -98,7 +98,7 @@ describe('enum field', () => {
             },
             [{
                 type: 'object.unknown',
-                path: ['models', 'button', 'fields', 0, 'options'],
+                fieldPath: ['models', 'button', 'fields', 0, 'options'],
                 message: 'models.button.fields[0].options is not allowed'
             }]
         );
@@ -117,7 +117,7 @@ describe('enum field', () => {
             [
                 {
                     type: 'any.required',
-                    path: ['models', 'button', 'fields', 0, 'options'],
+                    fieldPath: ['models', 'button', 'fields', 0, 'options'],
                     message: 'models.button.fields[0].options is required'
                 }
             ]
@@ -138,7 +138,7 @@ describe('enum field', () => {
             [
                 {
                     type: 'alternatives.types',
-                    path: ['models', 'button', 'fields', 0, 'options'],
+                    fieldPath: ['models', 'button', 'fields', 0, 'options'],
                     message: 'models.button.fields[0].options must be an array of strings or numbers, or array of objects with label and value properties'
                 }
             ]
@@ -176,7 +176,7 @@ describe('number field', () => {
             },
             [{
                 type: 'object.unknown',
-                path: ['models', 'button', 'fields', 0, 'subtype'],
+                fieldPath: ['models', 'button', 'fields', 0, 'subtype'],
                 message: 'models.button.fields[0].subtype is not allowed'
             }]
         );
@@ -196,7 +196,7 @@ describe('number field', () => {
             [
                 {
                     type: 'any.only',
-                    path: ['models', 'button', 'fields', 0, 'subtype'],
+                    fieldPath: ['models', 'button', 'fields', 0, 'subtype'],
                     message: 'models.button.fields[0].subtype must be one of [int, float]'
                 }
             ]
@@ -232,7 +232,7 @@ describe('object field', () => {
             [
                 {
                     type: 'any.required',
-                    path: ['models', 'button', 'fields', 0, 'fields'],
+                    fieldPath: ['models', 'button', 'fields', 0, 'fields'],
                     message: 'models.button.fields[0].fields is required'
                 }
             ]
@@ -268,7 +268,7 @@ describe('object field', () => {
             },
             [{
                 type: 'object.unknown',
-                path: ['models', 'button', 'fields', 0, 'fields'],
+                fieldPath: ['models', 'button', 'fields', 0, 'fields'],
                 message: 'models.button.fields[0].fields is not allowed'
             }]
         );
@@ -289,7 +289,7 @@ describe('object field', () => {
             },
             [{
                 type: 'object.unknown',
-                path: ['models', 'button', 'fields', 0, 'labelField'],
+                fieldPath: ['models', 'button', 'fields', 0, 'labelField'],
                 message: 'models.button.fields[0].labelField is not allowed'
             }]
         );
@@ -308,7 +308,7 @@ describe('object field', () => {
                 ]
             },
             [
-                { type: 'any.only', path: ['models', 'button', 'fields', 0, 'labelField'] }
+                { type: 'any.only', fieldPath: ['models', 'button', 'fields', 0, 'labelField'] }
             ]
         );
     });
@@ -328,7 +328,7 @@ describe('object field', () => {
             [
                 {
                     type: 'any.only',
-                    path: ['models', 'button', 'fields', 0, 'labelField'],
+                    fieldPath: ['models', 'button', 'fields', 0, 'labelField'],
                     message: '"models.button.fields[0].labelField" must be one of model field names, got "illegalField"'
                 }
             ]
@@ -392,7 +392,7 @@ describe('object field', () => {
             [
                 {
                     type: 'any.required',
-                    path: ['models', 'button', 'fields', 0, 'fields', 0, 'fields', 0, 'name'],
+                    fieldPath: ['models', 'button', 'fields', 0, 'fields', 0, 'fields', 0, 'name'],
                     message: 'models.button.fields[0].fields[0].fields[0].name is required'
                 }
             ]
@@ -419,7 +419,7 @@ describe('object field', () => {
             [
                 {
                     type: 'object.base',
-                    path: ['models', 'button', 'fields', 0, 'fields', 0, 'items'],
+                    fieldPath: ['models', 'button', 'fields', 0, 'fields', 0, 'items'],
                     message: 'models.button.fields[0].fields[0].items must be of type object'
                 }
             ]
@@ -444,7 +444,7 @@ describe('list field', () => {
             },
             [{
                 type: 'object.unknown',
-                path: ['models', 'button', 'fields', 0, 'items'],
+                fieldPath: ['models', 'button', 'fields', 0, 'items'],
                 message: 'models.button.fields[0].items is not allowed'
             }]
         );
@@ -467,7 +467,7 @@ describe('list field', () => {
             [
                 {
                     type: 'object.unknown',
-                    path: ['models', 'button', 'fields', 0, 'items', 'name'],
+                    fieldPath: ['models', 'button', 'fields', 0, 'items', 'name'],
                     message: 'models.button.fields[0].items.name is not allowed'
                 }
             ]
@@ -493,7 +493,7 @@ describe('list field', () => {
             [
                 {
                     type: 'any.required',
-                    path: ['models', 'button', 'fields', 0, 'items', 'fields', 0, 'name'],
+                    fieldPath: ['models', 'button', 'fields', 0, 'items', 'fields', 0, 'name'],
                     message: 'models.button.fields[0].items.fields[0].name is required'
                 }
             ]
@@ -522,7 +522,7 @@ describe('list field', () => {
             [
                 {
                     type: 'string.pattern.base',
-                    path: ['models', 'button', 'fields', 0, 'items', 'fields', 0, 'name'],
+                    fieldPath: ['models', 'button', 'fields', 0, 'items', 'fields', 0, 'name'],
                     message: 'Invalid field name "_legal_name" at "models.button.fields[0].items.fields[0].name". A field name must contain only alphanumeric characters, hyphens and underscores, must start and end with an alphanumeric character.'
                 }
             ]
@@ -548,7 +548,7 @@ describe('model and reference fields', () => {
             },
             [{
                 type: 'object.unknown',
-                path: ['models', 'button', 'fields', 0, 'models'],
+                fieldPath: ['models', 'button', 'fields', 0, 'models'],
                 message: 'models.button.fields[0].models is not allowed'
             }]
         );
@@ -566,7 +566,7 @@ describe('model and reference fields', () => {
             },
             [{
                 type: 'any.required',
-                path: ['models', 'button', 'fields', 0, 'models'],
+                fieldPath: ['models', 'button', 'fields', 0, 'models'],
                 message: 'models.button.fields[0].models is required'
             }]
         );
@@ -603,7 +603,7 @@ describe('model and reference fields', () => {
             },
             [{
                 type: 'model.name.of.object.models',
-                path: ['models', 'button', 'fields', 0, 'models', 0],
+                fieldPath: ['models', 'button', 'fields', 0, 'models', 0],
                 message: '"models.button.fields[0].models[0]" must reference the name of an existing model of type "object", got "no_such_model"'
             }],
         );
@@ -628,7 +628,7 @@ describe('model and reference fields', () => {
             },
             [{
                 type: 'model.name.of.document.models',
-                path: ['models', 'button', 'fields', 0, 'models', 0],
+                fieldPath: ['models', 'button', 'fields', 0, 'models', 0],
                 message: '"models.button.fields[0].models[0]" must reference the name of an existing model of type "page" or "data", got "no_such_model"'
             }],
         );
@@ -657,7 +657,7 @@ describe('model and reference fields', () => {
             },
             [{
                 type: 'model.name.of.object.models',
-                path: ['models', 'button', 'fields', 0, 'models', 0],
+                fieldPath: ['models', 'button', 'fields', 0, 'models', 0],
                 message: '"models.button.fields[0].models[0]" must reference the name of an existing model of type "object", got "post"'
             }],
         );
@@ -686,7 +686,7 @@ describe('model and reference fields', () => {
             },
             [{
                 type: 'model.name.of.document.models',
-                path: ['models', 'button', 'fields', 0, 'models', 0],
+                fieldPath: ['models', 'button', 'fields', 0, 'models', 0],
                 message: '"models.button.fields[0].models[0]" must reference the name of an existing model of type "page" or "data", got "style"'
             }],
         );

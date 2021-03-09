@@ -18,7 +18,7 @@ describe('model names', () => {
             [
                 {
                     type: 'model.name.pattern.match',
-                    path: ['models', '_post'],
+                    fieldPath: ['models', '_post'],
                     message: expect.stringContaining('Invalid model name "_post" at "models._post"')
                 }
             ]
@@ -34,7 +34,7 @@ describe('model "type" must be valid', () => {
             [
                 {
                     type: 'any.required',
-                    path: ['models', 'post', 'type'],
+                    fieldPath: ['models', 'post', 'type'],
                     message: 'models.post.type is required'
                 }
             ]
@@ -47,7 +47,7 @@ describe('model "type" must be valid', () => {
             [
                 {
                     type: 'any.only',
-                    path: ['models', 'post', 'type'],
+                    fieldPath: ['models', 'post', 'type'],
                     message: 'models.post.type must be one of [page, data, config, object]'
                 }
             ]
@@ -77,7 +77,7 @@ describe('model "label" property is required', () => {
             [
                 {
                     type: 'any.required',
-                    path: ['models', 'author', 'label'],
+                    fieldPath: ['models', 'author', 'label'],
                     message: 'models.author.label is required'
                 }
             ]
@@ -112,7 +112,7 @@ describe('model "extends" property references existing "object" model', () => {
             [
                 {
                     type: 'model.name.of.object.models',
-                    path: ['models', 'author', 'extends'],
+                    fieldPath: ['models', 'author', 'extends'],
                     message: '"models.author.extends" must reference the name of an existing model of type "object", got "person"'
                 }
             ]
@@ -137,7 +137,7 @@ describe('model "extends" property references existing "object" model', () => {
             [
                 {
                     type: 'model.name.of.object.models',
-                    path: ['models', 'author', 'extends'],
+                    fieldPath: ['models', 'author', 'extends'],
                     message: '"models.author.extends" must reference the name of an existing model of type "object", got "post"'
                 }
             ]
@@ -177,7 +177,7 @@ describe('"object" model "labelField" property references one of the model field
             [
                 {
                     type: 'any.only',
-                    path: ['models', 'author', 'labelField'],
+                    fieldPath: ['models', 'author', 'labelField'],
                     message: '"models.author.labelField" must be one of model field names, got "illegalField"'
                 }
             ]
@@ -199,7 +199,7 @@ describe('"object" model "labelField" property references one of the model field
             [
                 {
                     type: 'any.only',
-                    path: ['models', 'author', 'labelField'],
+                    fieldPath: ['models', 'author', 'labelField'],
                     message: '"models.author.labelField" must be one of model field names, got "illegalField"'
                 }
             ]
@@ -237,9 +237,9 @@ describe('"data" model with "file" property', () => {
                 }
             },
             [
-                { type: 'model.file.only', path: ['models', 'author', 'folder'], message: 'models.author.folder can not be used with "file"' },
-                { type: 'model.file.only', path: ['models', 'author', 'match'], message: 'models.author.match can not be used with "file"' },
-                { type: 'model.file.only', path: ['models', 'author', 'exclude'], message: 'models.author.exclude can not be used with "file"' }
+                { type: 'model.file.only', fieldPath: ['models', 'author', 'folder'], message: 'models.author.folder can not be used with "file"' },
+                { type: 'model.file.only', fieldPath: ['models', 'author', 'match'], message: 'models.author.match can not be used with "file"' },
+                { type: 'model.file.only', fieldPath: ['models', 'author', 'exclude'], message: 'models.author.exclude can not be used with "file"' }
             ]
         );
     });
@@ -277,7 +277,7 @@ describe('"data" model with "file" property', () => {
             [
                 {
                     type: 'object.unknown',
-                    path: ['models', 'author', 'fields', 0, 'labelField'],
+                    fieldPath: ['models', 'author', 'fields', 0, 'labelField'],
                     message: 'models.author.fields[0].labelField is not allowed'
                 }
             ]
@@ -316,7 +316,7 @@ describe('"data" model with "isList: true"', () => {
             [
                 {
                     type: 'model.isList.items.required',
-                    path: ['models', 'author', 'items'],
+                    fieldPath: ['models', 'author', 'items'],
                     message: 'models.author.items is required when "isList" is true'
                 }
             ]
@@ -338,7 +338,7 @@ describe('"data" model with "isList: true"', () => {
             [
                 {
                     type: 'model.items.forbidden',
-                    path: ['models', 'author', 'items'],
+                    fieldPath: ['models', 'author', 'items'],
                     message: 'models.author.items is not allowed when "isList" is not true'
                 }
             ]
@@ -365,7 +365,7 @@ describe('"data" model with "isList: true"', () => {
             [
                 {
                     type: 'model.isList.fields.forbidden',
-                    path: ['models', 'author', 'fields'],
+                    fieldPath: ['models', 'author', 'fields'],
                     message: 'models.author.fields is not allowed when "isList" is true'
                 }
             ]
@@ -407,7 +407,7 @@ describe('"data" model with "isList: true"', () => {
             [
                 {
                     type: 'object.unknown',
-                    path: ['models', 'author', 'items', 'fieldLabel'],
+                    fieldPath: ['models', 'author', 'items', 'fieldLabel'],
                     message: 'models.author.items.fieldLabel is not allowed'
                 }
             ]
@@ -432,7 +432,7 @@ describe('"data" model with "isList: true"', () => {
             [
                 {
                     type: 'any.required',
-                    path: ['models', 'author', 'items', 'options'],
+                    fieldPath: ['models', 'author', 'items', 'options'],
                     message: 'models.author.items.options is required'
                 }
             ]
@@ -456,7 +456,7 @@ describe('"page" model "file" and "singleInstance" properties are mutual exclusi
             [
                 {
                     type: 'any.required',
-                    path: ['models', 'post', 'singleInstance'],
+                    fieldPath: ['models', 'post', 'singleInstance'],
                     message: 'models.post.singleInstance is required'
                 }
             ]
@@ -477,7 +477,7 @@ describe('"page" model "file" and "singleInstance" properties are mutual exclusi
             [
                 {
                     type: 'any.required',
-                    path: ['models', 'post', 'file'],
+                    fieldPath: ['models', 'post', 'file'],
                     message: 'models.post.file is required'
                 }
             ]
@@ -515,7 +515,7 @@ describe('"page" model "file" and "singleInstance" properties are mutual exclusi
         }, [
             {
                 type: 'object.unknown',
-                path: ['models', 'post', 'fields', 0, 'labelField'],
+                fieldPath: ['models', 'post', 'fields', 0, 'labelField'],
                 message: 'models.post.fields[0].labelField is not allowed'
             }
         ]);
@@ -537,9 +537,9 @@ describe('"page" model "file" and "singleInstance" properties are mutual exclusi
                 }
             },
             [
-                { type: 'model.file.only', path: ['models', 'post', 'folder'], message: 'models.post.folder can not be used with "file"' },
-                { type: 'model.file.only', path: ['models', 'post', 'match'], message: 'models.post.match can not be used with "file"' },
-                { type: 'model.file.only', path: ['models', 'post', 'exclude'], message: 'models.post.exclude can not be used with "file"' }
+                { type: 'model.file.only', fieldPath: ['models', 'post', 'folder'], message: 'models.post.folder can not be used with "file"' },
+                { type: 'model.file.only', fieldPath: ['models', 'post', 'match'], message: 'models.post.match can not be used with "file"' },
+                { type: 'model.file.only', fieldPath: ['models', 'post', 'exclude'], message: 'models.post.exclude can not be used with "file"' }
             ]
         );
     });
