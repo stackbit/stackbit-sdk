@@ -315,8 +315,7 @@ const listFieldPartialSchema = Joi.object({
     items: listItemsSchema
 });
 
-const partialFieldWithListSchema = partialFieldSchema
-    .when('.type', { is: 'list', then: listFieldPartialSchema })
+const partialFieldWithListSchema = partialFieldSchema.when('.type', { is: 'list', then: listFieldPartialSchema });
 
 const fieldSchema: Joi.ObjectSchema<Field> = fieldCommonPropsSchema.concat(partialFieldWithListSchema);
 
@@ -381,16 +380,17 @@ export interface BaseDataModelMatchList extends Omit<BaseDataModel, 'fields'>, B
 
 export type YamlDataModel = StricterUnion<BaseDataModelFileSingle | BaseDataModelFileList | BaseDataModelMatchSingle | BaseDataModelMatchList>;
 
-const dataModelSchema: Joi.ObjectSchema<YamlDataModel> = baseModelSchema.concat(
-    Joi.object({
-        type: Joi.string().valid('data').required(),
-        file: Joi.string(),
-        folder: Joi.string(),
-        match: Joi.array().items(Joi.string()).single(),
-        exclude: Joi.array().items(Joi.string()).single(),
-        isList: Joi.boolean()
-    })
-)
+const dataModelSchema: Joi.ObjectSchema<YamlDataModel> = baseModelSchema
+    .concat(
+        Joi.object({
+            type: Joi.string().valid('data').required(),
+            file: Joi.string(),
+            folder: Joi.string(),
+            match: Joi.array().items(Joi.string()).single(),
+            exclude: Joi.array().items(Joi.string()).single(),
+            isList: Joi.boolean()
+        })
+    )
     .when('.isList', {
         is: true,
         then: Joi.object({
@@ -437,20 +437,21 @@ export interface PageModelMatch extends BasePageModel, BaseMatch {
 
 export type YamlPageModel = StricterUnion<PageModelSingle | PageModelMatch>;
 
-const pageModelSchema: Joi.ObjectSchema<YamlPageModel> = baseModelSchema.concat(
-    Joi.object({
-        type: Joi.string().valid('page').required(),
-        layout: Joi.string().when(Joi.ref('/pageLayoutKey'), { is: Joi.exist(), then: Joi.required() }),
-        urlPath: Joi.string(),
-        filePath: Joi.string(),
-        singleInstance: Joi.boolean(),
-        file: Joi.string(),
-        folder: Joi.string(),
-        match: Joi.array().items(Joi.string()).single(),
-        exclude: Joi.array().items(Joi.string()).single(),
-        hideContent: Joi.boolean()
-    })
-)
+const pageModelSchema: Joi.ObjectSchema<YamlPageModel> = baseModelSchema
+    .concat(
+        Joi.object({
+            type: Joi.string().valid('page').required(),
+            layout: Joi.string().when(Joi.ref('/pageLayoutKey'), { is: Joi.exist(), then: Joi.required() }),
+            urlPath: Joi.string(),
+            filePath: Joi.string(),
+            singleInstance: Joi.boolean(),
+            file: Joi.string(),
+            folder: Joi.string(),
+            match: Joi.array().items(Joi.string()).single(),
+            exclude: Joi.array().items(Joi.string()).single(),
+            hideContent: Joi.boolean()
+        })
+    )
     .when('.file', {
         is: Joi.exist(),
         then: {

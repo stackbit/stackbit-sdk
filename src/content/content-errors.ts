@@ -85,7 +85,21 @@ export class ContentValidationError extends Error {
     filePath: string;
     value: any;
     fieldPath: FieldPath;
-    constructor({ type, message, modelName, filePath, value, fieldPath }: { type: string, message: string; modelName: string, filePath: string; value: any; fieldPath: FieldPath }) {
+    constructor({
+        type,
+        message,
+        modelName,
+        filePath,
+        value,
+        fieldPath
+    }: {
+        type: string;
+        message: string;
+        modelName: string;
+        filePath: string;
+        value: any;
+        fieldPath: FieldPath;
+    }) {
         super(message);
         this.type = type;
         this.modelName = modelName;

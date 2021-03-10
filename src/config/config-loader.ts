@@ -5,11 +5,7 @@ import _ from 'lodash';
 import { extendModels, iterateModelFieldsRecursively, isListField } from '@stackbit/schema';
 import { StricterUnion } from '../utils';
 
-import {
-    validate,
-    ConfigValidationResult,
-    ConfigValidationError
-} from './config-validator';
+import { validate, ConfigValidationResult, ConfigValidationError } from './config-validator';
 import { Field, YamlConfigModel, YamlDataModel, YamlModel, YamlObjectModel, YamlPageModel, YamlConfig } from './config-schema';
 import { isPageModel } from '../schema-utils';
 
@@ -60,7 +56,7 @@ export async function loadConfig({ dirPath }: LoadConfigOptions) {
     }
     const validationResult = validate(config);
     const normalizedConfig = normalizeConfig(validationResult);
-    const normalizedErrors = normalizeErrors(normalizedConfig, validationResult.errors)
+    const normalizedErrors = normalizeErrors(normalizedConfig, validationResult.errors);
     return {
         valid: validationResult.valid,
         config: normalizedConfig,
@@ -126,13 +122,17 @@ async function loadConfigFromDotStackbit(dirPath: string) {
 function normalizeConfig(validationResult: ConfigValidationResult): Config {
     const config = _.cloneDeep(validationResult.value);
 
-    const invalidModelNames = _.reduce(validationResult.errors, (modelNames: string[], error: ConfigValidationError) => {
-        if (error.fieldPath[0] === 'models' && typeof error.fieldPath[1] == 'string') {
-            const modelName = error.fieldPath[1];
-            modelNames.push(modelName);
-        }
-        return modelNames;
-    }, []);
+    const invalidModelNames = _.reduce(
+        validationResult.errors,
+        (modelNames: string[], error: ConfigValidationError) => {
+            if (error.fieldPath[0] === 'models' && typeof error.fieldPath[1] == 'string') {
+                const modelName = error.fieldPath[1];
+                modelNames.push(modelName);
+            }
+            return modelNames;
+        },
+        []
+    );
 
     // in stackbit.yaml 'models' are defined as object where keys are model names,
     // convert 'models' to array of objects while 'name' property set to the
@@ -183,7 +183,7 @@ function normalizeErrors(config: Config, errors: ConfigValidationError[]): Confi
     return _.map(errors, (error: ConfigValidationError) => {
         if (error.fieldPath[0] === 'models' && typeof error.fieldPath[1] == 'string') {
             const modelName = error.fieldPath[1];
-            const modelIndex = _.findIndex(config.models, {name: modelName});
+            const modelIndex = _.findIndex(config.models, { name: modelName });
             const normFieldPath = error.fieldPath.slice();
             normFieldPath[1] = modelIndex;
             return {

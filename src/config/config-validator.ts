@@ -5,13 +5,13 @@ export interface ConfigValidationError {
     type: string;
     message: string;
     fieldPath: (string | number)[];
-    value?: any
+    value?: any;
 }
 
 export interface ConfigValidationResult {
     value: any;
     valid: boolean;
-    errors: ConfigValidationError[]
+    errors: ConfigValidationError[];
 }
 
 export function validate(config: any): ConfigValidationResult {
@@ -19,14 +19,16 @@ export function validate(config: any): ConfigValidationResult {
     const validationResult = stackbitConfigSchema.validate(config, validationOptions);
     const value = validationResult.value;
     const joiErrors = validationResult.error?.details || [];
-    const errors = joiErrors.map((validationError): ConfigValidationError => {
-        return {
-            type: validationError.type,
-            message: validationError.message,
-            fieldPath: validationError.path,
-            value: validationError.context?.value
-        };
-    });
+    const errors = joiErrors.map(
+        (validationError): ConfigValidationError => {
+            return {
+                type: validationError.type,
+                message: validationError.message,
+                fieldPath: validationError.path,
+                value: validationError.context?.value
+            };
+        }
+    );
     const valid = _.isEmpty(errors);
     return {
         value,
