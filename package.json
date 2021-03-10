@@ -7,6 +7,8 @@
     "scripts": {
         "test": "jest",
         "build": "tsc",
+        "prettier": "prettier --write src",
+        "prepack": "npm test && npm run build",
         "version-minor": "npm version minor -m \"bumped version to v%s\"",
         "version-patch": "npm version patch -m \"bumped version to v%s\""
     },
@@ -24,7 +26,7 @@
         "schema"
     ],
     "author": "Stackbit Inc.",
-    "license": "ISC",
+    "license": "MIT",
     "bugs": {
         "url": "https://github.com/stackbit/stackbit-sdk/issues"
     },

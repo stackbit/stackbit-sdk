@@ -6,7 +6,7 @@ import { parseFile, readDirRecursively, forEachPromise, findPromise } from '@sta
 import { getModelsByQuery } from '@stackbit/schema';
 
 import { ConfigModel, Model, Config } from '../config/config-loader';
-import { FileNotMatchedModel, FileMatchedMultipleModels, FileReadError, FileForModelNotFound, FolderReadError } from './content-errors';
+import { FileNotMatchedModelError, FileMatchedMultipleModelsError, FileReadError, FileForModelNotFoundError, FolderReadError } from './content-errors';
 import { isConfigModel, isDataModel, isPageModel } from '../schema-utils';
 import { validate } from './content-validator';
 
@@ -189,7 +189,7 @@ async function loadDataItemForConfigModel(dirPath: string, configModel: ConfigMo
     }
     if (!filePath) {
         return {
-            error: new FileForModelNotFound({ modelName: configModel.name })
+            error: new FileForModelNotFoundError({ modelName: configModel.name })
         };
     }
     const extension = path.extname(filePath).substring(1);
@@ -289,9 +289,9 @@ async function loadContentItems({
             contentItems.push(modeledDataItem(filePathRelativeToProject, matchedModels[0], data));
         } else {
             if (matchedModels.length === 0) {
-                errors.push(new FileNotMatchedModel({ filePath: filePathRelativeToProject }));
+                errors.push(new FileNotMatchedModelError({ filePath: filePathRelativeToProject }));
             } else {
-                errors.push(new FileMatchedMultipleModels({ filePath: filePathRelativeToProject, modelNames: _.map(matchedModels, 'name') }));
+                errors.push(new FileMatchedMultipleModelsError({ filePath: filePathRelativeToProject, modelNames: _.map(matchedModels, 'name') }));
             }
             if (!skipUnmodeledContent) {
                 contentItems.push(unmodeledDataItem(filePathRelativeToProject, data));

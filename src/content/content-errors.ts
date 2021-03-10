@@ -7,7 +7,7 @@ export class CustomError extends Error {
     }
 }
 
-export class FileNotMatchedModel extends Error {
+export class FileNotMatchedModelError extends Error {
     filePath: string;
     constructor({ filePath }: { filePath: string }) {
         super(`file '${filePath}' does not match any model`);
@@ -15,7 +15,7 @@ export class FileNotMatchedModel extends Error {
     }
 }
 
-export class FileMatchedMultipleModels extends Error {
+export class FileMatchedMultipleModelsError extends Error {
     filePath: string;
     modelNames: string[];
     constructor({ filePath, modelNames }: { filePath: string; modelNames: string[] }) {
@@ -45,7 +45,7 @@ export class FolderReadError extends Error {
     }
 }
 
-export class FileForModelNotFound extends Error {
+export class FileForModelNotFoundError extends Error {
     modelName: string;
     constructor({ modelName }: { modelName: string }) {
         super(`file for model '${modelName}' not found`);
@@ -53,7 +53,7 @@ export class FileForModelNotFound extends Error {
     }
 }
 
-export class ModelNotFound extends Error {
+export class ModelNotFoundError extends Error {
     modelName: string;
     fieldPath: FieldPath;
     constructor({ modelName, fieldPath }: { modelName: string; fieldPath: FieldPath }) {
@@ -63,7 +63,7 @@ export class ModelNotFound extends Error {
     }
 }
 
-export class IllegalModelField extends Error {
+export class IllegalModelFieldError extends Error {
     modelName: string;
     modelType: string;
     fieldPath: FieldPath;

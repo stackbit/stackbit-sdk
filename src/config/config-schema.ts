@@ -65,13 +65,13 @@ const validPageOrDataModelNames = Joi.custom((value, { error, state }) => {
     return value;
 });
 
-// TODO: explain type
-export type LogicField = unknown;
+export type LogicField = string;
 
-const logicFields = Joi.custom((value) => {
-    // TODO: validate that all logicFields reference existing fields
-    return value;
-});
+const logicField = Joi.string();
+// TODO: validate that all logicFields reference existing fields
+// const logicField = Joi.custom((value) => {
+//     return value;
+// });
 
 const inFields = Joi.string()
     .valid(
@@ -322,7 +322,7 @@ const fieldSchema: Joi.ObjectSchema<Field> = fieldCommonPropsSchema.concat(parti
 
 const fieldsSchema = Joi.array().items(fieldSchema).unique('name').id('fieldsSchema');
 
-export interface BaseModel {
+export interface YamlBaseModel {
     label: string;
     description?: string;
     extends?: string | string[];
@@ -345,7 +345,7 @@ const baseModelSchema = Joi.object({
     fields: Joi.link('#fieldsSchema')
 });
 
-export interface YamlObjectModel extends BaseModel {
+export interface YamlObjectModel extends YamlBaseModel {
     type: 'object';
 }
 
@@ -355,7 +355,7 @@ const objectModelSchema = baseModelSchema.concat(
     })
 );
 
-export interface BaseDataModel extends BaseModel {
+export interface BaseDataModel extends YamlBaseModel {
     type: 'data';
 }
 
@@ -407,7 +407,7 @@ const dataModelSchema: Joi.ObjectSchema<YamlDataModel> = baseModelSchema.concat(
         })
     });
 
-export interface YamlConfigModel extends BaseModel {
+export interface YamlConfigModel extends YamlBaseModel {
     type: 'config';
     file?: string;
 }
@@ -418,7 +418,7 @@ const configModelSchema: Joi.ObjectSchema<YamlConfigModel> = baseModelSchema.con
     })
 );
 
-export interface BasePageModel extends BaseModel {
+export interface BasePageModel extends YamlBaseModel {
     type: 'page';
     layout?: string;
     urlPath?: string;
@@ -562,7 +562,7 @@ const schema = Joi.object<YamlConfig>({
     pageLayoutKey: Joi.string().allow(null),
     objectTypeKey: Joi.string(),
     excludePages: Joi.array().items(Joi.string()).single(),
-    logicFields: Joi.array().items(logicFields),
+    logicFields: Joi.array().items(logicField),
     models: modelsSchema
 })
     .unknown(true)
