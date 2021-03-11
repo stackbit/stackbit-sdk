@@ -46,13 +46,18 @@ interface UnmodeledContentItem extends BaseContentItem {
 type ContentItem = ModeledContentItem | UnmodeledContentItem;
 */
 
-interface LoadContentOptions {
+export interface ContentLoaderOptions {
     dirPath: string;
     config: Config;
     skipUnmodeledContent: boolean;
 }
 
-export async function loadContent({ dirPath, config, skipUnmodeledContent }: LoadContentOptions) {
+export interface ContentLoaderResult {
+    contentItems: ContentItem[];
+    errors: Error[]
+}
+
+export async function loadContent({ dirPath, config, skipUnmodeledContent }: ContentLoaderOptions): Promise<ContentLoaderResult> {
     const { contentItems: dataItems, errors: dataErrors } = await loadDataFiles({ dirPath, config, skipUnmodeledContent });
     const { contentItems: pageItems, errors: pageErrors } = await loadPageFiles({ dirPath, config, skipUnmodeledContent });
     const contentItems = _.concat(dataItems, pageItems);
@@ -63,7 +68,7 @@ export async function loadContent({ dirPath, config, skipUnmodeledContent }: Loa
     };
 }
 
-async function loadDataFiles({ dirPath, config, skipUnmodeledContent }: LoadContentOptions) {
+async function loadDataFiles({ dirPath, config, skipUnmodeledContent }: ContentLoaderOptions) {
     const contentItems: ContentItem[] = [];
     const errors: Error[] = [];
 
@@ -131,7 +136,7 @@ async function loadDataFiles({ dirPath, config, skipUnmodeledContent }: LoadCont
     return { contentItems, errors };
 }
 
-async function loadPageFiles({ dirPath, config, skipUnmodeledContent }: LoadContentOptions) {
+async function loadPageFiles({ dirPath, config, skipUnmodeledContent }: ContentLoaderOptions) {
     const contentItems: ContentItem[] = [];
     const errors: Error[] = [];
 

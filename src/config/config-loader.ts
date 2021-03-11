@@ -23,7 +23,7 @@ export interface Config extends Omit<YamlConfig, 'models'> {
     models: Model[];
 }
 
-export interface ConfigNormalizedValidatorError extends ConfigValidationError {
+export interface ConfigNormalizedValidationError extends ConfigValidationError {
     normFieldPath: (string | number)[];
 }
 
@@ -33,19 +33,19 @@ export interface ConfigLoadError {
     internalError?: Error;
 }
 
-export type ConfigError = ConfigLoadError | ConfigNormalizedValidatorError;
+export type ConfigError = ConfigLoadError | ConfigNormalizedValidationError;
 
-export interface LoadConfigOptions {
+export interface ConfigLoaderOptions {
     dirPath: string;
 }
 
-export interface LoadConfigResult {
+export interface ConfigLoaderResult {
     valid: boolean;
     config: Config | null;
     errors: ConfigError[];
 }
 
-export async function loadConfig({ dirPath }: LoadConfigOptions): Promise<LoadConfigResult> {
+export async function loadConfig({ dirPath }: ConfigLoaderOptions): Promise<ConfigLoaderResult> {
     let config;
     try {
         config = await loadConfigFromDir(dirPath);
@@ -201,7 +201,7 @@ function normalizeConfig(validationResult: ConfigValidationResult): Config {
     };
 }
 
-function normalizeErrors(config: Config, errors: ConfigValidationError[]): ConfigNormalizedValidatorError[] {
+function normalizeErrors(config: Config, errors: ConfigValidationError[]): ConfigNormalizedValidationError[] {
     return _.map(errors, (error: ConfigValidationError) => {
         if (error.fieldPath[0] === 'models' && typeof error.fieldPath[1] == 'string') {
             const modelName = error.fieldPath[1];

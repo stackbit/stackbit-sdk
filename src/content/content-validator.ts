@@ -7,17 +7,23 @@ import { ContentValidationError } from './content-errors';
 import { getModelByName, isConfigModel, isPageModel } from '../schema-utils';
 import Joi from 'joi';
 
-interface ValidateContentOptions {
+interface ContentValidationOptions {
     contentItems: ContentItem[];
     config: Config;
 }
 
-export function validate({ contentItems, config }: ValidateContentOptions) {
+interface ContentValidationResult {
+    valid: boolean;
+    value: ContentItem[];
+    errors: ContentValidationError[];
+}
+
+export function validate({ contentItems, config }: ContentValidationOptions): ContentValidationResult {
     const errors: ContentValidationError[] = [];
 
     const joiModelSchemas = joiSchemasForModels(config.models);
 
-    const value = _.map(contentItems, (contentItem) => {
+    const value = _.map(contentItems, (contentItem): ContentItem => {
         const modelName = contentItem.__metadata.modelName;
         if (!modelName) {
             return contentItem;
@@ -74,8 +80,8 @@ export function validate({ contentItems, config }: ValidateContentOptions) {
     });
     const valid = _.isEmpty(errors);
     return {
-        value,
         valid,
+        value,
         errors
     };
 }

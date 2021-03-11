@@ -7,12 +7,12 @@ export {
     ConfigModel,
     PageModel,
     Model,
-    LoadConfigOptions,
-    LoadConfigResult,
+    ConfigLoaderOptions,
+    ConfigLoaderResult,
     Config,
     ConfigError,
     ConfigLoadError,
-    ConfigNormalizedValidatorError
+    ConfigNormalizedValidationError
 } from './config/config-loader';
 export { writeConfig } from './config/config-writer';
-export { loadContent, ContentItem } from './content/content-loader';
+export { loadContent, ContentItem, ContentLoaderOptions, ContentLoaderResult } from './content/content-loader';
