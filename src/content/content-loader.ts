@@ -54,7 +54,7 @@ export interface ContentLoaderOptions {
 
 export interface ContentLoaderResult {
     contentItems: ContentItem[];
-    errors: Error[]
+    errors: Error[];
 }
 
 export async function loadContent({ dirPath, config, skipUnmodeledContent }: ContentLoaderOptions): Promise<ContentLoaderResult> {
