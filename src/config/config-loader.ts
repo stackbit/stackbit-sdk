@@ -9,10 +9,6 @@ import { validate, ConfigValidationResult, ConfigValidationError } from './confi
 import { Field, YamlConfigModel, YamlDataModel, YamlModel, YamlObjectModel, YamlPageModel, YamlConfig } from './config-schema';
 import { isPageModel } from '../schema-utils';
 
-interface LoadConfigOptions {
-    dirPath: string;
-}
-
 export type BaseModel = {
     name: string;
     invalid?: boolean;
@@ -27,11 +23,29 @@ export interface Config extends Omit<YamlConfig, 'models'> {
     models: Model[];
 }
 
-export interface ConfigValidatorNormalizedError extends ConfigValidationError {
+export interface ConfigNormalizedValidatorError extends ConfigValidationError {
     normFieldPath: (string | number)[];
 }
 
-export async function loadConfig({ dirPath }: LoadConfigOptions) {
+export interface ConfigLoadError {
+    name: 'ConfigLoadError';
+    message: string;
+    internalError?: Error;
+}
+
+export type ConfigError = ConfigLoadError | ConfigNormalizedValidatorError;
+
+export interface LoadConfigOptions {
+    dirPath: string;
+}
+
+export interface LoadConfigResult {
+    valid: boolean;
+    config: Config | null;
+    errors: ConfigError[];
+}
+
+export async function loadConfig({ dirPath }: LoadConfigOptions): Promise<LoadConfigResult> {
     let config;
     try {
         config = await loadConfigFromDir(dirPath);
@@ -39,7 +53,13 @@ export async function loadConfig({ dirPath }: LoadConfigOptions) {
         return {
             valid: false,
             config: null,
-            errors: [{ message: 'Error loading Stackbit configuration', details: error }]
+            errors: [
+                {
+                    name: 'ConfigLoadError',
+                    message: `Error loading Stackbit configuration: ${error.message}`,
+                    internalError: error
+                }
+            ]
         };
     }
 
@@ -49,11 +69,13 @@ export async function loadConfig({ dirPath }: LoadConfigOptions) {
             config: null,
             errors: [
                 {
+                    name: 'ConfigLoadError',
                     message: 'Stackbit configuration not found, please refer Stackbit documentation: https://www.stackbit.com/docs/stackbit-yaml/'
                 }
             ]
         };
     }
+
     const validationResult = validate(config);
     const normalizedConfig = normalizeConfig(validationResult);
     const normalizedErrors = normalizeErrors(normalizedConfig, validationResult.errors);
@@ -179,7 +201,7 @@ function normalizeConfig(validationResult: ConfigValidationResult): Config {
     };
 }
 
-function normalizeErrors(config: Config, errors: ConfigValidationError[]): ConfigValidatorNormalizedError[] {
+function normalizeErrors(config: Config, errors: ConfigValidationError[]): ConfigNormalizedValidatorError[] {
     return _.map(errors, (error: ConfigValidationError) => {
         if (error.fieldPath[0] === 'models' && typeof error.fieldPath[1] == 'string') {
             const modelName = error.fieldPath[1];

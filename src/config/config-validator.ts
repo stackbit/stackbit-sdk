@@ -2,6 +2,7 @@ import _ from 'lodash';
 import { stackbitConfigSchema } from './config-schema';
 
 export interface ConfigValidationError {
+    name: 'ConfigValidationError';
     type: string;
     message: string;
     fieldPath: (string | number)[];
@@ -22,6 +23,7 @@ export function validate(config: any): ConfigValidationResult {
     const errors = joiErrors.map(
         (validationError): ConfigValidationError => {
             return {
+                name: 'ConfigValidationError',
                 type: validationError.type,
                 message: validationError.message,
                 fieldPath: validationError.path,
