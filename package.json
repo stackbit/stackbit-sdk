@@ -34,13 +34,11 @@
     "dependencies": {
         "@stackbit/schema": "^0.1.4",
         "@stackbit/utils": "^0.1.2",
-        "chalk": "^4.1.0",
         "fs-extra": "^9.1.0",
         "joi": "^17.4.0",
         "js-yaml": "^4.0.0",
         "lodash": "^4.17.20",
-        "micromatch": "^4.0.2",
-        "yargs": "^16.2.0"
+        "micromatch": "^4.0.2"
     },
     "devDependencies": {
         "@types/fs-extra": "^9.0.7",
