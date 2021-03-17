@@ -47,7 +47,7 @@ describe('model fields base rules', () => {
                 {
                     type: 'field.name.unique',
                     fieldPath: ['models', 'button', 'fields', 1],
-                    message: '"models.button.fields[1]" contains a duplicate field name "label"'
+                    message: 'models.button.fields[1] contains a duplicate field name "label"'
                 }
             ]
         );
@@ -329,7 +329,7 @@ describe('object field', () => {
                 {
                     type: 'any.only',
                     fieldPath: ['models', 'button', 'fields', 0, 'labelField'],
-                    message: '"models.button.fields[0].labelField" must be one of model field names, got "illegalField"'
+                    message: 'models.button.fields[0].labelField must be one of model field names, got "illegalField"'
                 }
             ]
         );
@@ -604,7 +604,7 @@ describe('model and reference fields', () => {
             [{
                 type: 'model.name.of.object.models',
                 fieldPath: ['models', 'button', 'fields', 0, 'models', 0],
-                message: '"models.button.fields[0].models[0]" must reference the name of an existing model of type "object", got "no_such_model"'
+                message: 'models.button.fields[0].models[0] must reference the name of an existing model of type "object", got "no_such_model"'
             }],
         );
     });
@@ -629,7 +629,7 @@ describe('model and reference fields', () => {
             [{
                 type: 'model.name.of.document.models',
                 fieldPath: ['models', 'button', 'fields', 0, 'models', 0],
-                message: '"models.button.fields[0].models[0]" must reference the name of an existing model of type "page" or "data", got "no_such_model"'
+                message: 'models.button.fields[0].models[0] must reference the name of an existing model of type "page" or "data", got "no_such_model"'
             }],
         );
     });
@@ -658,7 +658,7 @@ describe('model and reference fields', () => {
             [{
                 type: 'model.name.of.object.models',
                 fieldPath: ['models', 'button', 'fields', 0, 'models', 0],
-                message: '"models.button.fields[0].models[0]" must reference the name of an existing model of type "object", got "post"'
+                message: 'models.button.fields[0].models[0] must reference the name of an existing model of type "object", got "post"'
             }],
         );
     });
@@ -687,7 +687,7 @@ describe('model and reference fields', () => {
             [{
                 type: 'model.name.of.document.models',
                 fieldPath: ['models', 'button', 'fields', 0, 'models', 0],
-                message: '"models.button.fields[0].models[0]" must reference the name of an existing model of type "page" or "data", got "style"'
+                message: 'models.button.fields[0].models[0] must reference the name of an existing model of type "page" or "data", got "style"'
             }],
         );
     });

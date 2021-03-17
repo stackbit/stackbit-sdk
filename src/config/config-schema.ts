@@ -80,7 +80,7 @@ const inFields = Joi.string()
         })
     )
     .prefs({
-        messages: { 'any.only': '"{{#label}}" must be one of model field names, got "{{#value}}"' },
+        messages: { 'any.only': '{{#label}} must be one of model field names, got "{{#value}}"' },
         errors: { wrap: { label: false } }
     });
 
@@ -520,9 +520,9 @@ const modelsSchema = Joi.object<YamlModels>()
             [modelIsListItemsRequiredErrorCode]: '{{#label}} is required when "isList" is true',
             [modelIsListFieldsForbiddenErrorCode]: '{{#label}} is not allowed when "isList" is true',
             [modelListForbiddenErrorCode]: '{{#label}} is not allowed when "isList" is not true',
-            [objectModelNameErrorCode]: '"{{#label}}" must reference the name of an existing model of type "object", got "{{#value}}"',
-            [documentModelNameErrorCode]: '"{{#label}}" must reference the name of an existing model of type "page" or "data", got "{{#value}}"',
-            [fieldNameUnique]: '"{{#label}}" contains a duplicate field name "{{#value.name}}"'
+            [objectModelNameErrorCode]: '{{#label}} must reference the name of an existing model of type "object", got "{{#value}}"',
+            [documentModelNameErrorCode]: '{{#label}} must reference the name of an existing model of type "page" or "data", got "{{#value}}"',
+            [fieldNameUnique]: '{{#label}} contains a duplicate field name "{{#value.name}}"'
         },
         errors: { wrap: { label: false } }
     });

@@ -113,7 +113,7 @@ describe('model "extends" property references existing "object" model', () => {
                 {
                     type: 'model.name.of.object.models',
                     fieldPath: ['models', 'author', 'extends'],
-                    message: '"models.author.extends" must reference the name of an existing model of type "object", got "person"'
+                    message: 'models.author.extends must reference the name of an existing model of type "object", got "person"'
                 }
             ]
         );
@@ -138,7 +138,7 @@ describe('model "extends" property references existing "object" model', () => {
                 {
                     type: 'model.name.of.object.models',
                     fieldPath: ['models', 'author', 'extends'],
-                    message: '"models.author.extends" must reference the name of an existing model of type "object", got "post"'
+                    message: 'models.author.extends must reference the name of an existing model of type "object", got "post"'
                 }
             ]
         );
@@ -178,7 +178,7 @@ describe('"object" model "labelField" property references one of the model field
                 {
                     type: 'any.only',
                     fieldPath: ['models', 'author', 'labelField'],
-                    message: '"models.author.labelField" must be one of model field names, got "illegalField"'
+                    message: 'models.author.labelField must be one of model field names, got "illegalField"'
                 }
             ]
         );
@@ -200,7 +200,7 @@ describe('"object" model "labelField" property references one of the model field
                 {
                     type: 'any.only',
                     fieldPath: ['models', 'author', 'labelField'],
-                    message: '"models.author.labelField" must be one of model field names, got "illegalField"'
+                    message: 'models.author.labelField must be one of model field names, got "illegalField"'
                 }
             ]
         );
