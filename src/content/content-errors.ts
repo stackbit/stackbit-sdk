@@ -69,7 +69,7 @@ export class IllegalModelFieldError extends Error {
     fieldPath: FieldPath;
     constructor({ modelName, modelType, fieldPath }: { modelName: string; modelType: string; fieldPath: FieldPath }) {
         super(
-            `field of type 'model' can not reference model of type other than 'object', field '${fieldPath.join(
+            `field of type 'model' cannot reference model of type other than 'object', field '${fieldPath.join(
                 '.'
             )}' referenced model '${modelName}' of type '${modelType}'`
         );

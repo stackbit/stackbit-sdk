@@ -237,9 +237,9 @@ describe('"data" model with "file" property', () => {
                 }
             },
             [
-                { type: 'model.file.only', fieldPath: ['models', 'author', 'folder'], message: 'models.author.folder can not be used with "file"' },
-                { type: 'model.file.only', fieldPath: ['models', 'author', 'match'], message: 'models.author.match can not be used with "file"' },
-                { type: 'model.file.only', fieldPath: ['models', 'author', 'exclude'], message: 'models.author.exclude can not be used with "file"' }
+                { type: 'model.file.only', fieldPath: ['models', 'author', 'folder'], message: 'models.author.folder cannot be used with "file"' },
+                { type: 'model.file.only', fieldPath: ['models', 'author', 'match'], message: 'models.author.match cannot be used with "file"' },
+                { type: 'model.file.only', fieldPath: ['models', 'author', 'exclude'], message: 'models.author.exclude cannot be used with "file"' }
             ]
         );
     });
@@ -537,9 +537,9 @@ describe('"page" model "file" and "singleInstance" properties are mutual exclusi
                 }
             },
             [
-                { type: 'model.file.only', fieldPath: ['models', 'post', 'folder'], message: 'models.post.folder can not be used with "file"' },
-                { type: 'model.file.only', fieldPath: ['models', 'post', 'match'], message: 'models.post.match can not be used with "file"' },
-                { type: 'model.file.only', fieldPath: ['models', 'post', 'exclude'], message: 'models.post.exclude can not be used with "file"' }
+                { type: 'model.file.only', fieldPath: ['models', 'post', 'folder'], message: 'models.post.folder cannot be used with "file"' },
+                { type: 'model.file.only', fieldPath: ['models', 'post', 'match'], message: 'models.post.match cannot be used with "file"' },
+                { type: 'model.file.only', fieldPath: ['models', 'post', 'exclude'], message: 'models.post.exclude cannot be used with "file"' }
             ]
         );
     });

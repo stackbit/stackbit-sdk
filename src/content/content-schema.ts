@@ -41,7 +41,7 @@ export function joiSchemasForModels(models: Model[]) {
                 joiSchema = Joi.object()
                     .forbidden()
                     .messages({
-                        'any.unknown': `${objectLabel} can not be validated, the model "${model.name}" is invalid. Fix the model to validate the content.`
+                        'any.unknown': `${objectLabel} cannot be validated, the model "${model.name}" is invalid. Fix the model to validate the content.`
                     });
             } else {
                 joiSchema = joiSchemaForModel(model);
