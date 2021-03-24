@@ -1,0 +1,36 @@
+{
+    "title": 0,
+    "action": {
+        "label": 1,
+        "icon": {
+            "icon_type": 1,
+            "icon_color": 1
+        }
+    },
+    "actions": [
+        {
+            "label": 2,
+            "icon": {
+                "icon_type": 2,
+                "icon_color": "red"
+            }
+        },
+        {
+            "label": 3,
+            "icon": {
+                "icon_type": 3,
+                "icon_color": "red"
+            }
+        }
+    ],
+    "section": {
+        "title": 4,
+        "action": {
+            "label": 5,
+            "icon": {
+                "icon_type": 5,
+                "icon_color": "red"
+            }
+        }
+    }
+}

@@ -1,0 +1,52 @@
+stackbitVersion: ~0.3.0
+ssgName: gatsby
+dataDir: data
+pagesDir: null
+models:
+  config:
+    type: data
+    label: Config
+    file: config.json
+    fields:
+      - type: string
+        name: title
+      - type: model
+        name: action
+        models: [action]
+      - type: list
+        name: actions
+        label: Actions
+        items:
+          type: model
+          models: [action]
+      - type: object
+        name: section
+        label: Section
+        fields:
+          - type: string
+            name: title
+          - type: model
+            name: action
+            label: Action
+            models: [action]
+  action:
+    type: object
+    label: Action
+    fields:
+      - type: string
+        name: label
+        label: Label
+      - type: model
+        name: icon
+        label: Icon
+        models: [icon]
+  icon:
+    type: object
+    label: Icon
+    fields:
+      - type: string
+        name: icon_type
+        label: Icon Type
+      - type: string
+        name: icon_color
+        label: Icon Color

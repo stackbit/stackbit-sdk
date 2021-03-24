@@ -21,11 +21,17 @@ type FieldPath = (string | number)[];
 
 type ModelSchemaMap = Record<string, Joi.ObjectSchema>;
 
+const metadataSchema = Joi.object({
+    modelName: Joi.string().allow(null),
+    filePath: Joi.string(),
+    error: Joi.string()
+});
+
 export function joiSchemasForModels(models: Model[]) {
     const modelSchemas = _.reduce(
         models,
         (modelSchemas: ModelSchemaMap, model: Model) => {
-            let joiSchema;
+            let joiSchema: Joi.ObjectSchema;
             if (model.invalid) {
                 // if root model is invalid, replace the label with "file" otherwise joi outputs "value" which is not descriptive
                 let objectLabel = '{{#label}}';
@@ -195,9 +201,7 @@ const FieldSchemas: { [fieldType in keyof FieldPropsByType]: (field: FieldPropsB
                 .ref(`#${modelName}_model_schema`)
                 .concat(
                     Joi.object({
-                        __metadata: Joi.object().default({
-                            modelName: modelName
-                        }),
+                        __metadata: metadataSchema,
                         type: typeSchema
                     })
                 );
@@ -213,9 +217,7 @@ const FieldSchemas: { [fieldType in keyof FieldPropsByType]: (field: FieldPropsB
                                 .ref(`#${modelName}_model_schema`)
                                 .concat(
                                     Joi.object({
-                                        __metadata: Joi.object().default({
-                                            modelName: modelName
-                                        }),
+                                        __metadata: metadataSchema,
                                         type: Joi.string()
                                     })
                                 )

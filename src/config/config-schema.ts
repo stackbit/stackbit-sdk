@@ -235,6 +235,13 @@ export type FieldPartialProps = StricterUnion<NonStrictFieldPartialProps>;
 
 export type FieldListItems = StricterUnion<Exclude<NonStrictFieldPartialProps, FieldListProps>>;
 
+export type FieldEnum = FieldEnumProps & FieldCommonProps;
+export type FieldObject = FieldObjectProps & FieldCommonProps;
+export type FieldList = FieldListProps & FieldCommonProps;
+export type FieldNumber = FieldNumberProps & FieldCommonProps;
+export type FieldModel = FieldModelProps & FieldCommonProps;
+export type FieldReference = FieldReferenceProps & FieldCommonProps;
+
 export type Field = FieldPartialProps & FieldCommonProps;
 
 const fieldCommonPropsSchema = Joi.object({

@@ -3,9 +3,10 @@ import fse from 'fs-extra';
 import path from 'path';
 import micromatch from 'micromatch';
 import { parseFile, readDirRecursively, forEachPromise, findPromise } from '@stackbit/utils';
-import { getModelsByQuery } from '@stackbit/schema';
+import { getModelsByQuery, isListField, getListItemsField } from '@stackbit/schema';
 
 import { ConfigModel, Model, Config } from '../config/config-loader';
+import { Field, FieldModel } from '../config/config-schema';
 import { FileNotMatchedModelError, FileMatchedMultipleModelsError, FileReadError, FileForModelNotFoundError, FolderReadError } from './content-errors';
 import { isConfigModel, isDataModel, isPageModel } from '../schema-utils';
 import { validate } from './content-validator';
@@ -126,6 +127,7 @@ async function loadDataFiles({ dirPath, config, skipUnmodeledContent }: ContentL
         contentDir: dataDir,
         filePaths,
         models: dataModels,
+        config: config,
         objectTypeKeyPath: 'type',
         modelTypeKeyPath: 'name',
         skipUnmodeledContent
@@ -175,6 +177,7 @@ async function loadPageFiles({ dirPath, config, skipUnmodeledContent }: ContentL
         contentDir: pagesDir,
         filePaths,
         models: pageModels,
+        config: config,
         objectTypeKeyPath: pageLayoutKey ? pageLayoutKey : null,
         modelTypeKeyPath: 'layout',
         skipUnmodeledContent
@@ -213,7 +216,7 @@ async function loadDataItemForConfigModel(dirPath: string, configModel: ConfigMo
     try {
         const data = await loadFile(absFilePath);
         return {
-            contentItem: modeledDataItem(filePath, configModel, data)
+            contentItem: modeledDataItem(filePath, data, configModel, config)
         };
     } catch (error) {
         return {
@@ -242,6 +245,7 @@ interface LoadContentItemsOptions {
     contentDir: string;
     filePaths: string[];
     models: Model[];
+    config: Config;
     objectTypeKeyPath?: string | string[] | null;
     modelTypeKeyPath?: string | string[];
     skipUnmodeledContent: boolean;
@@ -256,6 +260,7 @@ interface LoadContentItemsOptions {
  * @param options.contentDir Directory within project directory from where to load files
  * @param options.filePaths Array of file paths to load, files paths must be relative to contentDir
  * @param options.models Array of models
+ * @param options.config Config
  * @param options.objectTypeKeyPath The key path of object field to match a model
  * @param options.modelTypeKeyPath The key path of model property to match an object
  * @param options.skipUnmodeledContent Don't return un-modeled data
@@ -265,6 +270,7 @@ async function loadContentItems({
     contentDir,
     filePaths,
     models,
+    config,
     objectTypeKeyPath,
     modelTypeKeyPath,
     skipUnmodeledContent
@@ -291,7 +297,7 @@ async function loadContentItems({
             models
         );
         if (matchedModels.length === 1) {
-            contentItems.push(modeledDataItem(filePathRelativeToProject, matchedModels[0], data));
+            contentItems.push(modeledDataItem(filePathRelativeToProject, data, matchedModels[0], config));
         } else {
             if (matchedModels.length === 0) {
                 errors.push(new FileNotMatchedModelError({ filePath: filePathRelativeToProject }));
@@ -319,7 +325,7 @@ async function loadFile(filePath: string) {
     return data;
 }
 
-function modeledDataItem(filePath: string, model: Model, data: any): ContentItem {
+function modeledDataItem(filePath: string, data: any, model: Model, config: Config): ContentItem {
     if (isDataModel(model) && model.isList && _.isArray(data)) {
         data = { items: data };
     } else if (isPageModel(model)) {
@@ -332,7 +338,7 @@ function modeledDataItem(filePath: string, model: Model, data: any): ContentItem
             filePath,
             modelName: model.name
         },
-        ...data
+        ...addMetadataRecursively(data, model, _.keyBy(config.models, 'name'))
     };
 }
 
@@ -343,6 +349,114 @@ function unmodeledDataItem(filePath: string, data: any): ContentItem {
             modelName: null
         },
         ...data
+    };
+}
+
+function addMetadataRecursively(
+    value: any,
+    model: Model | Field | null,
+    modelsByName: Record<string, Model>,
+    { objectTypeKey = 'type', _modelKeyPath }: { objectTypeKey?: string; _modelKeyPath?: string[] } = {}
+) {
+    if (!model) {
+        return value;
+    }
+
+    _modelKeyPath = _modelKeyPath || [model.name];
+
+    if (_.isPlainObject(value) && model && model.type === 'model') {
+        const modelResult = getModelOfObject(value, model, modelsByName, objectTypeKey, _modelKeyPath);
+        if (modelResult.error !== undefined) {
+            return {
+                __metadata: {
+                    modelName: null,
+                    error: modelResult.error
+                },
+                ...value
+            };
+        }
+        model = modelResult.model;
+        _modelKeyPath = [model.name];
+        value = {
+            __metadata: {
+                modelName: model.name
+            },
+            ...value
+        };
+    }
+
+    // Use lodash methods here, the models and values can be invalid, and therefore not all required properties might exist
+    if (_.isPlainObject(value)) {
+        const fields = _.get(model, 'fields', []);
+        const fieldsByName = _.keyBy(fields, 'name');
+        value = _.mapValues(value, (val, key) => {
+            if (key === '__metadata') {
+                return val;
+            }
+            // field might not be defined in the model, for example implicit fields like 'layout' and 'type'
+            // or for nested objects with unmatched models
+            const field = _.get(fieldsByName, key, null);
+            return addMetadataRecursively(val, field, modelsByName, {
+                objectTypeKey,
+                _modelKeyPath: _.concat(_modelKeyPath!, ['fields', key])
+            });
+        });
+    } else if (_.isArray(value)) {
+        if (!isListField(model)) {
+            return value;
+        }
+        const itemsModel = getListItemsField(model);
+        value = _.map(value, (val) => {
+            return addMetadataRecursively(val, itemsModel, modelsByName, {
+                objectTypeKey,
+                _modelKeyPath: _.concat(_modelKeyPath!, 'items')
+            });
+        });
+    }
+
+    return value;
+}
+
+function getModelOfObject(object: any, field: FieldModel, modelsByName: Record<string, Model>, objectTypeKey: string, modelKeyPath: string[]) {
+    // Use lodash methods here, the models and values can be invalid, and therefore not all required properties might exist
+    const modelNames = _.get(field, 'models', []);
+    let modelName: string;
+    if (modelNames.length === 0) {
+        return {
+            modelName: null,
+            error: `invalid model, no 'models' defined at ${modelKeyPath.join('.')}`
+        };
+    } else if (modelNames.length === 1) {
+        modelName = modelNames[0]!;
+        const model = _.get(modelsByName, modelName);
+        if (!model) {
+            return {
+                modelName: null,
+                error: `invalid model, invalid model name '${modelName}' at ${modelKeyPath.join('.')}`
+            };
+        }
+        return {
+            modelName: modelName,
+            model: model
+        };
+    }
+    modelName = _.get(object, objectTypeKey);
+    if (!modelName) {
+        return {
+            modelName: null,
+            error: `invalid content, no 'type' field`
+        };
+    }
+    const model = _.get(modelsByName, modelName);
+    if (!model) {
+        return {
+            modelName: null,
+            error: `invalid content, type '${modelName}' doesn't match any model name`
+        };
+    }
+    return {
+        modelName: modelName,
+        model: model
     };
 }
 

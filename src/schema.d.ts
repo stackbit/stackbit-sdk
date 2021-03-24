@@ -1,5 +1,6 @@
 declare module '@stackbit/schema' {
     import { Model } from './config/config-loader';
+    import { Field, FieldList, FieldListItems, FieldObjectProps, FieldModel, FieldReference } from './config/config-schema';
 
     interface BaseModelQuery {
         filePath: string;
@@ -15,13 +16,9 @@ declare module '@stackbit/schema' {
     export function iterateModelFieldsRecursively(model: Model, iterator: (field: Field, fieldPath: string[]) => void): void;
     export function getModelsByQuery(query: ModelQuery, models: Model[]): Model[];
     export function extendModels(models: Model[]): Model[];
-    export function isListField(field: { type: string }): boolean;
-}
-
-declare module '@stackbit/utils' {
-    import fs from 'fs';
-    export function parseFile(filePath: string): Promise<any>;
-    export function readDirRecursively(dir: string, options?: { filter: (filePath: string, stats: fs.Stats) => boolean }): Promise<string[]>;
-    export function forEachPromise<T>(array: T[], callback: (value: T, index: number, array: T[]) => Promise<void>, thisArg?: any): Promise<void>;
-    export function findPromise<T>(array: T[], callback: (value: T, index: number, array: T[]) => Promise<boolean>, thisArg?: any): Promise<T | undefined>;
+    export function isObjectField(field: Field): field is FieldObjectProps;
+    export function isModelField(field: Field): field is FieldModel;
+    export function isReferenceField(field: Field): field is FieldReference;
+    export function isListField(field: Field): field is FieldList;
+    export function getListItemsField(field: FieldList): FieldListItems;
 }
