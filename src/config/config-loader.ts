@@ -31,6 +31,7 @@ export interface ConfigLoadError {
     name: 'ConfigLoadError';
     message: string;
     internalError?: Error;
+    normFieldPath?: undefined;
 }
 
 export type ConfigError = ConfigLoadError | ConfigNormalizedValidationError;

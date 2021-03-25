@@ -523,7 +523,7 @@ const modelsSchema = Joi.object<YamlModels>()
         messages: {
             [modelNamePatternMatchErrorCode]:
                 'Invalid model name "{{#key}}" at "{{#label}}". A model name must contain only lower case alphanumeric characters and underscores, must start with a lower case letter, and end with alphanumeric character.',
-            [modelFileExclusiveErrorCode]: '{{#label}} can not be used with "file"',
+            [modelFileExclusiveErrorCode]: '{{#label}} cannot be used with "file"',
             [modelIsListItemsRequiredErrorCode]: '{{#label}} is required when "isList" is true',
             [modelIsListFieldsForbiddenErrorCode]: '{{#label}} is not allowed when "isList" is true',
             [modelListForbiddenErrorCode]: '{{#label}} is not allowed when "isList" is not true',
