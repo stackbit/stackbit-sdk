@@ -176,8 +176,11 @@ export class FileBrowser {
     }
 
     async listFiles({ includePattern, excludePattern }: { includePattern?: string | string[]; excludePattern?: string | string[] } = {}) {
-        this.files = await this.fileBrowserAdapter.listFiles({ includePattern, excludePattern });
+        if (this.files.length > 0) {
+            return;
+        }
 
+        this.files = await this.fileBrowserAdapter.listFiles({ includePattern, excludePattern });
         // create maps to find files by names or paths quickly
         _.forEach(this.files, (fileReadResult) => {
             const filePath = fileReadResult.filePath;

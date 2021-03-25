@@ -1,9 +1,15 @@
-import path from 'path';
 import _ from 'lodash';
-import { forEachPromise, reducePromise } from '@stackbit/utils';
+import { forEachPromise } from '@stackbit/utils';
 import { FileBrowser, FileBrowserAdapterInterface } from './file-browser';
+import { findDirsWithPackageDependency } from './analyzer-utils';
 
-export interface SSGPartialMatchResult {
+export interface SSGMatcherOptions {
+    fileBrowserAdapter?: FileBrowserAdapterInterface;
+    fileBrowser?: FileBrowser;
+}
+
+export interface SSGMatchResult {
+    ssgName: string;
     ssgDir?: string;
     isTheme?: boolean;
     options?: {
@@ -11,27 +17,18 @@ export interface SSGPartialMatchResult {
     };
 }
 
-export interface SSGMatchResult extends SSGPartialMatchResult {
-    ssgName: string;
-}
-
-interface SSGMatcher {
-    name: string;
-    files?: string[];
-    matchByPackageName?: string;
-    matchFilesNames?: string[];
-    nodePackageName?: string;
-    requiredFiles?: string[];
-    match?: (fileBrowser: FileBrowser) => Promise<SSGPartialMatchResult | null>;
-}
-
-export async function matchSSG({ fileBrowserAdapter }: { fileBrowserAdapter: FileBrowserAdapterInterface }): Promise<SSGMatchResult | null> {
-    const fileBrowser = new FileBrowser({ fileBrowserAdapter });
+export async function matchSSG({ fileBrowser, fileBrowserAdapter }: SSGMatcherOptions): Promise<SSGMatchResult | null> {
+    if (!fileBrowser) {
+        if (!fileBrowserAdapter) {
+            throw new Error('either fileBrowser or fileBrowserAdapter must be provided to SSG matcher');
+        }
+        fileBrowser = new FileBrowser({ fileBrowserAdapter });
+    }
     await fileBrowser.listFiles();
     let ssgMatch: SSGMatchResult | null = null;
     await forEachPromise(SSGMatchers, async (ssgMatcher: SSGMatcher) => {
         if (ssgMatcher.match) {
-            const partialMatch = await ssgMatcher.match(fileBrowser);
+            const partialMatch = await ssgMatcher.match(fileBrowser!);
             if (partialMatch) {
                 ssgMatch = {
                     ssgName: ssgMatcher.name,
@@ -40,17 +37,31 @@ export async function matchSSG({ fileBrowserAdapter }: { fileBrowserAdapter: Fil
                 return false;
             }
         } else if (ssgMatcher.matchByPackageName) {
-            const partialMatch = await matchSSGByPackageJSON(fileBrowser, ssgMatcher.matchByPackageName);
-            if (partialMatch) {
+            const dirs = await findDirsWithPackageDependency(fileBrowser!, ssgMatcher.matchByPackageName);
+            if (dirs.length === 1) {
                 ssgMatch = {
                     ssgName: ssgMatcher.name,
-                    ...partialMatch
+                    ssgDir: dirs[0]
+                };
+                return false;
+            } else if (dirs.length > 1) {
+                ssgMatch = {
+                    ssgName: ssgMatcher.name,
+                    options: {
+                        ssgDirs: dirs
+                    }
                 };
                 return false;
             }
         }
     });
     return ssgMatch;
+}
+
+interface SSGMatcher {
+    name: string;
+    matchByPackageName?: string;
+    match?: (fileBrowser: FileBrowser) => Promise<Omit<SSGMatchResult, 'ssgName'> | null>;
 }
 
 const SSGMatchers: SSGMatcher[] = [
@@ -202,45 +213,3 @@ const SSGMatchers: SSGMatcher[] = [
         }
     }
 ];
-
-async function matchSSGByPackageJSON(fileBrowser: FileBrowser, packageName: string): Promise<SSGPartialMatchResult | null> {
-    const fileName = 'package.json';
-
-    const packageJsonExists = fileBrowser.fileNameExists(fileName);
-    if (!packageJsonExists) {
-        return null;
-    }
-
-    let filePaths = fileBrowser.getFilePathsForFileName(fileName);
-
-    filePaths = await reducePromise(
-        filePaths,
-        async (filePaths: string[], filePath: string) => {
-            const data = await fileBrowser.getFileData(filePath);
-            const hasDependency = _.has(data, ['dependencies', packageName]);
-            const hasDevDependency = _.has(data, ['devDependencies', packageName]);
-            if (hasDependency || hasDevDependency) {
-                filePaths.push(filePath);
-            }
-            return filePaths;
-        },
-        []
-    );
-
-    if (filePaths.length === 1) {
-        const pathObject = path.parse(filePaths[0]!);
-        const ssgDir = pathObject.dir;
-        return {
-            ssgDir: ssgDir
-        };
-    } else if (filePaths.length > 1) {
-        const ssgDirs = _.map(filePaths, (filePath) => path.parse(filePath).dir);
-        return {
-            options: {
-                ssgDirs: ssgDirs
-            }
-        };
-    } else {
-        return null;
-    }
-}
