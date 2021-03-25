@@ -32,8 +32,9 @@
     },
     "homepage": "https://github.com/stackbit/stackbit-sdk#readme",
     "dependencies": {
+        "@octokit/rest": "^18.3.5",
         "@stackbit/schema": "^0.1.4",
-        "@stackbit/utils": "^0.1.2",
+        "@stackbit/utils": "^0.2.0",
         "fs-extra": "^9.1.0",
         "joi": "^17.4.0",
         "js-yaml": "^4.0.0",
