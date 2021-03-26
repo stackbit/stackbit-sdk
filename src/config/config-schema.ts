@@ -6,7 +6,7 @@ import { StricterUnion } from '../utils';
 const SSG_NAMES = ['unibit', 'jekyll', 'hugo', 'gatsby', 'nextjs', 'custom', 'eleventy', 'vuepress', 'gridsome', 'nuxt', 'sapper', 'hexo'] as const;
 
 // CMSes Stackbit Stuio supports
-const CMS_NAMES = ['git', 'contentful', 'sanity', 'forestry', 'netlify'] as const;
+const CMS_NAMES = ['git', 'contentful', 'sanity', 'forestry', 'netlifycms'] as const;
 
 const FIELD_TYPES = [
     'string',
