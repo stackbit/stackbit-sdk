@@ -1,7 +1,7 @@
 import path from 'path';
+import _ from 'lodash';
 import { reducePromise } from '@stackbit/utils';
 import { FileBrowser } from './file-browser';
-import _ from 'lodash';
 
 export async function findDirsWithPackageDependency(fileBrowser: FileBrowser, packageName: string): Promise<string[]> {
     const fileName = 'package.json';
@@ -28,4 +28,22 @@ export async function findDirsWithPackageDependency(fileBrowser: FileBrowser, pa
     );
 
     return _.map(filePaths, (filePath) => path.parse(filePath).dir);
+}
+
+export async function extractNodeEnvironmentVariablesFromFile(fileBrowser: FileBrowser, filePath: string): Promise<string[]> {
+    const envVars: string[] = [];
+    const fileExists = fileBrowser.filePathExists(filePath);
+    if (!fileExists) {
+        return envVars;
+    }
+    const data = await fileBrowser.getFileData(filePath);
+    if (typeof data !== 'string') {
+        return envVars;
+    }
+    const envVarsRe = /process\.env\.(\w+)/g;
+    let reResult;
+    while ((reResult = envVarsRe.exec(data)) !== null) {
+        envVars.push(reResult[1]!);
+    }
+    return envVars;
 }

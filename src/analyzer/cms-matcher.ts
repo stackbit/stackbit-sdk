@@ -1,8 +1,8 @@
+import path from 'path';
+import _ from 'lodash';
 import { forEachPromise, reducePromise } from '@stackbit/utils';
 import { FileBrowser, FileBrowserAdapterInterface } from './file-browser';
 import { findDirsWithPackageDependency } from './analyzer-utils';
-import _ from 'lodash';
-import path from 'path';
 
 export interface CMSMatcherOptions {
     fileBrowserAdapter?: FileBrowserAdapterInterface;
@@ -12,6 +12,8 @@ export interface CMSMatcherOptions {
 export interface CMSMatchResult {
     cmsName: string;
     cmsDir?: string;
+    cmsProjectId?: string;
+    cmsEnvironmentName?: string;
     options?: {
         cmsDirs?: string[];
     };
@@ -79,10 +81,13 @@ const CSSMatchers: CSSMatcher[] = [
             }
             const configFilePaths = fileBrowser.getFilePathsForFileName(configFile);
             const dirs = _.map(configFilePaths, (filePath) => path.parse(filePath).dir);
-            if (dirs.length === 0) {
-                return {
-                    cmsDir: dirs[0]
-                };
+            if (dirs.length === 1) {
+                const config = await fileBrowser.getFileData(configFilePaths[0]!);
+                return _.omitBy({
+                    cmsDir: dirs[0],
+                    cmsProjectId: _.get(config, 'api.projectId'),
+                    cmsEnvironmentName: _.get(config, 'api.dataset')
+                }, _.isNil);
             } else if (dirs.length > 1) {
                 return {
                     options: {
@@ -134,7 +139,7 @@ const CSSMatchers: CSSMatcher[] = [
                 []
             );
             const dirs = _.map(netlifyCMSConfigFilePaths, (filePath) => path.parse(filePath).dir);
-            if (dirs.length === 0) {
+            if (dirs.length === 1) {
                 return {
                     cmsDir: dirs[0]
                 };

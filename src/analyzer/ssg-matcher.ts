@@ -1,7 +1,7 @@
+import path from 'path';
 import _ from 'lodash';
-import { forEachPromise } from '@stackbit/utils';
 import { FileBrowser, FileBrowserAdapterInterface } from './file-browser';
-import { findDirsWithPackageDependency } from './analyzer-utils';
+import { extractNodeEnvironmentVariablesFromFile, findDirsWithPackageDependency } from './analyzer-utils';
 
 export interface SSGMatcherOptions {
     fileBrowserAdapter?: FileBrowserAdapterInterface;
@@ -15,6 +15,7 @@ export interface SSGMatchResult {
     pagesDir?: string;
     dataDir?: string;
     staticDir?: string;
+    envVars?: string[];
     options?: {
         ssgDirs?: string[];
     };
@@ -28,37 +29,44 @@ export async function matchSSG({ fileBrowser, fileBrowserAdapter }: SSGMatcherOp
         fileBrowser = new FileBrowser({ fileBrowserAdapter });
     }
     await fileBrowser.listFiles();
-    let ssgMatch: SSGMatchResult | null = null;
-    await forEachPromise(SSGMatchers, async (ssgMatcher: SSGMatcher) => {
+    return getFirstMatchedSSG(fileBrowser);
+}
+
+async function getFirstMatchedSSG(fileBrowser: FileBrowser): Promise<SSGMatchResult | null> {
+    let partialMatch = null;
+    let ssgMatcher = null;
+    for (ssgMatcher of SSGMatchers) {
         if (ssgMatcher.match) {
-            const partialMatch = await ssgMatcher.match(fileBrowser!);
-            if (partialMatch) {
-                ssgMatch = {
-                    ssgName: ssgMatcher.name,
-                    ...partialMatch
-                };
-                return false;
-            }
+            partialMatch = await ssgMatcher.match(fileBrowser!);
+            break;
         } else if (ssgMatcher.matchByPackageName) {
-            const dirs = await findDirsWithPackageDependency(fileBrowser!, ssgMatcher.matchByPackageName);
-            if (dirs.length === 1) {
-                ssgMatch = {
-                    ssgName: ssgMatcher.name,
-                    ssgDir: dirs[0]
-                };
-                return false;
-            } else if (dirs.length > 1) {
-                ssgMatch = {
-                    ssgName: ssgMatcher.name,
-                    options: {
-                        ssgDirs: dirs
-                    }
-                };
-                return false;
-            }
+            partialMatch = await matchSSGByPackageName(fileBrowser!, ssgMatcher.matchByPackageName);
+            break;
         }
-    });
-    return ssgMatch;
+    }
+    if (!partialMatch || !ssgMatcher) {
+        return null;
+    }
+    return {
+        ssgName: ssgMatcher.name,
+        ...partialMatch
+    };
+}
+
+async function matchSSGByPackageName(fileBrowser: FileBrowser, packageName: string): Promise<Omit<SSGMatchResult, 'ssgName'> | null> {
+    const dirs = await findDirsWithPackageDependency(fileBrowser, packageName);
+    if (dirs.length === 1) {
+        return {
+            ssgDir: dirs[0]
+        };
+    } else if (dirs.length > 1) {
+        return {
+            options: {
+                ssgDirs: dirs
+            }
+        };
+    }
+    return null;
 }
 
 interface SSGMatcher {
@@ -70,7 +78,18 @@ interface SSGMatcher {
 const SSGMatchers: SSGMatcher[] = [
     {
         name: 'gatsby',
-        matchByPackageName: 'gatsby'
+        match: async (fileBrowser) => {
+            const partialMatch = await matchSSGByPackageName(fileBrowser, 'gatsby');
+            if (!partialMatch || partialMatch.ssgDir === undefined) {
+                return partialMatch;
+            }
+            const gatsbyConfigPath = path.join(partialMatch.ssgDir, 'gatsby-config.js');
+            const envVars = await extractNodeEnvironmentVariablesFromFile(fileBrowser, gatsbyConfigPath);
+            if (!_.isEmpty(envVars)) {
+                partialMatch.envVars = envVars;
+            }
+            return partialMatch;
+        }
     },
     {
         name: 'nextjs',
