@@ -12,6 +12,9 @@ export interface SSGMatchResult {
     ssgName: string;
     ssgDir?: string;
     isTheme?: boolean;
+    pagesDir?: string;
+    dataDir?: string;
+    staticDir?: string;
     options?: {
         ssgDirs?: string[];
     };

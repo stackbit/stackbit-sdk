@@ -104,10 +104,10 @@ describe('assets with "relative" referenceType require "assetsDir" property', ()
 
 describe('mutual exclusive properties with api-based cms', () => {
     test.each([
-        // git cms is assumed if cmsType is not specified
+        // git cms is assumed if cmsName is not specified
         { pagesDir: '', dataDir: '', excludePages: [] },
-        { cmsType: 'netlifycms', pagesDir: '', dataDir: '', excludePages: [] },
-        { cmsType: 'forestry', pagesDir: '', dataDir: '', excludePages: [] }
+        { cmsName: 'netlifycms', pagesDir: '', dataDir: '', excludePages: [] },
+        { cmsName: 'forestry', pagesDir: '', dataDir: '', excludePages: [] }
     ])('file-based CMS with file-based schema properties should pass validation', (config) => {
         expectPassingValidation(config);
     });
