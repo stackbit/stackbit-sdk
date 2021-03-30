@@ -2,14 +2,15 @@ import _ from 'lodash';
 import fse from 'fs-extra';
 import path from 'path';
 import micromatch from 'micromatch';
-import { parseFile, readDirRecursively, forEachPromise, findPromise } from '@stackbit/utils';
-import { getModelsByQuery, isListField, getListItemsField } from '@stackbit/schema';
+import { findPromise, forEachPromise, parseFile, readDirRecursively } from '@stackbit/utils';
+import { getListItemsField, getModelsByQuery, isListField } from '@stackbit/schema';
 
-import { ConfigModel, Model, Config } from '../config/config-loader';
+import { Config, ConfigModel, Model } from '../config/config-loader';
 import { Field, FieldModel } from '../config/config-schema';
-import { FileNotMatchedModelError, FileMatchedMultipleModelsError, FileReadError, FileForModelNotFoundError, FolderReadError } from './content-errors';
+import { FileForModelNotFoundError, FileMatchedMultipleModelsError, FileNotMatchedModelError, FileReadError, FolderReadError } from './content-errors';
 import { isConfigModel, isDataModel, isPageModel } from '../schema-utils';
 import { validate } from './content-validator';
+import { DATA_FILE_EXTENSIONS, EXCLUDED_DATA_FILES, EXCLUDED_MARKDOWN_FILES, MARKDOWN_FILE_EXTENSIONS } from '../consts';
 
 interface BaseMetadata {
     filePath: string;
@@ -98,12 +99,10 @@ async function loadDataFiles({ dirPath, config, skipUnmodeledContent }: ContentL
     const dataDir = config.dataDir || '';
     const absDataDirPath = path.join(dirPath, dataDir);
     const excludedFiles = ['**/node_modules/**'];
-    const allowedExtensions = ['yml', 'yaml', 'toml', 'json'];
     const dataModels = config.models.filter(isDataModel);
 
     if (dataDir === '') {
-        const rootExcludedFiles = ['stackbit.yaml', 'netlify.toml', 'theme.toml', 'package.json', 'package-lock.json', 'yarn-lock.json'];
-        excludedFiles.push(...rootExcludedFiles);
+        excludedFiles.push(...EXCLUDED_DATA_FILES);
         if (configFilePath) {
             excludedFiles.push(configFilePath);
         }
@@ -114,7 +113,7 @@ async function loadDataFiles({ dirPath, config, skipUnmodeledContent }: ContentL
 
     let filePaths;
     try {
-        filePaths = await readDirRecursivelyWithFilter(absDataDirPath, excludedFiles, allowedExtensions);
+        filePaths = await readDirRecursivelyWithFilter(absDataDirPath, excludedFiles, DATA_FILE_EXTENSIONS);
     } catch (error) {
         return {
             contentItems,
@@ -152,12 +151,10 @@ async function loadPageFiles({ dirPath, config, skipUnmodeledContent }: ContentL
     const pageLayoutKey = config.pageLayoutKey;
     const absPagesDirPath = path.join(dirPath, pagesDir);
     const excludedFiles = _.castArray(config.excludePages || []).concat(['**/node_modules/**']);
-    const allowedExtensions = ['md', 'mdx', 'markdown'];
     const pageModels = config.models.filter(isPageModel);
 
     if (pagesDir === '') {
-        const rootExcludedFiles = ['LICENSE.md', 'README.md', 'README.theme.md', 'CONTRIBUTING.md', 'CHANGELOG.md'];
-        excludedFiles.push(...rootExcludedFiles);
+        excludedFiles.push(...EXCLUDED_MARKDOWN_FILES);
         if (config.publishDir) {
             excludedFiles.push(config.publishDir);
         }
@@ -165,7 +162,7 @@ async function loadPageFiles({ dirPath, config, skipUnmodeledContent }: ContentL
 
     let filePaths;
     try {
-        filePaths = await readDirRecursivelyWithFilter(absPagesDirPath, excludedFiles, allowedExtensions);
+        filePaths = await readDirRecursivelyWithFilter(absPagesDirPath, excludedFiles, MARKDOWN_FILE_EXTENSIONS);
     } catch (error) {
         return {
             contentItems,
@@ -201,8 +198,7 @@ async function loadDataItemForConfigModel(dirPath: string, configModel: ConfigMo
         };
     }
     const extension = path.extname(filePath).substring(1);
-    const allowedExtensions = ['yml', 'yaml', 'toml', 'json'];
-    if (!allowedExtensions.includes(extension)) {
+    if (!DATA_FILE_EXTENSIONS.includes(extension)) {
         return {
             error: new FileReadError({ filePath: filePath, error: new Error(`extension '${extension}' is not supported`) })
         };
@@ -319,7 +315,7 @@ async function loadFile(filePath: string) {
     // { frontmatter: { ...fields }, markdown: '...md...' }
     // =>
     // { ...fields, markdown_content: '...md...' }
-    if (['md', 'mdx', 'markdown'].includes(extension) && _.has(data, 'frontmatter') && _.has(data, 'markdown')) {
+    if (MARKDOWN_FILE_EXTENSIONS.includes(extension) && _.has(data, 'frontmatter') && _.has(data, 'markdown')) {
         data = _.assign(data.frontmatter, { markdown_content: data.markdown });
     }
     return data;

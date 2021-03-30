@@ -5,6 +5,8 @@ import micromatch from 'micromatch';
 import { Octokit } from '@octokit/rest';
 import { readDirRecursively, parseDataByFilePath, reducePromise } from '@stackbit/utils';
 
+import { DATA_FILE_EXTENSIONS, MARKDOWN_FILE_EXTENSIONS } from '../consts';
+
 export interface FileResult {
     filePath: string;
     isFile: boolean;
@@ -207,8 +209,8 @@ export class FileBrowser {
         return _.has(this.filePathsByFileName, fileName);
     }
 
-    getFilePathsForFileName(fileName: string) {
-        return _.get(this.filePathsByFileName, fileName);
+    getFilePathsForFileName(fileName: string): string[] {
+        return _.get(this.filePathsByFileName, fileName, []);
     }
 
     directoryPathExists(dirPath: string) {
@@ -219,14 +221,14 @@ export class FileBrowser {
         return micromatch(this.filePaths, pattern);
     }
 
-    async getFileData(filePath: string) {
+    async getFileData(filePath: string): Promise<any> {
         if (!this.filePathExists(filePath)) {
             return null;
         }
         if (!(filePath in this.fileData)) {
             const extension = path.extname(filePath).substring(1);
             const data = await this.fileBrowserAdapter.readFile(filePath);
-            if (['yml', 'yaml', 'json', 'toml', 'md', 'mdx', 'markdown'].includes(extension)) {
+            if ([...DATA_FILE_EXTENSIONS, ...MARKDOWN_FILE_EXTENSIONS].includes(extension)) {
                 this.fileData[filePath] = parseDataByFilePath(data, filePath);
             } else {
                 this.fileData[filePath] = data;

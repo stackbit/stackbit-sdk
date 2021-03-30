@@ -1,8 +1,10 @@
 import path from 'path';
 import _ from 'lodash';
 import { forEachPromise, reducePromise } from '@stackbit/utils';
+
 import { FileBrowser, FileBrowserAdapterInterface } from './file-browser';
 import { findDirsWithPackageDependency } from './analyzer-utils';
+import { Config } from '../config/config-loader';
 
 export interface CMSMatcherOptions {
     fileBrowserAdapter?: FileBrowserAdapterInterface;
@@ -10,7 +12,7 @@ export interface CMSMatcherOptions {
 }
 
 export interface CMSMatchResult {
-    cmsName: string;
+    cmsName: Config['cmsName'];
     cmsDir?: string;
     cmsProjectId?: string;
     cmsEnvironmentName?: string;
@@ -61,7 +63,7 @@ export async function matchCMS({ fileBrowser, fileBrowserAdapter }: CMSMatcherOp
 }
 
 interface CSSMatcher {
-    name: string;
+    name: Config['cmsName'];
     matchByPackageName?: string;
     match?: (fileBrowser: FileBrowser) => Promise<Omit<CMSMatchResult, 'cmsName'> | null>;
 }
@@ -83,11 +85,14 @@ const CSSMatchers: CSSMatcher[] = [
             const dirs = _.map(configFilePaths, (filePath) => path.parse(filePath).dir);
             if (dirs.length === 1) {
                 const config = await fileBrowser.getFileData(configFilePaths[0]!);
-                return _.omitBy({
-                    cmsDir: dirs[0],
-                    cmsProjectId: _.get(config, 'api.projectId'),
-                    cmsEnvironmentName: _.get(config, 'api.dataset')
-                }, _.isNil);
+                return _.omitBy(
+                    {
+                        cmsDir: dirs[0],
+                        cmsProjectId: _.get(config, 'api.projectId'),
+                        cmsEnvironmentName: _.get(config, 'api.dataset')
+                    },
+                    _.isNil
+                );
             } else if (dirs.length > 1) {
                 return {
                     options: {

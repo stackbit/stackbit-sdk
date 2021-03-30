@@ -1,7 +1,9 @@
 import path from 'path';
 import _ from 'lodash';
+
 import { FileBrowser, FileBrowserAdapterInterface } from './file-browser';
 import { extractNodeEnvironmentVariablesFromFile, findDirsWithPackageDependency } from './analyzer-utils';
+import { Config } from '../config/config-loader';
 
 export interface SSGMatcherOptions {
     fileBrowserAdapter?: FileBrowserAdapterInterface;
@@ -9,12 +11,13 @@ export interface SSGMatcherOptions {
 }
 
 export interface SSGMatchResult {
-    ssgName: string;
+    ssgName: Config['ssgName'];
     ssgDir?: string;
     isTheme?: boolean;
+    publishDir?: string;
+    staticDir?: string;
     pagesDir?: string;
     dataDir?: string;
-    staticDir?: string;
     envVars?: string[];
     options?: {
         ssgDirs?: string[];
@@ -38,9 +41,10 @@ async function getFirstMatchedSSG(fileBrowser: FileBrowser): Promise<SSGMatchRes
     for (ssgMatcher of SSGMatchers) {
         if (ssgMatcher.match) {
             partialMatch = await ssgMatcher.match(fileBrowser!);
-            break;
         } else if (ssgMatcher.matchByPackageName) {
             partialMatch = await matchSSGByPackageName(fileBrowser!, ssgMatcher.matchByPackageName);
+        }
+        if (partialMatch) {
             break;
         }
     }
@@ -49,6 +53,7 @@ async function getFirstMatchedSSG(fileBrowser: FileBrowser): Promise<SSGMatchRes
     }
     return {
         ssgName: ssgMatcher.name,
+        ...(_.pick(ssgMatcher, ['publishDir', 'staticDir'])),
         ...partialMatch
     };
 }
@@ -70,14 +75,17 @@ async function matchSSGByPackageName(fileBrowser: FileBrowser, packageName: stri
 }
 
 interface SSGMatcher {
-    name: string;
+    name: Config['ssgName'];
     matchByPackageName?: string;
+    publishDir?: string;
+    staticDir?: string;
     match?: (fileBrowser: FileBrowser) => Promise<Omit<SSGMatchResult, 'ssgName'> | null>;
 }
 
 const SSGMatchers: SSGMatcher[] = [
     {
         name: 'gatsby',
+        publishDir: 'public',
         match: async (fileBrowser) => {
             const partialMatch = await matchSSGByPackageName(fileBrowser, 'gatsby');
             if (!partialMatch || partialMatch.ssgDir === undefined) {
@@ -93,14 +101,19 @@ const SSGMatchers: SSGMatcher[] = [
     },
     {
         name: 'nextjs',
+        publishDir: 'out',
+        staticDir: 'static',
         matchByPackageName: 'next'
     },
     {
         name: 'hexo',
+        publishDir: 'public',
         matchByPackageName: 'hexo'
     },
     {
         name: 'eleventy',
+        // TODO: publishDir can be changed in 11ty config, read it from there
+        publishDir: '_site',
         matchByPackageName: '@11ty/eleventy'
     },
     {
@@ -139,7 +152,8 @@ const SSGMatchers: SSGMatcher[] = [
                 contentDir: 'content',
                 dataDir: 'data',
                 layoutDir: 'layouts',
-                staticDir: 'static'
+                staticDir: 'static',
+                publishDir: 'public'
             };
             if (configFilePath) {
                 const configData = fileBrowser.getFileData(configFilePath);
@@ -158,7 +172,8 @@ const SSGMatchers: SSGMatcher[] = [
                 isTheme: isTheme,
                 pagesDir: dirMap.contentDir,
                 dataDir: dirMap.dataDir,
-                staticDir: dirMap.staticDir
+                staticDir: dirMap.staticDir,
+                publishDir: dirMap.publishDir
             };
         }
     },
@@ -208,7 +223,8 @@ const SSGMatchers: SSGMatcher[] = [
                 data_dir: '_data',
                 plugins_dir: '_plugins',
                 layouts_dir: '_layouts',
-                includes_dir: '_includes'
+                includes_dir: '_includes',
+                destination: '_site'
             };
             if (configFilePath) {
                 const configData = fileBrowser.getFileData(configFilePath);
@@ -216,10 +232,11 @@ const SSGMatchers: SSGMatcher[] = [
             }
             const match = {
                 ssgDir: '',
+                isTheme: hasGemspecWithJekyll,
                 pagesDir: dirMap.source,
                 dataDir: dirMap.data_dir,
                 staticDir: dirMap.source,
-                isTheme: hasGemspecWithJekyll
+                publishDir: dirMap.destination
             };
 
             if (hasGemfileWithJekyll || hasGemspecWithJekyll) {
