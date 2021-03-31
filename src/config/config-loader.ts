@@ -11,7 +11,9 @@ import { isPageModel } from '../schema-utils';
 
 export type BaseModel = {
     name: string;
-    invalid?: boolean;
+    __metadata?: {
+        invalid?: boolean
+    };
 };
 export type ObjectModel = YamlObjectModel & BaseModel;
 export type DataModel = YamlDataModel & BaseModel;
@@ -169,7 +171,7 @@ function normalizeConfig(validationResult: ConfigValidationResult): Config {
                 ...yamlModel
             };
             if (invalidModelNames.includes(modelName)) {
-                model.invalid = true;
+                _.set(model, '__metadata.invalid', true);
             }
             if (isPageModel(model) && !model.hideContent && model.fields) {
                 model.fields.push({

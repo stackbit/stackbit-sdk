@@ -58,12 +58,22 @@ export class FileSystemFileBrowserAdapter implements FileBrowserAdapterInterface
     }
 }
 
-export interface GitHubFileBrowserAdapterOptions {
-    owner: string;
-    repo: string;
+export interface GitHubFileBrowserAdapterBaseOptions {
     branch: string;
     auth?: string;
 }
+
+export interface GitHubFileBrowserAdapterOwnerRepoOptions {
+    owner: string;
+    repo: string;
+}
+
+export interface GitHubFileBrowserAdapterRepoUrlOptions {
+    repoUrl: string;
+}
+
+export type GitHubFileBrowserAdapterOptions = GitHubFileBrowserAdapterBaseOptions &
+    (GitHubFileBrowserAdapterRepoUrlOptions | GitHubFileBrowserAdapterOwnerRepoOptions);
 
 interface OctokitTreeNode {
     path?: string;
@@ -80,12 +90,23 @@ export class GitHubFileBrowserAdapter implements FileBrowserAdapterInterface {
     private readonly repo: string;
     private readonly branch: string;
 
-    constructor({ owner, repo, branch, auth }: GitHubFileBrowserAdapterOptions) {
-        this.owner = owner;
-        this.repo = repo;
-        this.branch = branch;
+    constructor(options: GitHubFileBrowserAdapterBaseOptions & GitHubFileBrowserAdapterRepoUrlOptions);
+    constructor(options: GitHubFileBrowserAdapterBaseOptions & GitHubFileBrowserAdapterOwnerRepoOptions);
+    constructor(options: GitHubFileBrowserAdapterOptions) {
+        if ('repoUrl' in options) {
+            const parsedRepoUrl = this.parseGitHubUrl(options.repoUrl);
+            if (!parsedRepoUrl) {
+                throw new Error(`repository URL '${options.repoUrl}' cannot be parsed, please use standard github URL`);
+            }
+            this.owner = parsedRepoUrl.owner;
+            this.repo = parsedRepoUrl.repo;
+        } else {
+            this.owner = options.owner;
+            this.repo = options.repo;
+        }
+        this.branch = options.branch;
         this.octokit = new Octokit({
-            auth: auth
+            auth: options.auth
         });
     }
 
@@ -156,6 +177,16 @@ export class GitHubFileBrowserAdapter implements FileBrowserAdapterInterface {
             return Buffer.from(base64Content, 'base64').toString();
         }
         return '';
+    }
+
+    parseGitHubUrl(repoUrl: string): GitHubFileBrowserAdapterOwnerRepoOptions | null {
+        const match = repoUrl.match(/github\.com[/:](.+?)\/(.+?)(\.git)?$/);
+        if (!match) {
+            return null;
+        }
+        const owner = match[1]!;
+        const repo = match[2]!;
+        return { owner, repo };
     }
 }
 

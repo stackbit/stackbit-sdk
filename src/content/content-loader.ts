@@ -98,6 +98,11 @@ async function loadDataFiles({ dirPath, config, skipUnmodeledContent }: ContentL
     // if dataDir was not set, assume empty string as root folder
     const dataDir = config.dataDir || '';
     const absDataDirPath = path.join(dirPath, dataDir);
+    const dataDirExists = await fse.pathExists(absDataDirPath);
+    if (!dataDirExists) {
+        return { contentItems, errors };
+    }
+
     const excludedFiles = ['**/node_modules/**'];
     const dataModels = config.models.filter(isDataModel);
 
@@ -148,8 +153,13 @@ async function loadPageFiles({ dirPath, config, skipUnmodeledContent }: ContentL
 
     // if pagesDir was not set, assume empty string as root folder
     const pagesDir = config.pagesDir || '';
-    const pageLayoutKey = config.pageLayoutKey;
     const absPagesDirPath = path.join(dirPath, pagesDir);
+    const pageDirExists = await fse.pathExists(absPagesDirPath);
+    if (!pageDirExists) {
+        return { contentItems, errors };
+    }
+
+    const pageLayoutKey = config.pageLayoutKey;
     const excludedFiles = _.castArray(config.excludePages || []).concat(['**/node_modules/**']);
     const pageModels = config.models.filter(isPageModel);
 

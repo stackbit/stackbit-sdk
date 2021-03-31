@@ -51,9 +51,10 @@ export function validate({ contentItems, config }: ContentValidationOptions): Co
                     // in config models allow skip root fields
                     modelSchema = modelSchema.unknown();
                 } else if (isPageModel(model)) {
-                    if (config.ssgName === 'unibit') {
-                        // in Unibit, every page has implicit layout field which must be equal to model name
-                        modelSchema = modelSchema.keys({ layout: Joi.string().valid(modelName).required() });
+                    // if pageLayoutKey is defined, then every page has implicit layout field which must be equal to model name
+                    const pageLayoutKey = config.pageLayoutKey || 'layout';
+                    if (!_.find(model.fields, { name: pageLayoutKey })) {
+                        modelSchema = modelSchema.keys({ [pageLayoutKey]: Joi.string().valid(modelName) });
                     }
                 }
                 modelSchema = modelSchema.keys({

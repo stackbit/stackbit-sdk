@@ -32,7 +32,7 @@ export function joiSchemasForModels(models: Model[]) {
         models,
         (modelSchemas: ModelSchemaMap, model: Model) => {
             let joiSchema: Joi.ObjectSchema;
-            if (model.invalid) {
+            if (model.__metadata?.invalid) {
                 // if root model is invalid, replace the label with "file" otherwise joi outputs "value" which is not descriptive
                 let objectLabel = '{{#label}}';
                 if (isDataModel(model) || isPageModel(model)) {
