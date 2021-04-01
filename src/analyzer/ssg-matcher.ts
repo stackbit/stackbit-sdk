@@ -53,7 +53,7 @@ async function getFirstMatchedSSG(fileBrowser: FileBrowser): Promise<SSGMatchRes
     }
     return {
         ssgName: ssgMatcher.name,
-        ...(_.pick(ssgMatcher, ['publishDir', 'staticDir'])),
+        ..._.pick(ssgMatcher, ['publishDir', 'staticDir']),
         ...partialMatch
     };
 }
@@ -86,6 +86,7 @@ const SSGMatchers: SSGMatcher[] = [
     {
         name: 'gatsby',
         publishDir: 'public',
+        staticDir: 'static',
         match: async (fileBrowser) => {
             const partialMatch = await matchSSGByPackageName(fileBrowser, 'gatsby');
             if (!partialMatch || partialMatch.ssgDir === undefined) {

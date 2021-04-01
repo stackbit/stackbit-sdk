@@ -12,7 +12,7 @@ import { isPageModel } from '../schema-utils';
 export type BaseModel = {
     name: string;
     __metadata?: {
-        invalid?: boolean
+        invalid?: boolean;
     };
 };
 export type ObjectModel = YamlObjectModel & BaseModel;

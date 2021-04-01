@@ -16,6 +16,7 @@ export {
 } from './config/config-loader';
 export { writeConfig, WriteConfigOptions, convertToYamlConfig } from './config/config-writer';
 export { loadContent, ContentItem, ContentLoaderOptions, ContentLoaderResult } from './content/content-loader';
-export { matchSSG, SSGMatchResult } from './analyzer/ssg-matcher';
-export { matchCMS, CMSMatchResult } from './analyzer/cms-matcher';
+export { matchSSG, SSGMatcherOptions, SSGMatchResult } from './analyzer/ssg-matcher';
+export { matchCMS, CMSMatcherOptions, CMSMatchResult } from './analyzer/cms-matcher';
+export { analyzeSite, SiteAnalyzerOptions, SiteAnalyzerResult } from './analyzer/site-analyzer';
 export * from './analyzer/file-browser';

@@ -1,6 +1,6 @@
 import path from 'path';
 import _ from 'lodash';
-import { forEachPromise, reducePromise } from '@stackbit/utils';
+import { findPromise, forEachPromise, reducePromise } from '@stackbit/utils';
 
 import { FileBrowser, FileBrowserAdapterInterface } from './file-browser';
 import { findDirsWithPackageDependency } from './analyzer-utils';
@@ -11,15 +11,30 @@ export interface CMSMatcherOptions {
     fileBrowser?: FileBrowser;
 }
 
-export interface CMSMatchResult {
-    cmsName: Config['cmsName'];
-    cmsDir?: string;
-    cmsProjectId?: string;
-    cmsEnvironmentName?: string;
-    options?: {
-        cmsDirs?: string[];
-    };
+type CmsNames = NonNullable<Config['cmsName']>;
+
+export interface CMSResultDataSanity {
+    studioPath: string;
+    projectId?: string;
+    dataset?: string;
 }
+
+export interface CMSResultDataNetlifyCMS {
+    configPath: string;
+}
+
+export interface CMSResultDataForestry {
+    forestryDir: string;
+    siteId?: string;
+    ssoName?: string;
+}
+
+type CMSResultDataType = CMSResultDataSanity | CMSResultDataNetlifyCMS | CMSResultDataForestry;
+
+export type CMSMatchResult = {
+    cmsName: CmsNames;
+    cmsData?: CMSResultDataType;
+};
 
 export async function matchCMS({ fileBrowser, fileBrowserAdapter }: CMSMatcherOptions): Promise<CMSMatchResult | null> {
     if (!fileBrowser) {
@@ -32,11 +47,11 @@ export async function matchCMS({ fileBrowser, fileBrowserAdapter }: CMSMatcherOp
     let cssMatch: CMSMatchResult | null = null;
     await forEachPromise(CSSMatchers, async (cssMatcher: CSSMatcher) => {
         if (cssMatcher.match) {
-            const partialMatch = await cssMatcher.match(fileBrowser!);
-            if (partialMatch) {
+            const cmsDataResult = await cssMatcher.match(fileBrowser!);
+            if (cmsDataResult) {
                 cssMatch = {
                     cmsName: cssMatcher.name,
-                    ...partialMatch
+                    cmsData: cmsDataResult
                 };
                 return false;
             }
@@ -44,16 +59,7 @@ export async function matchCMS({ fileBrowser, fileBrowserAdapter }: CMSMatcherOp
             const dirs = await findDirsWithPackageDependency(fileBrowser!, cssMatcher.matchByPackageName);
             if (dirs.length === 1) {
                 cssMatch = {
-                    cmsName: cssMatcher.name,
-                    cmsDir: dirs[0]
-                };
-                return false;
-            } else if (dirs.length > 1) {
-                cssMatch = {
-                    cmsName: cssMatcher.name,
-                    options: {
-                        cmsDirs: dirs
-                    }
+                    cmsName: cssMatcher.name
                 };
                 return false;
             }
@@ -63,9 +69,9 @@ export async function matchCMS({ fileBrowser, fileBrowserAdapter }: CMSMatcherOp
 }
 
 interface CSSMatcher {
-    name: Config['cmsName'];
+    name: CmsNames;
     matchByPackageName?: string;
-    match?: (fileBrowser: FileBrowser) => Promise<Omit<CMSMatchResult, 'cmsName'> | null>;
+    match?: (fileBrowser: FileBrowser) => Promise<CMSResultDataType | null>;
 }
 
 const CSSMatchers: CSSMatcher[] = [
@@ -82,23 +88,20 @@ const CSSMatchers: CSSMatcher[] = [
                 return null;
             }
             const configFilePaths = fileBrowser.getFilePathsForFileName(configFile);
-            const dirs = _.map(configFilePaths, (filePath) => path.parse(filePath).dir);
-            if (dirs.length === 1) {
-                const config = await fileBrowser.getFileData(configFilePaths[0]!);
+            const rootConfigPath = await findPromise(configFilePaths, async (configFilePath: string) => {
+                const config = await fileBrowser.getFileData(configFilePath);
+                return _.has(config, 'root') || _.has(config, 'api');
+            });
+            if (rootConfigPath) {
+                const config = await fileBrowser.getFileData(rootConfigPath);
                 return _.omitBy(
                     {
-                        cmsDir: dirs[0],
-                        cmsProjectId: _.get(config, 'api.projectId'),
-                        cmsEnvironmentName: _.get(config, 'api.dataset')
+                        studioPath: path.parse(rootConfigPath).dir,
+                        projectId: _.get(config, 'api.projectId'),
+                        dataset: _.get(config, 'api.dataset')
                     },
                     _.isNil
-                );
-            } else if (dirs.length > 1) {
-                return {
-                    options: {
-                        cmsDirs: dirs
-                    }
-                };
+                ) as CMSResultDataSanity;
             }
             return null;
         }
@@ -112,7 +115,7 @@ const CSSMatchers: CSSMatcher[] = [
                 return null;
             }
             return {
-                cmsDir: ''
+                forestryDir: configFolder
             };
         }
     },
@@ -143,16 +146,9 @@ const CSSMatchers: CSSMatcher[] = [
                 },
                 []
             );
-            const dirs = _.map(netlifyCMSConfigFilePaths, (filePath) => path.parse(filePath).dir);
-            if (dirs.length === 1) {
+            if (netlifyCMSConfigFilePaths.length === 1) {
                 return {
-                    cmsDir: dirs[0]
-                };
-            } else if (dirs.length > 1) {
-                return {
-                    options: {
-                        cmsDirs: dirs
-                    }
+                    configPath: netlifyCMSConfigFilePaths[0]!
                 };
             }
             return null;

@@ -5,7 +5,7 @@ import micromatch from 'micromatch';
 import { Octokit } from '@octokit/rest';
 import { readDirRecursively, parseDataByFilePath, reducePromise } from '@stackbit/utils';
 
-import { DATA_FILE_EXTENSIONS, MARKDOWN_FILE_EXTENSIONS } from '../consts';
+import { DATA_FILE_EXTENSIONS, GLOBAL_EXCLUDES, MARKDOWN_FILE_EXTENSIONS } from '../consts';
 
 export interface FileResult {
     filePath: string;
@@ -40,7 +40,7 @@ export class FileSystemFileBrowserAdapter implements FileBrowserAdapterInterface
             includeStats: true,
             filter: (filePath) => {
                 const isIncluded = !includePattern || micromatch.isMatch(filePath, includePattern);
-                excludePattern = excludePattern || ['**/node_modules', '.git', '.idea'];
+                excludePattern = excludePattern || GLOBAL_EXCLUDES;
                 const isExcluded = micromatch.isMatch(filePath, excludePattern);
                 return isIncluded && !isExcluded;
             }
@@ -190,6 +190,25 @@ export class GitHubFileBrowserAdapter implements FileBrowserAdapterInterface {
     }
 }
 
+export type GetFileBrowserOptions = { fileBrowser: FileBrowser } | { fileBrowserAdapter: FileBrowserAdapterInterface };
+export function getFileBrowserFromOptions(options: GetFileBrowserOptions): FileBrowser {
+    if ('fileBrowser' in options) {
+        return options.fileBrowser;
+    }
+    if (!('fileBrowserAdapter' in options)) {
+        throw new Error('either fileBrowser or fileBrowserAdapter must be provided to SSG matcher');
+    }
+    return new FileBrowser({ fileBrowserAdapter: options.fileBrowserAdapter });
+}
+
+export interface FileBrowserOptions {
+    fileBrowserAdapter: FileBrowserAdapterInterface;
+}
+
+interface TreeNode {
+    [key: string]: true | TreeNode;
+}
+
 export class FileBrowser {
     private readonly fileBrowserAdapter: FileBrowserAdapterInterface;
     private readonly filePathMap: Record<string, boolean>;
@@ -197,14 +216,16 @@ export class FileBrowser {
     private readonly filePathsByFileName: Record<string, string[]>;
     private readonly fileData: Record<string, any>;
     private readonly filePaths: string[];
+    private readonly fileTree: TreeNode;
     private files: FileResult[] = [];
 
-    constructor({ fileBrowserAdapter }: { fileBrowserAdapter: FileBrowserAdapterInterface }) {
+    constructor({ fileBrowserAdapter }: FileBrowserOptions) {
         this.fileBrowserAdapter = fileBrowserAdapter;
         this.filePaths = [];
         this.filePathMap = {};
         this.directoryPathsMap = {};
         this.filePathsByFileName = {};
+        this.fileTree = {};
         this.fileData = {};
     }
 
@@ -217,7 +238,9 @@ export class FileBrowser {
         // create maps to find files by names or paths quickly
         _.forEach(this.files, (fileReadResult) => {
             const filePath = fileReadResult.filePath;
+            const filePathArr = filePath.split(path.sep);
             if (fileReadResult.isFile) {
+                _.set(this.fileTree, filePathArr, true);
                 const pathObject = path.parse(filePath);
                 const fileName = pathObject.base;
                 if (!(fileName in this.filePathsByFileName)) {
@@ -227,6 +250,9 @@ export class FileBrowser {
                 this.filePaths.push(filePath);
                 this.filePathMap[filePath] = true;
             } else if (fileReadResult.isDirectory) {
+                if (!_.has(this.fileTree, filePathArr)) {
+                    _.set(this.fileTree, filePathArr, {});
+                }
                 this.directoryPathsMap[filePath] = true;
             }
         });
@@ -250,6 +276,30 @@ export class FileBrowser {
 
     findFiles(pattern: string | string[]) {
         return micromatch(this.filePaths, pattern);
+    }
+
+    readFilesRecursively(dirPath: string, { filter, includeDirs }: { filter?: (fileResult: FileResult) => boolean; includeDirs?: boolean }): string[] {
+        const reduceTreeNode = (treeNode: TreeNode, parentPath: string) => {
+            return _.reduce(
+                treeNode,
+                (result: string[], value, name) => {
+                    const filePath = path.join(parentPath, name);
+                    const isFile = value === true;
+                    if (filter && !filter({ filePath, isFile: isFile, isDirectory: !isFile })) {
+                        return result;
+                    }
+                    if (value !== true) {
+                        const childFilePaths = reduceTreeNode(value, filePath);
+                        result = includeDirs ? result.concat(filePath, childFilePaths) : result.concat(childFilePaths);
+                    } else {
+                        result = result.concat(filePath);
+                    }
+                    return result;
+                },
+                []
+            );
+        };
+        return reduceTreeNode(this.fileTree, '');
     }
 
     async getFileData(filePath: string): Promise<any> {

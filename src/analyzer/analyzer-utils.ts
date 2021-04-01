@@ -42,5 +42,5 @@ export async function extractNodeEnvironmentVariablesFromFile(fileBrowser: FileB
     while ((reResult = envVarsRe.exec(data)) !== null) {
         envVars.push(reResult[1]!);
     }
-    return envVars;
+    return _.uniq(envVars);
 }
