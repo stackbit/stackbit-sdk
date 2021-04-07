@@ -28,6 +28,7 @@ export async function analyzeSite(options: SiteAnalyzerOptions): Promise<SiteAna
         stackbitVersion: '~0.3.0',
         ssgName: ssgMatchResult?.ssgName,
         cmsName: cmsMatchResult?.cmsName,
+        nodeVersion: ssgMatchResult?.nodeVersion,
         publishDir: ssgMatchResult?.publishDir,
         dataDir: ssgMatchResult?.dataDir,
         pagesDir: ssgMatchResult?.pagesDir,

@@ -235,6 +235,7 @@ export type FieldPartialProps = StricterUnion<NonStrictFieldPartialProps>;
 
 export type FieldListItems = StricterUnion<Exclude<NonStrictFieldPartialProps, FieldListProps>>;
 
+export type SimpleField = FieldSimpleNoProps & FieldCommonProps;
 export type FieldEnum = FieldEnumProps & FieldCommonProps;
 export type FieldObject = FieldObjectProps & FieldCommonProps;
 export type FieldList = FieldListProps & FieldCommonProps;
@@ -538,6 +539,7 @@ export interface YamlConfig {
     stackbitVersion: string;
     ssgName?: typeof SSG_NAMES[number];
     ssgVersion?: string;
+    nodeVersion?: string;
     cmsName?: typeof CMS_NAMES[number];
     import?: Import;
     buildCommand?: string;
@@ -558,6 +560,7 @@ const schema = Joi.object<YamlConfig>({
     stackbitVersion: Joi.string().required(),
     ssgName: Joi.string().valid(...SSG_NAMES),
     ssgVersion: Joi.string(),
+    nodeVersion: Joi.string(),
     cmsName: Joi.string().valid(...CMS_NAMES),
     import: importSchema,
     buildCommand: Joi.string(),

@@ -1,14 +1,12 @@
 import path from 'path';
 import _ from 'lodash';
+import semver from 'semver';
 
-import { FileBrowser, FileBrowserAdapterInterface } from './file-browser';
+import { FileBrowser, getFileBrowserFromOptions, GetFileBrowserOptions } from './file-browser';
 import { extractNodeEnvironmentVariablesFromFile, findDirsWithPackageDependency } from './analyzer-utils';
 import { Config } from '../config/config-loader';
 
-export interface SSGMatcherOptions {
-    fileBrowserAdapter?: FileBrowserAdapterInterface;
-    fileBrowser?: FileBrowser;
-}
+export type SSGMatcherOptions = GetFileBrowserOptions;
 
 export interface SSGMatchResult {
     ssgName: Config['ssgName'];
@@ -19,18 +17,16 @@ export interface SSGMatchResult {
     pagesDir?: string;
     dataDir?: string;
     envVars?: string[];
+    nodeVersion?: string;
     options?: {
         ssgDirs?: string[];
     };
 }
 
-export async function matchSSG({ fileBrowser, fileBrowserAdapter }: SSGMatcherOptions): Promise<SSGMatchResult | null> {
-    if (!fileBrowser) {
-        if (!fileBrowserAdapter) {
-            throw new Error('either fileBrowser or fileBrowserAdapter must be provided to SSG matcher');
-        }
-        fileBrowser = new FileBrowser({ fileBrowserAdapter });
-    }
+type SSGMatchPartialResult = Omit<SSGMatchResult, 'ssgName'>;
+
+export async function matchSSG(options: SSGMatcherOptions): Promise<SSGMatchResult | null> {
+    const fileBrowser = getFileBrowserFromOptions(options);
     await fileBrowser.listFiles();
     return getFirstMatchedSSG(fileBrowser);
 }
@@ -51,6 +47,12 @@ async function getFirstMatchedSSG(fileBrowser: FileBrowser): Promise<SSGMatchRes
     if (!partialMatch || !ssgMatcher) {
         return null;
     }
+    if (partialMatch.nodeVersion === undefined && ssgMatcher.matchNodeVersion) {
+        const nodeVersion = await matchNodeVersion(fileBrowser, partialMatch);
+        if (nodeVersion) {
+            partialMatch.nodeVersion = nodeVersion;
+        }
+    }
     return {
         ssgName: ssgMatcher.name,
         ..._.pick(ssgMatcher, ['publishDir', 'staticDir']),
@@ -58,8 +60,8 @@ async function getFirstMatchedSSG(fileBrowser: FileBrowser): Promise<SSGMatchRes
     };
 }
 
-async function matchSSGByPackageName(fileBrowser: FileBrowser, packageName: string): Promise<Omit<SSGMatchResult, 'ssgName'> | null> {
-    const dirs = await findDirsWithPackageDependency(fileBrowser, packageName);
+async function matchSSGByPackageName(fileBrowser: FileBrowser, packageName: string): Promise<SSGMatchPartialResult | null> {
+    const dirs = await findDirsWithPackageDependency(fileBrowser, [packageName]);
     if (dirs.length === 1) {
         return {
             ssgDir: dirs[0]
@@ -74,12 +76,35 @@ async function matchSSGByPackageName(fileBrowser: FileBrowser, packageName: stri
     return null;
 }
 
+async function matchNodeVersion(fileBrowser: FileBrowser, partialMatch: SSGMatchPartialResult): Promise<string | null> {
+    if (partialMatch.ssgDir === undefined) {
+        return null;
+    }
+    const packageJsonPath = path.join(partialMatch.ssgDir, 'package.json');
+    const packageJsonData = await fileBrowser.getFileData(packageJsonPath);
+    if (packageJsonData) {
+        const nodeVerRange = _.get(packageJsonData, 'engines.node');
+        if (nodeVerRange && semver.validRange(nodeVerRange)) {
+            const minNodeVersion = semver.minVersion(nodeVerRange);
+            return minNodeVersion ? String(minNodeVersion.major) : null;
+        }
+    }
+    const nvmrcPath = path.join(partialMatch.ssgDir, '.nvmrc');
+    const nvmrcData = await fileBrowser.getFileData(nvmrcPath);
+    if (nvmrcData && semver.validRange(nvmrcData)) {
+        const minNodeVersion = semver.minVersion(nvmrcData);
+        return minNodeVersion ? String(minNodeVersion.major) : null;
+    }
+    return null;
+}
+
 interface SSGMatcher {
     name: Config['ssgName'];
     matchByPackageName?: string;
+    matchNodeVersion?: boolean;
     publishDir?: string;
     staticDir?: string;
-    match?: (fileBrowser: FileBrowser) => Promise<Omit<SSGMatchResult, 'ssgName'> | null>;
+    match?: (fileBrowser: FileBrowser) => Promise<SSGMatchPartialResult | null>;
 }
 
 const SSGMatchers: SSGMatcher[] = [
@@ -87,6 +112,7 @@ const SSGMatchers: SSGMatcher[] = [
         name: 'gatsby',
         publishDir: 'public',
         staticDir: 'static',
+        matchNodeVersion: false,
         match: async (fileBrowser) => {
             const partialMatch = await matchSSGByPackageName(fileBrowser, 'gatsby');
             if (!partialMatch || partialMatch.ssgDir === undefined) {
@@ -97,6 +123,17 @@ const SSGMatchers: SSGMatcher[] = [
             if (!_.isEmpty(envVars)) {
                 partialMatch.envVars = envVars;
             }
+            const nodeVesion = await matchNodeVersion(fileBrowser, partialMatch);
+            if (nodeVesion) {
+                partialMatch.nodeVersion = nodeVesion;
+            } else {
+                const packageJsonPath = path.join(partialMatch.ssgDir, 'package.json');
+                const packageJsonData = await fileBrowser.getFileData(packageJsonPath);
+                const gatsbyVersion = semver.coerce(_.get(packageJsonData, ['dependencies', 'gatsby']));
+                if (gatsbyVersion && semver.satisfies(gatsbyVersion, '>=3.x')) {
+                    partialMatch.nodeVersion = '12';
+                }
+            }
             return partialMatch;
         }
     },
@@ -104,33 +141,40 @@ const SSGMatchers: SSGMatcher[] = [
         name: 'nextjs',
         publishDir: 'out',
         staticDir: 'static',
+        matchNodeVersion: true,
         matchByPackageName: 'next'
     },
     {
         name: 'hexo',
         publishDir: 'public',
+        matchNodeVersion: true,
         matchByPackageName: 'hexo'
     },
     {
         name: 'eleventy',
         // TODO: publishDir can be changed in 11ty config, read it from there
         publishDir: '_site',
+        matchNodeVersion: true,
         matchByPackageName: '@11ty/eleventy'
     },
     {
         name: 'vuepress',
+        matchNodeVersion: true,
         matchByPackageName: 'vuepress'
     },
     {
         name: 'gridsome',
+        matchNodeVersion: true,
         matchByPackageName: 'gridsome'
     },
     {
         name: 'nuxt',
+        matchNodeVersion: true,
         matchByPackageName: 'nuxt'
     },
     {
         name: 'sapper',
+        matchNodeVersion: true,
         matchByPackageName: 'sapper'
     },
     {

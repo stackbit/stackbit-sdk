@@ -2,16 +2,13 @@ import path from 'path';
 import _ from 'lodash';
 import { findPromise, forEachPromise, reducePromise } from '@stackbit/utils';
 
-import { FileBrowser, FileBrowserAdapterInterface } from './file-browser';
+import { FileBrowser, getFileBrowserFromOptions, GetFileBrowserOptions } from './file-browser';
 import { findDirsWithPackageDependency } from './analyzer-utils';
 import { Config } from '../config/config-loader';
 
-export interface CMSMatcherOptions {
-    fileBrowserAdapter?: FileBrowserAdapterInterface;
-    fileBrowser?: FileBrowser;
-}
+export type CMSMatcherOptions = GetFileBrowserOptions;
 
-type CmsNames = NonNullable<Config['cmsName']>;
+type CmsName = NonNullable<Config['cmsName']>;
 
 export interface CMSResultDataSanity {
     studioPath: string;
@@ -32,17 +29,12 @@ export interface CMSResultDataForestry {
 type CMSResultDataType = CMSResultDataSanity | CMSResultDataNetlifyCMS | CMSResultDataForestry;
 
 export type CMSMatchResult = {
-    cmsName: CmsNames;
+    cmsName: CmsName;
     cmsData?: CMSResultDataType;
 };
 
-export async function matchCMS({ fileBrowser, fileBrowserAdapter }: CMSMatcherOptions): Promise<CMSMatchResult | null> {
-    if (!fileBrowser) {
-        if (!fileBrowserAdapter) {
-            throw new Error('either fileBrowser or fileBrowserAdapter must be provided to CSS matcher');
-        }
-        fileBrowser = new FileBrowser({ fileBrowserAdapter });
-    }
+export async function matchCMS(options: CMSMatcherOptions): Promise<CMSMatchResult | null> {
+    const fileBrowser = getFileBrowserFromOptions(options);
     await fileBrowser.listFiles();
     let cssMatch: CMSMatchResult | null = null;
     await forEachPromise(CSSMatchers, async (cssMatcher: CSSMatcher) => {
@@ -56,7 +48,7 @@ export async function matchCMS({ fileBrowser, fileBrowserAdapter }: CMSMatcherOp
                 return false;
             }
         } else if (cssMatcher.matchByPackageName) {
-            const dirs = await findDirsWithPackageDependency(fileBrowser!, cssMatcher.matchByPackageName);
+            const dirs = await findDirsWithPackageDependency(fileBrowser!, _.castArray(cssMatcher.matchByPackageName));
             if (dirs.length === 1) {
                 cssMatch = {
                     cmsName: cssMatcher.name
@@ -69,15 +61,15 @@ export async function matchCMS({ fileBrowser, fileBrowserAdapter }: CMSMatcherOp
 }
 
 interface CSSMatcher {
-    name: CmsNames;
-    matchByPackageName?: string;
+    name: CmsName;
+    matchByPackageName?: string | string[];
     match?: (fileBrowser: FileBrowser) => Promise<CMSResultDataType | null>;
 }
 
 const CSSMatchers: CSSMatcher[] = [
     {
         name: 'contentful',
-        matchByPackageName: 'gatsby-source-contentful'
+        matchByPackageName: ['gatsby-source-contentful', 'sourcebit-source-contentful', 'contentful', 'contentful-management']
     },
     {
         name: 'sanity',
