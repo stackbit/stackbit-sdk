@@ -18,6 +18,7 @@ export interface SSGMatchResult {
     dataDir?: string;
     envVars?: string[];
     nodeVersion?: string;
+    pageTypeKey?: string;
     options?: {
         ssgDirs?: string[];
     };
@@ -55,7 +56,7 @@ async function getFirstMatchedSSG(fileBrowser: FileBrowser): Promise<SSGMatchRes
     }
     return {
         ssgName: ssgMatcher.name,
-        ..._.pick(ssgMatcher, ['publishDir', 'staticDir']),
+        ..._.pick(ssgMatcher, ['publishDir', 'staticDir', 'pageTypeKey']),
         ...partialMatch
     };
 }
@@ -104,6 +105,7 @@ interface SSGMatcher {
     matchNodeVersion?: boolean;
     publishDir?: string;
     staticDir?: string;
+    pageTypeKey?: string;
     match?: (fileBrowser: FileBrowser) => Promise<SSGMatchPartialResult | null>;
 }
 
@@ -154,6 +156,7 @@ const SSGMatchers: SSGMatcher[] = [
         name: 'eleventy',
         // TODO: publishDir can be changed in 11ty config, read it from there
         publishDir: '_site',
+        pageTypeKey: 'layout',
         matchNodeVersion: true,
         matchByPackageName: '@11ty/eleventy'
     },
@@ -179,6 +182,7 @@ const SSGMatchers: SSGMatcher[] = [
     },
     {
         name: 'hugo',
+        pageTypeKey: 'layout',
         match: async (fileBrowser) => {
             let configFiles = ['config.toml', 'config.yaml', 'config.json'];
             configFiles = configFiles.concat(_.map(configFiles, (configFile) => 'config/_default/' + configFile));
@@ -224,6 +228,7 @@ const SSGMatchers: SSGMatcher[] = [
     },
     {
         name: 'jekyll',
+        pageTypeKey: 'layout',
         match: async (fileBrowser) => {
             // We (Stackbit) can only run Jekyll sites, or themes, that have explicitly defined specific 'jekyll' or
             // 'github-pages' as a dependency. Having jekyll plugin dependencies such as 'jekyll-paginate' and

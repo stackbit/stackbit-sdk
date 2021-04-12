@@ -18,8 +18,8 @@ export async function findDirsWithPackageDependency(fileBrowser: FileBrowser, pa
         filePaths,
         async (filePaths: string[], filePath: string) => {
             const data = await fileBrowser.getFileData(filePath);
-            const hasDependency = _.some(packageNames, packageName => _.has(data, ['dependencies', packageName]));
-            const hasDevDependency = _.some(packageNames, packageName => _.has(data, ['devDependencies', packageName]));
+            const hasDependency = _.some(packageNames, (packageName) => _.has(data, ['dependencies', packageName]));
+            const hasDevDependency = _.some(packageNames, (packageName) => _.has(data, ['devDependencies', packageName]));
             if (hasDependency || hasDevDependency) {
                 filePaths.push(filePath);
             }

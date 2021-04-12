@@ -12,9 +12,9 @@ import { Field, FieldType, FieldListItems, FieldListProps, FieldPartialProps, Fi
 type FieldPath = (string | number)[];
 type StringFieldTypes = Exclude<FieldType, 'number' | 'boolean' | 'enum' | 'object' | 'model' | 'reference' | 'list'>;
 type PartialObjectModel = Omit<ObjectModel, 'label'> & { refFieldPaths?: FieldPath[]; refFields?: FieldModelProps[] };
-type PartialPageModels = Omit<PageModel, 'label'> & { filePaths: string[] };
-type PartialDataModels = Omit<DataModel, 'label'> & { filePaths: string[] };
-type PartialModels = PartialPageModels | PartialDataModels;
+type PartialPageModel = Omit<PageModel, 'label'> & { filePaths: string[] };
+type PartialDataModel = Omit<DataModel, 'label'> & { filePaths: string[] };
+type PartialModel = PartialPageModel | PartialDataModel;
 
 const SAME_FOLDER_PAGE_DSC_COEFFICIENT = 0.7;
 const DIFF_FOLDER_PAGE_DSC_COEFFICIENT = 0.8;
@@ -48,8 +48,19 @@ export async function generateSchema({ ssgMatchResult, ...fileBrowserOptions }: 
     const pageFiles = await readDirRecursivelyWithFilter(fileBrowser, rootPagesDir, excludedPageFiles, MARKDOWN_FILE_EXTENSIONS);
     const dataFiles = await readDirRecursivelyWithFilter(fileBrowser, rootDataDir, excludedDataFiles, DATA_FILE_EXTENSIONS);
 
-    const pageModelsResults = await generatePageModelsForFiles(pageFiles, rootPagesDir, fileBrowser, []);
-    const dataModelsResults = await generateDataModelsForFiles(dataFiles, rootDataDir, fileBrowser, pageModelsResults.objectModels);
+    const pageModelsResults = await generatePageModelsForFiles({
+        filePaths: pageFiles,
+        dirPath: rootPagesDir,
+        fileBrowser: fileBrowser,
+        pageTypeKey: ssgMatchResult.pageTypeKey,
+        objectModels: []
+    });
+    const dataModelsResults = await generateDataModelsForFiles({
+        filePaths: dataFiles,
+        dirPath: rootDataDir,
+        fileBrowser: fileBrowser,
+        objectModels: pageModelsResults.objectModels
+    });
 
     let pageModels = analyzePageFileMatchingProperties(pageModelsResults.pageModels);
     let dataModels = analyzeDataFileMatchingProperties(dataModelsResults.dataModels);
@@ -148,16 +159,28 @@ async function readDirRecursivelyWithFilter(fileBrowser: FileBrowser, dirPath: s
     });
 }
 
-async function generatePageModelsForFiles(
-    filePaths: string[],
-    dirPath: string,
-    fileBrowser: FileBrowser,
-    objectModels: PartialObjectModel[]
-): Promise<{ pageModels: PartialPageModels[]; objectModels: PartialObjectModel[] }> {
-    let pageModels: PartialPageModels[] = [];
+interface GeneratePageModelsOptions {
+    filePaths: string[];
+    dirPath: string;
+    fileBrowser: FileBrowser;
+    pageTypeKey?: string;
+    objectModels: PartialObjectModel[];
+}
+async function generatePageModelsForFiles({
+    filePaths,
+    dirPath,
+    fileBrowser,
+    pageTypeKey,
+    objectModels
+}: GeneratePageModelsOptions): Promise<{ pageModels: PartialPageModel[]; objectModels: PartialObjectModel[] }> {
+    let pageModels: PartialPageModel[] = [];
     let modelNameCounter = 1;
     for (const filePath of filePaths) {
         let data = await fileBrowser.getFileData(path.join(dirPath, filePath));
+        const extension = path.extname(filePath).substring(1);
+        if (MARKDOWN_FILE_EXTENSIONS.includes(extension) && _.get(data, 'frontmatter') === null) {
+            continue;
+        }
         if (_.has(data, 'frontmatter') && _.has(data, 'markdown')) {
             data = _.assign(data.frontmatter, { markdown_content: data.markdown });
         }
@@ -166,9 +189,9 @@ async function generatePageModelsForFiles(
             const result = generateObjectFields(data, [modelName], objectModels);
             if (result) {
                 const pageModelGroups: {
-                    sameFolder: PartialPageModels[];
+                    sameFolder: PartialPageModel[];
                     sameFolderFieldsList: Field[][];
-                    diffFolder: PartialPageModels[];
+                    diffFolder: PartialPageModel[];
                     diffFolderFieldsList: Field[][];
                 } = {
                     sameFolder: [],
@@ -221,13 +244,20 @@ async function generatePageModelsForFiles(
     };
 }
 
-async function generateDataModelsForFiles(
-    filePaths: string[],
-    dirPath: string,
-    fileBrowser: FileBrowser,
-    objectModels: PartialObjectModel[]
-): Promise<{ dataModels: PartialDataModels[]; objectModels: PartialObjectModel[] }> {
-    const dataModels: PartialDataModels[] = [];
+interface GenerateDataModelsOptions {
+    filePaths: string[];
+    dirPath: string;
+    fileBrowser: FileBrowser;
+    objectModels: PartialObjectModel[];
+}
+
+async function generateDataModelsForFiles({
+    filePaths,
+    dirPath,
+    fileBrowser,
+    objectModels
+}: GenerateDataModelsOptions): Promise<{ dataModels: PartialDataModel[]; objectModels: PartialObjectModel[] }> {
+    const dataModels: PartialDataModel[] = [];
     for (const filePath of filePaths) {
         let data = await fileBrowser.getFileData(path.join(dirPath, filePath));
         const pathObject = path.parse(filePath);
@@ -303,6 +333,7 @@ function generateField(
 ): { field: Field | null; objectModels: PartialObjectModel[] } {
     let field: Field | null = null;
     if (fieldValue === null) {
+        // TODO: return 'unknown' field type and coerce it to string, or consolidate with anything else
         // we don't know what is the type of the field
         field = null;
     }
@@ -503,7 +534,7 @@ function consolidateListItems(
         switch (type) {
             case 'number':
                 const subtypes = _.compact(_.uniq(_.map(listItemModels, 'subtype')));
-                const subtype = subtypes.length === 1 ? subtypes[0] : null;
+                const subtype = subtypes.length === 1 ? subtypes[0] : 'float';
                 return {
                     items: {
                         type: 'number',
@@ -726,8 +757,8 @@ function consolidateFields(
         // handle fields with extra properties
         switch (type) {
             case 'number':
-                const subtypes = _.compact(_.uniq(_.map(fieldTypes, 'subtype')));
-                const subtype = subtypes.length === 1 ? subtypes[0] : null;
+                const subtypes = _.compact(_.uniq(_.map(fields, 'subtype')));
+                const subtype = subtypes.length === 1 ? subtypes[0] : 'float';
                 return {
                     field: {
                         type: 'number',
@@ -814,15 +845,25 @@ function generateRandomModelName(length = 10) {
     return result.join('');
 }
 
-function analyzePageFileMatchingProperties(pageModelsWithFilePaths: PartialPageModels[]) {
+function analyzePageFileMatchingProperties(pageModelsWithFilePaths: PartialPageModel[]) {
     let pageCount = 1;
     pageModelsWithFilePaths = _.map(
         pageModelsWithFilePaths,
-        (pageModel: PartialPageModels): PartialPageModels => {
+        (pageModel: PartialPageModel): PartialPageModel => {
             const folder = findCommonAncestorFolder(pageModel.filePaths);
             const lastPart = _.last(folder.split(path.sep));
             const sameFolder = allFilePathInSameFolder(pageModel.filePaths);
-            const modelName = lastPart ? (_.endsWith(lastPart, 's') ? lastPart.substring(0, lastPart.length - 1) : lastPart) : `page_${pageCount++}`;
+            let modelName;
+            if (lastPart) {
+                if (_.endsWith(lastPart, 's')) {
+                    modelName = lastPart.substring(0, lastPart.length - 1);
+                } else {
+                    modelName = lastPart;
+                }
+                modelName = _.snakeCase(modelName);
+            } else {
+                modelName = `page_${pageCount++}`;
+            }
             return {
                 type: 'page',
                 name: modelName,
@@ -863,7 +904,7 @@ function analyzePageFileMatchingProperties(pageModelsWithFilePaths: PartialPageM
     return pageModels;
 }
 
-function analyzeDataFileMatchingProperties(dataModelsWithFilePaths: PartialDataModels[]) {
+function analyzeDataFileMatchingProperties(dataModelsWithFilePaths: PartialDataModel[]) {
     const dataModels: DataModel[] = [];
     const modelNames: string[] = [];
     for (let index = 0; index < dataModelsWithFilePaths.length; index++) {
@@ -930,22 +971,25 @@ function consolidatedModelsCommonAncestorFolder<T extends PageModel | DataModel>
     if (commonDirString === '') {
         return null;
     }
-    const adjustedModels = _.map(models, (model): T => {
-        if (model.file) {
-            return Object.assign(model, {
-                file: path.relative(commonDirString, model.file)
-            });
-        } else {
-            const folder = path.relative(commonDirString, model.folder!);
-            if (folder) {
+    const adjustedModels = _.map(
+        models,
+        (model): T => {
+            if (model.file) {
                 return Object.assign(model, {
-                    folder: folder
+                    file: path.relative(commonDirString, model.file)
                 });
             } else {
-                return _.omit(model, 'folder') as T;
+                const folder = path.relative(commonDirString, model.folder!);
+                if (folder) {
+                    return Object.assign(model, {
+                        folder: folder
+                    });
+                } else {
+                    return _.omit(model, 'folder') as T;
+                }
             }
         }
-    });
+    );
     return {
         models: adjustedModels,
         commonDir: commonDirString

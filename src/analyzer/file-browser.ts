@@ -119,9 +119,9 @@ export class GitHubFileBrowserAdapter implements FileBrowserAdapterInterface {
         // const treeSha = branchResponse.data.commit.commit.tree.sha;
         const branchResponse = await this.octokit.repos.listBranches({
             owner: this.owner,
-            repo: this.repo,
+            repo: this.repo
         });
-        const branch = _.find(branchResponse.data, {name: this.branch});
+        const branch = _.find(branchResponse.data, { name: this.branch });
         if (!branch) {
             throw new Error(`branch ${this.branch} not found`);
         }
