@@ -111,12 +111,21 @@ export class GitHubFileBrowserAdapter implements FileBrowserAdapterInterface {
     }
 
     async listFiles(listFilesOptions: ListFilesOptions): Promise<FileResult[]> {
-        const branchResponse = await this.octokit.repos.getBranch({
+        // const branchResponse = await this.octokit.repos.getBranch({
+        //     owner: this.owner,
+        //     repo: this.repo,
+        //     branch: this.branch
+        // });
+        // const treeSha = branchResponse.data.commit.commit.tree.sha;
+        const branchResponse = await this.octokit.repos.listBranches({
             owner: this.owner,
             repo: this.repo,
-            branch: this.branch
         });
-        const treeSha = branchResponse.data.commit.commit.tree.sha;
+        const branch = _.find(branchResponse.data, {name: this.branch});
+        if (!branch) {
+            throw new Error(`branch ${this.branch} not found`);
+        }
+        const treeSha = branch.commit.sha;
         const treeResponse = await this.octokit.git.getTree({
             owner: this.owner,
             repo: this.repo,
@@ -299,7 +308,8 @@ export class FileBrowser {
                 []
             );
         };
-        return reduceTreeNode(this.fileTree, '');
+        const treeNode = dirPath === '' ? this.fileTree : _.get(this.fileTree, dirPath.split(path.sep));
+        return reduceTreeNode(treeNode, '');
     }
 
     async getFileData(filePath: string): Promise<any> {
@@ -310,7 +320,12 @@ export class FileBrowser {
             const extension = path.extname(filePath).substring(1);
             const data = await this.fileBrowserAdapter.readFile(filePath);
             if ([...DATA_FILE_EXTENSIONS, ...MARKDOWN_FILE_EXTENSIONS].includes(extension)) {
-                this.fileData[filePath] = parseDataByFilePath(data, filePath);
+                try {
+                    this.fileData[filePath] = parseDataByFilePath(data, filePath);
+                } catch (error) {
+                    console.warn(`error parsing file: ${filePath}`);
+                    this.fileData[filePath] = null;
+                }
             } else {
                 this.fileData[filePath] = data;
             }

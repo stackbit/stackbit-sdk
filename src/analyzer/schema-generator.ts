@@ -10,15 +10,16 @@ import { DataModel, Model, ObjectModel, PageModel } from '../config/config-loade
 import { Field, FieldType, FieldListItems, FieldListProps, FieldPartialProps, FieldModelProps } from '../config/config-schema';
 
 type FieldPath = (string | number)[];
-type PartialObjectModel = Omit<ObjectModel, 'name' | 'label'> & { refFieldPaths?: FieldPath[]; refFields?: FieldModelProps[] };
 type StringFieldTypes = Exclude<FieldType, 'number' | 'boolean' | 'enum' | 'object' | 'model' | 'reference' | 'list'>;
+type PartialObjectModel = Omit<ObjectModel, 'label'> & { refFieldPaths?: FieldPath[]; refFields?: FieldModelProps[] };
+type PartialPageModels = Omit<PageModel, 'label'> & { filePaths: string[] };
+type PartialDataModels = Omit<DataModel, 'label'> & { filePaths: string[] };
+type PartialModels = PartialPageModels | PartialDataModels;
 
-export interface FieldModelRefProps {
-    type: 'modelRef';
-    models: PartialObjectModel[];
-}
-
-type FieldListItemsWithModelRef = FieldListItems | FieldModelRefProps;
+const SAME_FOLDER_PAGE_DSC_COEFFICIENT = 0.7;
+const DIFF_FOLDER_PAGE_DSC_COEFFICIENT = 0.8;
+const DATA_DSC_COEFFICIENT = 0.8;
+const LIST_OBJECT_DSC_COEFFICIENT = 0.8;
 
 export type SchemaGeneratorOptions = {
     ssgMatchResult: SSGMatchResult;
@@ -26,6 +27,8 @@ export type SchemaGeneratorOptions = {
 
 export interface SchemaGeneratorResult {
     models: Model[];
+    pagesDir?: string;
+    dataDir?: string;
 }
 
 export async function generateSchema({ ssgMatchResult, ...fileBrowserOptions }: SchemaGeneratorOptions): Promise<SchemaGeneratorResult | null> {
@@ -35,26 +38,99 @@ export async function generateSchema({ ssgMatchResult, ...fileBrowserOptions }: 
     const ssgDir = ssgMatchResult.ssgDir ?? '';
     const pagesDir = ssgMatchResult.pagesDir ?? '';
     const dataDir = ssgMatchResult.dataDir ?? '';
-    const fullPagesDir = path.join(ssgDir, pagesDir);
-    const fullDataDir = path.join(ssgDir, dataDir);
+    const rootPagesDir = getDir(ssgDir, pagesDir);
+    const rootDataDir = getDir(ssgDir, dataDir);
 
-    const excludedPageFiles = [...GLOBAL_EXCLUDES, ...EXCLUDED_MARKDOWN_FILES];
-    const excludedDataFiles = ['config.*', '_config.*', ...GLOBAL_EXCLUDES, ...EXCLUDED_DATA_FILES];
-    if (ssgMatchResult.publishDir) {
-        excludedPageFiles.push(ssgMatchResult.publishDir);
-        excludedDataFiles.push(ssgMatchResult.publishDir);
+    const excludedPageFiles = getExcludedPageFiles(ssgMatchResult, rootPagesDir);
+    const excludedDataFiles = getExcludedDataFiles(ssgMatchResult, rootDataDir);
+
+    // TODO: in some projects, pages can be defined as JSON files as well
+    const pageFiles = await readDirRecursivelyWithFilter(fileBrowser, rootPagesDir, excludedPageFiles, MARKDOWN_FILE_EXTENSIONS);
+    const dataFiles = await readDirRecursivelyWithFilter(fileBrowser, rootDataDir, excludedDataFiles, DATA_FILE_EXTENSIONS);
+
+    const pageModelsResults = await generatePageModelsForFiles(pageFiles, rootPagesDir, fileBrowser, []);
+    const dataModelsResults = await generateDataModelsForFiles(dataFiles, rootDataDir, fileBrowser, pageModelsResults.objectModels);
+
+    let pageModels = analyzePageFileMatchingProperties(pageModelsResults.pageModels);
+    let dataModels = analyzeDataFileMatchingProperties(dataModelsResults.dataModels);
+
+    let commonPageModelsDir;
+    if (ssgMatchResult.pagesDir === undefined && pageModels.length > 0) {
+        const result = consolidatedModelsCommonAncestorFolder(pageModels);
+        if (result) {
+            commonPageModelsDir = getDir(ssgDir, result.commonDir);
+            pageModels = result.models;
+        }
+    }
+    let commonDataModelsDir;
+    if (ssgMatchResult.dataDir === undefined && dataModels.length > 0) {
+        const result = consolidatedModelsCommonAncestorFolder(dataModels);
+        if (result) {
+            commonDataModelsDir = getDir(ssgDir, result.commonDir);
+            dataModels = result.models;
+        }
     }
 
-    const pageFiles = await readDirRecursivelyWithFilter(fileBrowser, fullPagesDir, excludedPageFiles, MARKDOWN_FILE_EXTENSIONS);
-    const dataFiles = await readDirRecursivelyWithFilter(fileBrowser, fullDataDir, excludedDataFiles, DATA_FILE_EXTENSIONS);
+    const objectModels: ObjectModel[] = _.map(
+        dataModelsResults.objectModels,
+        (objectModel, index): ObjectModel => {
+            const modelName = `object_${index + 1}`;
+            return {
+                type: 'object',
+                name: objectModel.name,
+                label: _.startCase(modelName),
+                fields: objectModel.fields
+            };
+        }
+    );
 
-    const pageModels = await generateModelsForFiles(pageFiles, fileBrowser);
-    const dataModels = await generateModelsForFiles(dataFiles, fileBrowser);
-    const models = _.concat(pageModels, dataModels);
+    const models = _.concat<Model>(pageModels, dataModels, objectModels);
 
     return {
-        models: models
+        models: models,
+        ...(commonPageModelsDir && { pagesDir: commonPageModelsDir }),
+        ...(commonDataModelsDir && { dataDir: commonDataModelsDir })
     };
+}
+
+function getDir(ssgDir: string, contentDir: string) {
+    const fullDir = path.join(ssgDir, contentDir);
+    return fullDir === '.' ? '' : fullDir;
+}
+
+function getExcludedPageFiles(ssgMatchResult: SSGMatchResult, rootPagesDir: string): string[] {
+    const excludedPageFiles = [...GLOBAL_EXCLUDES, ...EXCLUDED_MARKDOWN_FILES];
+    if (rootPagesDir === '') {
+        // if pagesDir wasn't specifically set to empty string, ignore content files in the root folder
+        if (ssgMatchResult.pagesDir === undefined) {
+            excludedPageFiles.push('*.*');
+        }
+        if (ssgMatchResult.publishDir) {
+            excludedPageFiles.push(ssgMatchResult.publishDir);
+        }
+        if (ssgMatchResult.staticDir) {
+            excludedPageFiles.push(ssgMatchResult.staticDir);
+        }
+    }
+    return excludedPageFiles;
+}
+
+function getExcludedDataFiles(ssgMatchResult: SSGMatchResult, rootDataDir: string): string[] {
+    const excludedDataFiles = [...GLOBAL_EXCLUDES, ...EXCLUDED_DATA_FILES];
+    if (rootDataDir === '') {
+        excludedDataFiles.push('config.*', '_config.*');
+        // if dataDir wasn't specifically set to empty string, ignore content files in the root folder
+        if (ssgMatchResult.dataDir === undefined) {
+            excludedDataFiles.push('*.*');
+        }
+        if (ssgMatchResult.publishDir) {
+            excludedDataFiles.push(ssgMatchResult.publishDir);
+        }
+        if (ssgMatchResult.staticDir) {
+            excludedDataFiles.push(ssgMatchResult.staticDir);
+        }
+    }
+    return excludedDataFiles;
 }
 
 async function readDirRecursivelyWithFilter(fileBrowser: FileBrowser, dirPath: string, excludedFiles: string[], allowedExtensions: string[]) {
@@ -72,101 +148,146 @@ async function readDirRecursivelyWithFilter(fileBrowser: FileBrowser, dirPath: s
     });
 }
 
-async function generateModelsForFiles(pageFilePaths: string[], fileBrowser: FileBrowser): Promise<Model[]> {
-    const pageModels: PageModel[] = [];
-    const dataModels: DataModel[] = [];
-    const partialObjectModels: PartialObjectModel[] = [];
-    for (const pageFilePath of pageFilePaths) {
-        let data = await fileBrowser.getFileData(pageFilePath);
-        const pathObject = path.parse(pageFilePath);
-        const extension = pathObject.ext.substring(1);
-        const isMarkdownFile = MARKDOWN_FILE_EXTENSIONS.includes(extension);
-        if (isMarkdownFile && _.has(data, 'frontmatter') && _.has(data, 'markdown')) {
+async function generatePageModelsForFiles(
+    filePaths: string[],
+    dirPath: string,
+    fileBrowser: FileBrowser,
+    objectModels: PartialObjectModel[]
+): Promise<{ pageModels: PartialPageModels[]; objectModels: PartialObjectModel[] }> {
+    let pageModels: PartialPageModels[] = [];
+    let modelNameCounter = 1;
+    for (const filePath of filePaths) {
+        let data = await fileBrowser.getFileData(path.join(dirPath, filePath));
+        if (_.has(data, 'frontmatter') && _.has(data, 'markdown')) {
             data = _.assign(data.frontmatter, { markdown_content: data.markdown });
         }
         if (_.isPlainObject(data)) {
-            const result = generateObjectFields(data, [pageFilePath]);
-            // generally, pages can be defined as JSON files as well.
+            const modelName = `page_${modelNameCounter++}`;
+            const result = generateObjectFields(data, [modelName], objectModels);
             if (result) {
-                if (isMarkdownFile) {
-                    const modelName = `page_${pageModels.length + 1}`;
-                    pageModels.push({
-                        type: 'page',
-                        name: modelName,
-                        label: _.startCase(modelName),
-                        fields: result.fields
-                    });
-                } else {
-                    const modelName = _.snakeCase(pathObject.name);
-                    dataModels.push({
-                        type: 'data',
-                        name: modelName,
-                        label: _.startCase(modelName),
-                        fields: result.fields
-                    });
+                const pageModelGroups: {
+                    sameFolder: PartialPageModels[];
+                    sameFolderFieldsList: Field[][];
+                    diffFolder: PartialPageModels[];
+                    diffFolderFieldsList: Field[][];
+                } = {
+                    sameFolder: [],
+                    sameFolderFieldsList: [],
+                    diffFolder: [],
+                    diffFolderFieldsList: []
+                };
+                for (let i = 0; i < pageModels.length; i++) {
+                    const pageModel = pageModels[i]!;
+                    if (allFilePathInSameFolder([filePath].concat(pageModel.filePaths))) {
+                        pageModelGroups.sameFolder.push(pageModel);
+                        pageModelGroups.sameFolderFieldsList.push(pageModel.fields!);
+                    } else {
+                        pageModelGroups.diffFolder.push(pageModel);
+                        pageModelGroups.diffFolderFieldsList.push(pageModel.fields!);
+                    }
                 }
-                if (!_.isEmpty(result.objectModels)) {
-                    partialObjectModels.push(...result.objectModels);
-                }
-            }
-        } else if (_.isArray(data)) {
-            const result = generateListField(data, [pageFilePath]);
-            const modelName = _.snakeCase(pathObject.name);
-            if (result) {
-                dataModels.push({
-                    type: 'data',
+                const sameFolderMergeResult = mergeSimilarFields(
+                    result.fields,
+                    pageModelGroups.sameFolderFieldsList,
+                    [modelName],
+                    SAME_FOLDER_PAGE_DSC_COEFFICIENT,
+                    result.objectModels
+                );
+                const sameFolderMergedPageModels = _.pullAt(pageModelGroups.sameFolder, sameFolderMergeResult.mergedIndexes);
+                const sameFolderMergedFilePaths = _.flatten(sameFolderMergedPageModels.map((pageModel) => pageModel.filePaths));
+                const diffFolderMergeResult = mergeSimilarFields(
+                    sameFolderMergeResult.mergedFields,
+                    pageModelGroups.diffFolderFieldsList,
+                    [modelName],
+                    DIFF_FOLDER_PAGE_DSC_COEFFICIENT,
+                    sameFolderMergeResult.objectModels
+                );
+                const diffFolderMergedPageModels = _.pullAt(pageModelGroups.diffFolder, diffFolderMergeResult.mergedIndexes);
+                const diffFolderMergedFilePaths = _.flatten(diffFolderMergedPageModels.map((pageModel) => pageModel.filePaths));
+                objectModels = diffFolderMergeResult.objectModels;
+                pageModels = _.concat(pageModelGroups.sameFolder, pageModelGroups.diffFolder, {
+                    type: 'page',
                     name: modelName,
-                    label: _.startCase(modelName),
-                    isList: true,
-                    items: result.field.items!
+                    fields: diffFolderMergeResult.mergedFields,
+                    filePaths: [filePath].concat(sameFolderMergedFilePaths, diffFolderMergedFilePaths)
                 });
-                if (!_.isEmpty(result.objectModels)) {
-                    partialObjectModels.push(...result.objectModels);
-                }
             }
         }
     }
-    const pageFieldsList = _.map(pageModels, (pageModel) => pageModel.fields!);
-    const mergedPageFieldsList = consolidateObjectFieldsListWithDSC(pageFieldsList, ['page'], 0.75);
-    partialObjectModels.push(...mergedPageFieldsList.objectModels);
-    const mergedPageModels = _.map(
-        mergedPageFieldsList.fieldsList,
-        (fields, index): PageModel => {
-            const modelName = `page_${index + 1}`;
-            return {
-                type: 'page',
-                name: modelName,
-                label: _.startCase(modelName),
-                fields: fields
-            };
-        }
-    );
-    const objectModels = _.map(partialObjectModels, (partialObjectModel, index): ObjectModel => {
-        const modelName = `object_${index + 1}`;
-        return {
-            type: 'object',
-            name: modelName,
-            label: _.startCase(modelName),
-            fields: partialObjectModel.fields
-        }
-    });
-    return [...mergedPageModels, ...dataModels, ...objectModels];
+
+    return {
+        pageModels,
+        objectModels
+    };
 }
 
-function generateObjectFields(value: any, fieldPath: FieldPath): { fields: Field[]; objectModels: PartialObjectModel[] } | null {
+async function generateDataModelsForFiles(
+    filePaths: string[],
+    dirPath: string,
+    fileBrowser: FileBrowser,
+    objectModels: PartialObjectModel[]
+): Promise<{ dataModels: PartialDataModels[]; objectModels: PartialObjectModel[] }> {
+    const dataModels: PartialDataModels[] = [];
+    for (const filePath of filePaths) {
+        let data = await fileBrowser.getFileData(path.join(dirPath, filePath));
+        const pathObject = path.parse(filePath);
+        const modelName = _.snakeCase(pathObject.name);
+        if (_.isPlainObject(data)) {
+            const result = generateObjectFields(data, [modelName], objectModels);
+            // generally, pages can be defined as JSON files as well.
+            if (result) {
+                objectModels = result.objectModels;
+                const dataFieldsList = dataModels.filter((dataModel) => dataModel.fields).map((dataModel) => dataModel.fields!);
+                const mergeResult = mergeSimilarFields(result.fields, dataFieldsList, [modelName], DATA_DSC_COEFFICIENT, objectModels);
+                objectModels = mergeResult.objectModels;
+                const mergedDataModels = _.pullAt(dataModels, mergeResult.mergedIndexes);
+                const mergedFilePaths = _.flatten(mergedDataModels.map((dataModel) => dataModel.filePaths));
+                dataModels.push({
+                    type: 'data',
+                    name: modelName,
+                    fields: mergeResult.mergedFields,
+                    filePaths: [filePath].concat(mergedFilePaths)
+                });
+            }
+        } else if (_.isArray(data)) {
+            const result = generateListField(data, [modelName], objectModels);
+            if (result) {
+                objectModels = result.objectModels;
+                dataModels.push({
+                    type: 'data',
+                    name: modelName,
+                    isList: true,
+                    items: result.field.items!,
+                    filePaths: [filePath]
+                });
+            }
+        }
+    }
+
+    return {
+        dataModels,
+        objectModels
+    };
+}
+
+function generateObjectFields(
+    value: any,
+    fieldPath: FieldPath,
+    objectModels: PartialObjectModel[]
+): { fields: Field[]; objectModels: PartialObjectModel[] } | null {
     if (_.isEmpty(value)) {
         return null;
     }
     const result = _.reduce(
         value,
-        (accum: { fields: Field[]; objectModels: PartialObjectModel[] }, value: any, key: string) => {
-            const { field, objectModels } = generateField(value, key, fieldPath.concat(key));
+        (accum: { fields: Field[]; objectModels: PartialObjectModel[] }, fieldValue: any, fieldName: string) => {
+            const result = generateField(fieldValue, fieldName, fieldPath.concat(fieldName), accum.objectModels);
             return {
-                fields: field ? accum.fields.concat(field) : accum.fields,
-                objectModels: accum.objectModels.concat(objectModels)
+                fields: result.field ? accum.fields.concat(result.field) : accum.fields,
+                objectModels: result.objectModels
             };
         },
-        { fields: [], objectModels: [] }
+        { fields: [], objectModels: objectModels }
     );
     if (_.isEmpty(result.fields)) {
         return null;
@@ -174,69 +295,75 @@ function generateObjectFields(value: any, fieldPath: FieldPath): { fields: Field
     return result;
 }
 
-function generateField(value: any, key: string, fieldPath: FieldPath): { field: Field | null; objectModels: PartialObjectModel[] } {
+function generateField(
+    fieldValue: any,
+    fieldName: string,
+    fieldPath: FieldPath,
+    objectModels: PartialObjectModel[]
+): { field: Field | null; objectModels: PartialObjectModel[] } {
     let field: Field | null = null;
-    let objectModels: PartialObjectModel[] = [];
-    if (value === null) {
+    if (fieldValue === null) {
         // we don't know what is the type of the field
         field = null;
     }
-    if (key === 'markdown_content') {
+    if (fieldName === 'markdown_content') {
         field = {
             type: 'markdown',
-            name: key,
+            name: fieldName,
             label: 'Content'
         };
-    } else if (_.isString(value)) {
+    } else if (_.isString(fieldValue)) {
         field = {
-            ...fieldFromStringValue(value),
-            name: key
+            ...fieldFromStringValue(fieldValue),
+            name: fieldName,
+            label: _.startCase(fieldName)
         };
-    } else if (_.isNumber(value)) {
+    } else if (_.isNumber(fieldValue)) {
         field = {
             type: 'number',
-            name: key,
-            subtype: _.isInteger(value) ? 'int' : 'float'
+            name: fieldName,
+            label: _.startCase(fieldName),
+            subtype: _.isInteger(fieldValue) ? 'int' : 'float'
         };
-    } else if (_.isBoolean(value)) {
+    } else if (_.isBoolean(fieldValue)) {
         field = {
             type: 'boolean',
-            name: key
+            name: fieldName,
+            label: _.startCase(fieldName)
         };
-    } else if (_.isPlainObject(value)) {
-        const result = generateObjectFields(value, fieldPath);
+    } else if (_.isPlainObject(fieldValue)) {
+        const result = generateObjectFields(fieldValue, fieldPath, objectModels);
         if (result) {
+            objectModels = result.objectModels;
             field = {
                 type: 'object',
-                name: key,
+                name: fieldName,
+                label: _.startCase(fieldName),
                 fields: result.fields
             };
-            // const modelName = modelNameFromFieldPath(fieldPath);
+            // const modelName = generateRandomModelName();
             // field = {
             //     type: 'model',
-            //     name: key,
+            //     name: fieldName,
             //     models: [modelName]
             // };
             // objectModels = result.objectModels.concat({
             //     type: 'object',
             //     name: modelName,
-            //     label: 'temp',
             //     fields: result.fields
             // });
         }
-    } else if (_.isArray(value)) {
-        const result = generateListField(value, fieldPath);
+    } else if (_.isArray(fieldValue)) {
+        const result = generateListField(fieldValue, fieldPath, objectModels);
         if (result) {
-            // objectModels = result.objectModels;
+            objectModels = result.objectModels;
             field = {
                 type: result.field.type,
-                name: key,
+                name: fieldName,
+                label: _.startCase(fieldName),
                 items: result.field.items
             };
         }
-    }
-    if (field && field.label === undefined) {
-        field.label = _.startCase(field.name);
     }
     return {
         field,
@@ -244,37 +371,33 @@ function generateField(value: any, key: string, fieldPath: FieldPath): { field: 
     };
 }
 
-function generateListField(value: any[], fieldPath: FieldPath): { field: FieldListProps; objectModels: PartialObjectModel[] } | null {
+function generateListField(
+    value: any[],
+    fieldPath: FieldPath,
+    objectModels: PartialObjectModel[]
+): { field: FieldListProps; objectModels: PartialObjectModel[] } | null {
     if (_.isEmpty(value)) {
         // we don't know what is the type of array items
         return null;
     }
     const listItemsArr: FieldListItems[] = [];
-    const childModels: PartialObjectModel[] = [];
-    const nestedModels: PartialObjectModel[] = [];
     for (let index = 0; index < value.length; index++) {
         const listItem = value[index];
         if (_.isArray(listItem)) {
             // array of arrays are not supported
             return null;
         }
-        const result = generateFieldListItems(listItem, fieldPath);
-        const { items, model, objectModels } = result;
-        if (items === null) {
+        const result = generateFieldListItems(listItem, fieldPath, objectModels);
+        if (result === null) {
             continue;
         }
-        listItemsArr.push(items);
-        if (model) {
-            childModels.push(model);
-        }
-        if (!_.isEmpty(objectModels)) {
-            nestedModels.push(...objectModels);
-        }
+        objectModels = result.objectModels;
+        listItemsArr.push(result.items);
     }
     if (listItemsArr.length === 0) {
         return null;
     }
-    const result = consolidateListItems(listItemsArr, fieldPath, childModels);
+    const result = consolidateListItems(listItemsArr, fieldPath, objectModels);
     if (result === null) {
         return null;
     }
@@ -283,24 +406,21 @@ function generateListField(value: any[], fieldPath: FieldPath): { field: FieldLi
             type: 'list',
             items: result.items
         },
-        objectModels: result.objectModels ? nestedModels.concat(result.objectModels) : nestedModels
+        objectModels: result.objectModels
     };
 }
 
 function generateFieldListItems(
     value: any,
-    fieldPath: FieldPath
-): { items: FieldListItems | null; model: PartialObjectModel | null; objectModels: PartialObjectModel[] } {
+    fieldPath: FieldPath,
+    objectModels: PartialObjectModel[]
+): { items: FieldListItems; objectModels: PartialObjectModel[] } | null {
     let items: FieldListItems | null = null;
-    let model: PartialObjectModel | null = null;
-    let objectModels: PartialObjectModel[] = [];
     if (value === null) {
         // type-less value
-        items = null;
+        return null;
     } else if (_.isString(value)) {
-        items = {
-            ...fieldFromStringValue(value)
-        };
+        items = fieldFromStringValue(value);
     } else if (_.isNumber(value)) {
         items = {
             type: 'number',
@@ -311,34 +431,32 @@ function generateFieldListItems(
             type: 'boolean'
         };
     } else if (_.isPlainObject(value)) {
-        const result = generateObjectFields(value, fieldPath);
-        if (result) {
-            objectModels = result.objectModels;
-            items = {
-                type: 'object',
-                fields: result.fields
-            };
-            // const modelName = modelNameFromFieldPath(fieldPath);
-            // items = {
-            //     type: 'model',
-            //     models: [modelName]
-            // };
-            // model = {
-            //     type: 'object',
-            //     name: modelName,
-            //     label: 'temp',
-            //     fields: result.fields
-            // };
+        const result = generateObjectFields(value, fieldPath, objectModels);
+        if (!result) {
+            return null;
         }
+        objectModels = result.objectModels;
+        items = {
+            type: 'object',
+            fields: result.fields
+        };
+        // const modelName = generateRandomModelName();
+        // items = {
+        //     type: 'model',
+        //     models: [modelName]
+        // };
+        // model = {
+        //     type: 'object',
+        //     name: modelName,
+        //     fields: result.fields
+        // };
     } else if (_.isArray(value)) {
         // we don't support array of arrays
         throw new Error('nested arrays are not supported');
+    } else {
+        return null;
     }
-    return {
-        items,
-        model,
-        objectModels
-    };
+    return { items, objectModels };
 }
 
 const COLOR_PATTERN = /^#(?:[A-Fa-f0-9]{3){1,2}$/;
@@ -364,6 +482,7 @@ function fieldFromStringValue(value: string): { type: StringFieldTypes } {
         //     fieldProps.referenceType = 'relative';
         // }
     } else if (moment(value, moment.ISO_8601).isValid() || value.match(DATE_PATTERN)) {
+        moment.suppressDeprecationWarnings = true;
         fieldType = _.endsWith(moment.utc(value).toISOString(), '00:00:00.000Z') ? 'date' : 'datetime';
     }
     return {
@@ -375,8 +494,8 @@ function fieldFromStringValue(value: string): { type: StringFieldTypes } {
 function consolidateListItems(
     listItemModels: FieldListItems[],
     fieldPath: FieldPath,
-    childModels: PartialObjectModel[]
-): { items: FieldListItems; objectModels?: PartialObjectModel[] } | null {
+    objectModels: PartialObjectModel[]
+): { items: FieldListItems; objectModels: PartialObjectModel[] } | null {
     const itemTypes = _.uniq(_.map(listItemModels, 'type'));
     if (itemTypes.length === 1) {
         const type = itemTypes[0]!;
@@ -390,14 +509,12 @@ function consolidateListItems(
                         type: 'number',
                         // name: fieldName,
                         ...(subtype && { subtype })
-                    }
+                    },
+                    objectModels
                 };
             case 'object':
-                // TODO: lists can have variable types of object, create an algorithm
-                //  that will merge similar objects into a single model and split different
-                //  objects between several models
                 const fieldsList = _.map(listItemModels, 'fields') as Field[][];
-                const result = consolidateObjectFieldsList(fieldsList, fieldPath);
+                const result = consolidateObjectFieldsListWithDSC(fieldsList, fieldPath, LIST_OBJECT_DSC_COEFFICIENT, objectModels);
                 if (!result) {
                     return null;
                 }
@@ -406,22 +523,26 @@ function consolidateListItems(
                         items: {
                             type: 'object',
                             fields: result.fieldsList[0]!
-                        }
+                        },
+                        objectModels: result.objectModels
                     };
                 } else {
+                    const models = result.fieldsList.map(
+                        (fields): PartialObjectModel => {
+                            const modelName = generateRandomModelName();
+                            return {
+                                type: 'object',
+                                name: modelName,
+                                fields: fields
+                                // refFields: [items],
+                                // refFieldPaths: [fieldPath]
+                            };
+                        }
+                    );
                     const items: FieldListItems = {
                         type: 'model',
-                        models: []
+                        models: _.map(models, 'name')
                     };
-                    const models = result.fieldsList.map((fields, idx): PartialObjectModel => {
-                        return {
-                            type: 'object',
-                            fields: fields,
-                            // refFields: [items],
-                            // refFieldPaths: [fieldPath]
-                        };
-                    });
-                    // items.modelsReferences = models;
                     return {
                         items: items,
                         objectModels: result.objectModels.concat(models)
@@ -429,34 +550,40 @@ function consolidateListItems(
                 }
             case 'model':
                 const models = _.compact(_.uniq(_.flatten(_.map(listItemModels, 'models'))));
-                const modelReferences = _.map(listItemModels, 'modelReferences');
                 return {
                     items: {
                         type: 'model',
-                        models: models,
-                        // modelsReferences: modelReferences
-                    }
+                        models: models
+                    },
+                    objectModels
                 };
             case 'enum':
             case 'reference':
                 // these cases cannot happen because we don't generate these fields,
                 return null;
             default:
-                return { items: { type } };
+                return {
+                    items: { type },
+                    objectModels
+                };
         }
     }
     const fieldType = coerceSimpleFieldTypes(itemTypes);
     return fieldType
         ? {
               items: { type: fieldType },
-              objectModels: []
+              objectModels: objectModels
           }
         : null;
 }
 
 type FieldNameTypeMap = Record<Field['name'], FieldType>;
 
-function consolidateObjectFieldsList(fieldsList: Field[][], fieldPath: FieldPath): { fieldsList: Field[][]; objectModels: PartialObjectModel[] } | null {
+function consolidateObjectFieldsList(
+    fieldsList: Field[][],
+    fieldPath: FieldPath,
+    objectModels: PartialObjectModel[]
+): { fieldsList: Field[][]; objectModels: PartialObjectModel[] } | null {
     const fieldsListGroups: { fieldNameTypeMap: FieldNameTypeMap; fieldsList: Field[][] }[] = [];
     for (const fields of fieldsList) {
         const fieldNameTypeMap = fields.reduce((fieldMap: FieldNameTypeMap, field: Field) => {
@@ -474,14 +601,13 @@ function consolidateObjectFieldsList(fieldsList: Field[][], fieldPath: FieldPath
         group.fieldsList.push(fields);
     }
     const mergedFieldsList = [];
-    const objectModels = [];
     for (const group of fieldsListGroups) {
-        const result = mergeObjectFieldsList(group.fieldsList, fieldPath);
+        const result = mergeObjectFieldsList(group.fieldsList, fieldPath, objectModels);
         if (!result) {
             return null;
         }
         mergedFieldsList.push(result.fields);
-        objectModels.push(...result.objectModels);
+        objectModels = result.objectModels;
     }
     return {
         fieldsList: mergedFieldsList,
@@ -493,40 +619,19 @@ function consolidateObjectFieldsList(fieldsList: Field[][], fieldPath: FieldPath
 function consolidateObjectFieldsListWithDSC(
     fieldsList: Field[][],
     fieldPath: FieldPath,
-    minCoefficient: number
+    minCoefficient: number,
+    objectModels: PartialObjectModel[]
 ): { fieldsList: Field[][]; objectModels: PartialObjectModel[] } {
-    const mergeSimilarFields = function (fields: Field[], fieldsList: Field[][], fieldPath: FieldPath) {
-        const objectModels = [];
-        const unmergedFieldsList: Field[][] = [];
-        let mergedFields = fields;
-        for (let i = 0; i < fieldsList.length; i++) {
-            const otherFields = fieldsList[i]!;
-            const dscCoefficient = computeDSC(mergedFields, otherFields);
-            if (dscCoefficient >= minCoefficient) {
-                const result = mergeObjectFieldsList([mergedFields, otherFields], fieldPath.concat(i));
-                if (result) {
-                    mergedFields = result.fields;
-                    objectModels.push(...result.objectModels);
-                } else {
-                    unmergedFieldsList.push(otherFields);
-                }
-            } else {
-                unmergedFieldsList.push(otherFields);
-            }
-        }
-        return { mergedFields, unmergedFieldsList, objectModels };
-    };
-
     let unmergedFieldsList = fieldsList.slice();
     let idx = 0;
     const mergedFieldsList = [];
-    const objectModels = [];
+
     while (unmergedFieldsList.length > 0) {
         const fields = unmergedFieldsList.pop()!;
-        const result = mergeSimilarFields(fields, unmergedFieldsList, fieldPath.concat(idx));
+        const result = mergeSimilarFields(fields, unmergedFieldsList, fieldPath, minCoefficient, objectModels);
         unmergedFieldsList = result.unmergedFieldsList;
         mergedFieldsList.push(result.mergedFields);
-        objectModels.push(...result.objectModels);
+        objectModels = result.objectModels;
         idx++;
     }
 
@@ -534,6 +639,33 @@ function consolidateObjectFieldsListWithDSC(
         fieldsList: mergedFieldsList,
         objectModels: objectModels
     };
+}
+
+function mergeSimilarFields(fields: Field[], fieldsList: Field[][], fieldPath: FieldPath, minCoefficient: number, objectModels: PartialObjectModel[]) {
+    const unmergedFieldsList: Field[][] = [];
+    const mergedIndexes: number[] = [];
+    const unmergedIndexes: number[] = [];
+    let mergedFields = fields;
+    for (let i = 0; i < fieldsList.length; i++) {
+        const otherFields = fieldsList[i]!;
+        const dscCoefficient = computeDSC(mergedFields, otherFields);
+        // TODO: check if intersected fields have same types, otherwise don't try to merge
+        if (dscCoefficient >= minCoefficient) {
+            const result = mergeObjectFieldsList([mergedFields, otherFields], fieldPath, objectModels);
+            if (result) {
+                mergedIndexes.push(i);
+                mergedFields = result.fields;
+                objectModels = result.objectModels;
+            } else {
+                unmergedIndexes.push(i);
+                unmergedFieldsList.push(otherFields);
+            }
+        } else {
+            unmergedIndexes.push(i);
+            unmergedFieldsList.push(otherFields);
+        }
+    }
+    return { mergedFields, unmergedFieldsList, mergedIndexes, unmergedIndexes, objectModels };
 }
 
 function computeDSC(fieldsA: Field[], fieldsB: Field[]) {
@@ -549,25 +681,26 @@ function getFieldsSet(fields: Field[]): string[] {
     });
 }
 
-function mergeObjectFieldsList(fieldsList: Field[][], fieldPath: FieldPath): { fields: Field[]; objectModels: PartialObjectModel[] } | null {
+function mergeObjectFieldsList(
+    fieldsList: Field[][],
+    fieldPath: FieldPath,
+    objectModels: PartialObjectModel[]
+): { fields: Field[]; objectModels: PartialObjectModel[] } | null {
     const fieldsByName: Record<string, Field[]> = _.groupBy(_.flatten(fieldsList), 'name');
     const fieldNames = Object.keys(fieldsByName);
     const consolidatedFields: Field[] = [];
-    const objectModels: PartialObjectModel[] = [];
     for (const fieldName of fieldNames) {
         const fields = fieldsByName[fieldName]!;
-        const result = consolidateFields(fields, fieldPath.concat(fieldName));
+        const result = consolidateFields(fields, fieldPath.concat(fieldName), objectModels);
         // if one of the fields cannot be consolidated, then the object cannot be consolidated as well
         if (!result) {
             return null;
         }
+        objectModels = result.objectModels;
         consolidatedFields.push({
             name: fieldName,
             ...result.field
         });
-        if (result.objectModels) {
-            objectModels.push(...result.objectModels);
-        }
     }
     return {
         fields: consolidatedFields,
@@ -575,10 +708,18 @@ function mergeObjectFieldsList(fieldsList: Field[][], fieldPath: FieldPath): { f
     };
 }
 
-function consolidateFields(fields: Field[], fieldPath: FieldPath): { field: FieldPartialProps; objectModels?: PartialObjectModel[] } | null {
+function consolidateFields(
+    fields: Field[],
+    fieldPath: FieldPath,
+    objectModels: PartialObjectModel[]
+): { field: FieldPartialProps; objectModels: PartialObjectModel[] } | null {
     if (fields.length === 1) {
-        return { field: fields[0]! };
+        return {
+            field: fields[0]!,
+            objectModels
+        };
     }
+    // TODO: merge field labels
     const fieldTypes = _.uniq(_.map(fields, 'type'));
     if (fieldTypes.length === 1) {
         const type = fieldTypes[0]!;
@@ -592,11 +733,12 @@ function consolidateFields(fields: Field[], fieldPath: FieldPath): { field: Fiel
                         type: 'number',
                         // name: fieldName,
                         ...(subtype && { subtype })
-                    }
+                    },
+                    objectModels
                 };
             case 'object':
                 const fieldsList = _.map(fields, 'fields') as Field[][];
-                const mergeResult = mergeObjectFieldsList(fieldsList, fieldPath);
+                const mergeResult = mergeObjectFieldsList(fieldsList, fieldPath, objectModels);
                 if (!mergeResult) {
                     return null;
                 }
@@ -628,11 +770,19 @@ function consolidateFields(fields: Field[], fieldPath: FieldPath): { field: Fiel
                 // these cases cannot happen because we don't generate these fields,
                 return null;
             default:
-                return { field: { type } };
+                return {
+                    field: { type },
+                    objectModels
+                };
         }
     }
     const fieldType = coerceSimpleFieldTypes(fieldTypes);
-    return fieldType ? { field: { type: fieldType } } : null;
+    return fieldType
+        ? {
+              field: { type: fieldType },
+              objectModels
+          }
+        : null;
 }
 
 function coerceSimpleFieldTypes(fieldTypes: FieldType[]): 'string' | 'text' | 'markdown' | null {
@@ -654,6 +804,194 @@ function coerceSimpleFieldTypes(fieldTypes: FieldType[]): 'string' | 'text' | 'm
     return null;
 }
 
-function modelNameFromFieldPath(fieldPath: FieldPath): string {
-    return fieldPath.join('_');
+function generateRandomModelName(length = 10) {
+    const result = [];
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const charactersLength = characters.length;
+    for (let i = 0; i < length; i++) {
+        result.push(characters.charAt(Math.floor(Math.random() * charactersLength)));
+    }
+    return result.join('');
+}
+
+function analyzePageFileMatchingProperties(pageModelsWithFilePaths: PartialPageModels[]) {
+    let pageCount = 1;
+    pageModelsWithFilePaths = _.map(
+        pageModelsWithFilePaths,
+        (pageModel: PartialPageModels): PartialPageModels => {
+            const folder = findCommonAncestorFolder(pageModel.filePaths);
+            const lastPart = _.last(folder.split(path.sep));
+            const sameFolder = allFilePathInSameFolder(pageModel.filePaths);
+            const modelName = lastPart ? (_.endsWith(lastPart, 's') ? lastPart.substring(0, lastPart.length - 1) : lastPart) : `page_${pageCount++}`;
+            return {
+                type: 'page',
+                name: modelName,
+                folder: folder,
+                match: sameFolder ? '*' : '**/*',
+                fields: pageModel.fields,
+                filePaths: pageModel.filePaths
+            };
+        }
+    );
+    const pageModels: PageModel[] = [];
+    for (let index = 0; index < pageModelsWithFilePaths.length; index++) {
+        const model = pageModelsWithFilePaths[index]!;
+        const otherModels = pageModelsWithFilePaths.slice();
+        otherModels.splice(index, 1);
+        const glob = (model.folder ? model.folder + '/' : '') + model.match;
+        const otherFiles = _.flatten(_.map(otherModels, 'filePaths'));
+        const otherNames = _.map(pageModels, 'name');
+        const modelName = getUniqueName(model.name, otherNames);
+        const otherModelMatchedFiles = micromatch.match(otherFiles, glob);
+        let match = model.match;
+        let exclude: string[] = [];
+        if (otherModelMatchedFiles.length > 1) {
+            match = _.map(model.filePaths, (filePath) => path.relative(model.folder || '', filePath));
+        } else if (otherModelMatchedFiles.length === 1) {
+            exclude = _.map(otherModelMatchedFiles, (filePath) => path.relative(model.folder || '', filePath));
+        }
+        pageModels.push({
+            type: 'page',
+            name: modelName,
+            label: _.startCase(modelName),
+            ...(model.folder && { folder: model.folder }),
+            match: match,
+            ...(!_.isEmpty(exclude) && { exclude }),
+            fields: model.fields
+        });
+    }
+    return pageModels;
+}
+
+function analyzeDataFileMatchingProperties(dataModelsWithFilePaths: PartialDataModels[]) {
+    const dataModels: DataModel[] = [];
+    const modelNames: string[] = [];
+    for (let index = 0; index < dataModelsWithFilePaths.length; index++) {
+        const dataModelWithFilePaths = dataModelsWithFilePaths[index]!;
+        const otherModels = dataModelsWithFilePaths.slice();
+        otherModels.splice(index, 1);
+        const modelName = getUniqueName(dataModelWithFilePaths.name, modelNames);
+        const modelLabel = _.startCase(modelName);
+        modelNames.push(modelName);
+        if (dataModelWithFilePaths.filePaths.length === 1) {
+            dataModels.push({
+                type: 'data',
+                name: modelName,
+                label: modelLabel,
+                file: dataModelWithFilePaths.filePaths[0]!,
+                ...(dataModelWithFilePaths.isList && dataModelWithFilePaths.items
+                    ? { isList: true, items: dataModelWithFilePaths.items }
+                    : { fields: dataModelWithFilePaths.fields })
+            });
+        } else {
+            const folder = findCommonAncestorFolder(dataModelWithFilePaths.filePaths);
+            dataModels.push({
+                type: 'data',
+                name: modelName,
+                label: modelLabel,
+                folder: folder,
+                ...(dataModelWithFilePaths.isList && dataModelWithFilePaths.items
+                    ? { isList: true, items: dataModelWithFilePaths.items }
+                    : { fields: dataModelWithFilePaths.fields })
+            });
+        }
+    }
+    return dataModels;
+}
+
+function consolidatedModelsCommonAncestorFolder<T extends PageModel | DataModel>(models: T[]) {
+    let commonDir: null | string[] = null;
+    for (let model of models) {
+        let dir;
+        if (model.file) {
+            dir = path.parse(model.file).dir;
+        } else if (model.folder) {
+            dir = model.folder;
+        } else {
+            dir = '';
+        }
+        dir = dir.split(path.sep);
+        if (commonDir === null) {
+            commonDir = dir;
+        } else {
+            let common: string[] = [];
+            let j = 0;
+            while (j < commonDir.length && j < dir.length && commonDir[j] === dir[j]) {
+                common.push(commonDir[j]!);
+                j++;
+            }
+            commonDir = common;
+        }
+        if (commonDir.length === 1 && commonDir[0] === '') {
+            break;
+        }
+    }
+    const commonDirString = commonDir === null ? '' : commonDir.join(path.sep);
+    if (commonDirString === '') {
+        return null;
+    }
+    const adjustedModels = _.map(models, (model): T => {
+        if (model.file) {
+            return Object.assign(model, {
+                file: path.relative(commonDirString, model.file)
+            });
+        } else {
+            const folder = path.relative(commonDirString, model.folder!);
+            if (folder) {
+                return Object.assign(model, {
+                    folder: folder
+                });
+            } else {
+                return _.omit(model, 'folder') as T;
+            }
+        }
+    });
+    return {
+        models: adjustedModels,
+        commonDir: commonDirString
+    };
+}
+
+function findCommonAncestorFolder(filePaths: string[]): string {
+    let commonDir = path.parse(filePaths[0]!).dir;
+    if (commonDir === '') {
+        return '';
+    }
+    filePaths = filePaths.slice(1);
+    for (let i = 0; i < filePaths.length; i++) {
+        const dir = path.parse(filePaths[i]!).dir;
+        if (dir === '') {
+            return '';
+        }
+        const commonDirParts = _.split(commonDir, path.sep);
+        const dirParts = _.split(dir, path.sep);
+        let common = [];
+        let j = 0;
+        while (j < commonDirParts.length && j < dirParts.length && commonDirParts[j] === dirParts[j]) {
+            common.push(commonDirParts[j]);
+            j++;
+        }
+        commonDir = common.join(path.sep);
+        if (commonDir === '') {
+            return commonDir;
+        }
+    }
+    return commonDir;
+}
+
+function allFilePathInSameFolder(filePaths: string[]): boolean {
+    const folder = path.parse(filePaths[0]!).dir;
+    filePaths = filePaths.slice(1);
+    return _.every(filePaths, (filePath) => path.parse(filePath).dir === folder);
+}
+
+function getUniqueName(name: string, otherNames: string[], idx = 1): string {
+    if (!otherNames.includes(name)) {
+        return name;
+    }
+    const altName = `${name}_${idx}`;
+    if (!otherNames.includes(altName)) {
+        return altName;
+    }
+    return getUniqueName(name, otherNames, idx + 1);
 }

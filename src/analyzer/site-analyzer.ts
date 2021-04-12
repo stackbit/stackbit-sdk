@@ -30,8 +30,8 @@ export async function analyzeSite(options: SiteAnalyzerOptions): Promise<SiteAna
         cmsName: cmsMatchResult?.cmsName,
         nodeVersion: ssgMatchResult?.nodeVersion,
         publishDir: ssgMatchResult?.publishDir,
-        dataDir: ssgMatchResult?.dataDir,
-        pagesDir: ssgMatchResult?.pagesDir,
+        dataDir: ssgMatchResult?.dataDir || schemaGeneratorResult?.dataDir,
+        pagesDir: ssgMatchResult?.pagesDir || schemaGeneratorResult?.pagesDir,
         models: schemaGeneratorResult?.models || []
     };
 
