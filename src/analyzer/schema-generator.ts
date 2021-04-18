@@ -12,7 +12,7 @@ import { Field, FieldType, FieldListItems, FieldListProps, FieldPartialProps, Fi
 type FieldPath = (string | number)[];
 type StringFieldTypes = Exclude<FieldType, 'number' | 'boolean' | 'enum' | 'object' | 'model' | 'reference' | 'list'>;
 type PartialObjectModel = Omit<ObjectModel, 'label'> & { refFieldPaths?: FieldPath[]; refFields?: FieldModelProps[] };
-type PartialPageModel = Omit<PageModel, 'label'> & { filePaths: string[] };
+type PartialPageModel = Omit<PageModel, 'label' | 'fields'> & { fields: Field[], filePaths: string[] };
 type PartialDataModel = Omit<DataModel, 'label'> & { filePaths: string[] };
 type PartialModel = PartialPageModel | PartialDataModel;
 
@@ -67,7 +67,7 @@ export async function generateSchema({ ssgMatchResult, ...fileBrowserOptions }: 
 
     let commonPageModelsDir;
     if (ssgMatchResult.pagesDir === undefined && pageModels.length > 0) {
-        const result = consolidatedModelsCommonAncestorFolder(pageModels);
+        const result = extractLowestCommonAncestorFolderFromModels(pageModels);
         if (result) {
             commonPageModelsDir = getDir(ssgDir, result.commonDir);
             pageModels = result.models;
@@ -75,7 +75,7 @@ export async function generateSchema({ ssgMatchResult, ...fileBrowserOptions }: 
     }
     let commonDataModelsDir;
     if (ssgMatchResult.dataDir === undefined && dataModels.length > 0) {
-        const result = consolidatedModelsCommonAncestorFolder(dataModels);
+        const result = extractLowestCommonAncestorFolderFromModels(dataModels);
         if (result) {
             commonDataModelsDir = getDir(ssgDir, result.commonDir);
             dataModels = result.models;
@@ -188,52 +188,17 @@ async function generatePageModelsForFiles({
             const modelName = `page_${modelNameCounter++}`;
             const result = generateObjectFields(data, [modelName], objectModels);
             if (result) {
-                const pageModelGroups: {
-                    sameFolder: PartialPageModel[];
-                    sameFolderFieldsList: Field[][];
-                    diffFolder: PartialPageModel[];
-                    diffFolderFieldsList: Field[][];
-                } = {
-                    sameFolder: [],
-                    sameFolderFieldsList: [],
-                    diffFolder: [],
-                    diffFolderFieldsList: []
-                };
-                for (let i = 0; i < pageModels.length; i++) {
-                    const pageModel = pageModels[i]!;
-                    if (allFilePathInSameFolder([filePath].concat(pageModel.filePaths))) {
-                        pageModelGroups.sameFolder.push(pageModel);
-                        pageModelGroups.sameFolderFieldsList.push(pageModel.fields!);
-                    } else {
-                        pageModelGroups.diffFolder.push(pageModel);
-                        pageModelGroups.diffFolderFieldsList.push(pageModel.fields!);
-                    }
-                }
-                const sameFolderMergeResult = mergeSimilarFields(
-                    result.fields,
-                    pageModelGroups.sameFolderFieldsList,
-                    [modelName],
-                    SAME_FOLDER_PAGE_DSC_COEFFICIENT,
-                    result.objectModels
-                );
-                const sameFolderMergedPageModels = _.pullAt(pageModelGroups.sameFolder, sameFolderMergeResult.mergedIndexes);
-                const sameFolderMergedFilePaths = _.flatten(sameFolderMergedPageModels.map((pageModel) => pageModel.filePaths));
-                const diffFolderMergeResult = mergeSimilarFields(
-                    sameFolderMergeResult.mergedFields,
-                    pageModelGroups.diffFolderFieldsList,
-                    [modelName],
-                    DIFF_FOLDER_PAGE_DSC_COEFFICIENT,
-                    sameFolderMergeResult.objectModels
-                );
-                const diffFolderMergedPageModels = _.pullAt(pageModelGroups.diffFolder, diffFolderMergeResult.mergedIndexes);
-                const diffFolderMergedFilePaths = _.flatten(diffFolderMergedPageModels.map((pageModel) => pageModel.filePaths));
-                objectModels = diffFolderMergeResult.objectModels;
-                pageModels = _.concat(pageModelGroups.sameFolder, pageModelGroups.diffFolder, {
-                    type: 'page',
-                    name: modelName,
-                    fields: diffFolderMergeResult.mergedFields,
-                    filePaths: [filePath].concat(sameFolderMergedFilePaths, diffFolderMergedFilePaths)
+                const pageLayout: string | undefined = pageTypeKey && typeof data[pageTypeKey] === 'string' ? data[pageTypeKey] : undefined;
+                const mergeResult = mergeFieldsWithSimilarPageModels({
+                    pageLayout,
+                    fields: result.fields,
+                    filePath,
+                    modelName,
+                    pageModels,
+                    objectModels: result.objectModels
                 });
+                pageModels = mergeResult.pageModels;
+                objectModels = mergeResult.objectModels;
             }
         }
     }
@@ -845,6 +810,77 @@ function generateRandomModelName(length = 10) {
     return result.join('');
 }
 
+interface MergeSimilarPageModelsOptions {
+    pageLayout: string | undefined;
+    fields: Field[];
+    filePath: string;
+    modelName: string;
+    pageModels: PartialPageModel[];
+    objectModels: PartialObjectModel[];
+}
+
+interface MergeSimilarPageModelsResult {
+    pageModels: PartialPageModel[];
+    objectModels: PartialObjectModel[];
+}
+
+function mergeFieldsWithSimilarPageModels({ pageLayout, fields, filePath, modelName, pageModels, objectModels }: MergeSimilarPageModelsOptions): MergeSimilarPageModelsResult {
+    const result = pageModels.reduce((accum, pageModel) => {
+        if (accum.pageLayout && pageModel.layout) {
+            if (accum.pageLayout !== pageModel.layout) {
+                // do not merge page models with different layouts
+                accum.pageModels.push(pageModel);
+                return accum;
+            } else {
+                const mergeResult = mergeObjectFieldsList([accum.fields, pageModel.fields], [modelName], accum.objectModels);
+                if (mergeResult) {
+                    accum.fields = mergeResult.fields;
+                    accum.objectModels = mergeResult.objectModels;
+                    accum.filePaths = accum.filePaths.concat(pageModel.filePaths);
+                    return accum;
+                } else {
+                    accum.pageModels.push(pageModel);
+                    return accum;
+                }
+            }
+        } else {
+            const dscCoefficient = computeDSC(accum.fields, pageModel.fields);
+            const sameFolder = allFilePathInSameFolder([...accum.filePaths, ...pageModel.filePaths]);
+            const minCoefficient = sameFolder ? SAME_FOLDER_PAGE_DSC_COEFFICIENT : DIFF_FOLDER_PAGE_DSC_COEFFICIENT;
+            if (dscCoefficient >= minCoefficient) {
+                const mergeResult = mergeObjectFieldsList([accum.fields, pageModel.fields], [modelName], accum.objectModels);
+                if (mergeResult) {
+                    accum.fields = mergeResult.fields;
+                    accum.objectModels = mergeResult.objectModels;
+                    accum.filePaths = accum.filePaths.concat(pageModel.filePaths);
+                    if (pageModel.layout) {
+                        accum.pageLayout = pageModel.layout;
+                    }
+                    return accum;
+                }
+            }
+            accum.pageModels.push(pageModel);
+            return accum;
+        }
+    }, {
+        pageLayout: pageLayout,
+        fields: fields,
+        filePaths: [filePath],
+        pageModels: [] as PartialPageModel[],
+        objectModels: objectModels
+    });
+    return {
+        pageModels: result.pageModels.concat({
+            type: 'page',
+            name: modelName,
+            ...(result.pageLayout && { layout: result.pageLayout }),
+            fields: result.fields,
+            filePaths: result.filePaths
+        }),
+        objectModels: result.objectModels
+    }
+}
+
 function analyzePageFileMatchingProperties(pageModelsWithFilePaths: PartialPageModel[]) {
     let pageCount = 1;
     pageModelsWithFilePaths = _.map(
@@ -940,7 +976,7 @@ function analyzeDataFileMatchingProperties(dataModelsWithFilePaths: PartialDataM
     return dataModels;
 }
 
-function consolidatedModelsCommonAncestorFolder<T extends PageModel | DataModel>(models: T[]) {
+function extractLowestCommonAncestorFolderFromModels<T extends PageModel | DataModel>(models: T[]) {
     let commonDir: null | string[] = null;
     for (let model of models) {
         let dir;
