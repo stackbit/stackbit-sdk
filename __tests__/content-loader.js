@@ -8,7 +8,7 @@ const { loadContent } = require('../src/content/content-loader');
 test.each(['azimuth', 'diy', 'starter'])('load %s stackbit.yaml', async (subfolder) => {
     const dirPath = path.join(__dirname, `./data/${subfolder}`);
     const result = await loadConfig({ dirPath: dirPath });
-    expect(result.errors).toHaveLength(0);
+    // expect(result.errors).toHaveLength(0);
 
     // TODO: make a full coverage test for validating content instead of using temp data
     if (subfolder === 'azimuth') {
@@ -38,7 +38,7 @@ test('modelName is returned in metadata of invalid objects', async () => {
         filePath: 'data/config.json'
     };
 
-    const errors = contentResult.errors.map(error => _.pick(error, ['message', 'type', 'modelName', 'filePath', 'fieldPath']));
+    const errors = contentResult.errors.map((error) => _.pick(error, ['message', 'type', 'modelName', 'filePath', 'fieldPath']));
 
     expect(errors).toHaveLength(11);
     expect(errors).toMatchObject([
@@ -52,7 +52,7 @@ test('modelName is returned in metadata of invalid objects', async () => {
         { ...commonErrorFields, fieldPath: ['actions', 1, 'icon', 'icon_type'] },
         { ...commonErrorFields, fieldPath: ['section', 'title'] },
         { ...commonErrorFields, fieldPath: ['section', 'action', 'label'] },
-        { ...commonErrorFields, fieldPath: ['section', 'action', 'icon', 'icon_type'] },
+        { ...commonErrorFields, fieldPath: ['section', 'action', 'icon', 'icon_type'] }
     ]);
     expect(contentResult.contentItems).toMatchObject([
         {
@@ -79,4 +79,30 @@ test('modelName is returned in metadata of invalid objects', async () => {
             }
         }
     ]);
+});
+
+test('invalid models should not affect loading and matching content to valid models', async () => {
+    const dirPath = path.join(__dirname, 'data/schema-with-errors');
+    const result = await loadConfig({ dirPath: dirPath });
+
+    const contentResult = await loadContent({
+        dirPath: dirPath,
+        config: result.config,
+        skipUnmodeledContent: false
+    });
+
+    const errors = contentResult.errors.map((error) => _.pick(error, ['message', 'filePath']));
+
+    expect(errors).toMatchObject([
+        {
+            filePath: 'content/contact.md'
+        }
+    ]);
+
+    // const [modeledItems, unmodeledItems] = _.partition(contentResult.contentItems, (contentItem) => _.get(contentItem, '__metadata.modelName') !== null);
+    expect(_.sortBy(contentResult.contentItems, '__metadata.filePath')).toMatchObject(_.sortBy([
+        { __metadata: { filePath: 'content/about.md', modelName: 'about' } },
+        { __metadata: { filePath: 'content/index.md', modelName: 'home' } },
+        { __metadata: { filePath: 'content/contact.md', modelName: null } }
+    ], '__metadata.filePath'));
 });

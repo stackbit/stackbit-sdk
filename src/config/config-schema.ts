@@ -449,7 +449,7 @@ const pageModelSchema: Joi.ObjectSchema<YamlPageModel> = baseModelSchema
     .concat(
         Joi.object({
             type: Joi.string().valid('page').required(),
-            layout: Joi.string().when(Joi.ref('/pageLayoutKey'), { is: Joi.string().exist(), then: Joi.required() }),
+            layout: Joi.string(),//.when(Joi.ref('/pageLayoutKey'), { is: Joi.string().exist(), then: Joi.required() }),
             urlPath: Joi.string(),
             filePath: Joi.string(),
             singleInstance: Joi.boolean(),

@@ -1,0 +1,74 @@
+stackbitVersion: ~0.3.0
+ssgName: jekyll
+dataDir: null
+pagesDir: content
+pageLayoutKey: layout
+models:
+  invalid_1:
+    type: page
+    label: Invalid 1
+    description: 'invalid model with illegal field type'
+    fields:
+      - type: invalid_type
+        name: field_name
+      - type: string
+        label: No name
+  invalid_2:
+    type: page
+    label: Invalid 2
+    description: 'invalid model with illegal nested fields with illegal propeties'
+    fields:
+      - type: object
+        name: object_field
+        fields:
+          - type: string
+            name: nested_field_name
+            illegal: field
+      - type: list
+        name: list_field
+        items:
+          type: object
+          fields:
+            - type: string
+              name: nested_field_name
+              illegal: field
+  invalid_3:
+    type: page
+    label: Invalid 3
+    description: 'invalid singleInstance model without file'
+    singleInstance: true
+    fields:
+      - type: string
+        name: title
+  invalid_4:
+    type: page
+    label: Invalid 3
+    description: 'invalid singleInstance model with empty file'
+    singleInstance: true
+    file: ''
+    fields:
+      - type: string
+        name: title
+  home:
+    type: page
+    label: Home
+    layout: home
+    fields:
+      - type: string
+        name: title
+      - type: string
+        name: layout
+  about:
+    type: page
+    label: About
+    singleInstance: true
+    file: about.md
+    fields:
+      - type: string
+        name: title
+  page:
+    type: page
+    label: Page
+    fields:
+      - type: string
+        name: title
