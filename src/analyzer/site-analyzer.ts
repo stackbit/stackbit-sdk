@@ -24,18 +24,21 @@ export async function analyzeSite(options: SiteAnalyzerOptions): Promise<SiteAna
         schemaGeneratorResult = await generateSchema({ ssgMatchResult, fileBrowser });
     }
 
+    const dataDir = ssgMatchResult?.dataDir !== undefined ? ssgMatchResult.dataDir : schemaGeneratorResult?.dataDir;
+    const pagesDir = ssgMatchResult?.pagesDir !== undefined ? ssgMatchResult.pagesDir : schemaGeneratorResult?.pagesDir;
+
     let config: Config = {
         stackbitVersion: '~0.3.0',
         ssgName: ssgMatchResult?.ssgName,
         cmsName: cmsMatchResult?.cmsName,
         nodeVersion: ssgMatchResult?.nodeVersion,
         publishDir: ssgMatchResult?.publishDir,
-        dataDir: ssgMatchResult?.dataDir || schemaGeneratorResult?.dataDir,
-        pagesDir: ssgMatchResult?.pagesDir || schemaGeneratorResult?.pagesDir,
+        dataDir: dataDir,
+        pagesDir: pagesDir,
         models: schemaGeneratorResult?.models || []
     };
 
-    config = _.omitBy(config, _.isNil) as Config;
+    config = _.omitBy(config, _.isUndefined) as Config;
 
     return {
         ssgMatchResult,

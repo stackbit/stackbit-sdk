@@ -27,8 +27,8 @@ export type SchemaGeneratorOptions = {
 
 export interface SchemaGeneratorResult {
     models: Model[];
-    pagesDir?: string;
-    dataDir?: string;
+    pagesDir?: string | null;
+    dataDir?: string | null;
 }
 
 export async function generateSchema({ ssgMatchResult, ...fileBrowserOptions }: SchemaGeneratorOptions): Promise<SchemaGeneratorResult | null> {
@@ -36,10 +36,8 @@ export async function generateSchema({ ssgMatchResult, ...fileBrowserOptions }: 
     await fileBrowser.listFiles();
 
     const ssgDir = ssgMatchResult.ssgDir ?? '';
-    const pagesDir = ssgMatchResult.pagesDir ?? '';
-    const dataDir = ssgMatchResult.dataDir ?? '';
-    const rootPagesDir = getDir(ssgDir, pagesDir);
-    const rootDataDir = getDir(ssgDir, dataDir);
+    const rootPagesDir = getDir(ssgDir, ssgMatchResult.pagesDir ?? '');
+    const rootDataDir = getDir(ssgDir, ssgMatchResult.dataDir ?? '');
 
     const excludedPageFiles = getExcludedPageFiles(ssgMatchResult, rootPagesDir);
     const excludedDataFiles = getExcludedDataFiles(ssgMatchResult, rootDataDir);
@@ -65,21 +63,17 @@ export async function generateSchema({ ssgMatchResult, ...fileBrowserOptions }: 
     let pageModels = analyzePageFileMatchingProperties(pageModelsResults.pageModels);
     let dataModels = analyzeDataFileMatchingProperties(dataModelsResults.dataModels);
 
-    let commonPageModelsDir;
-    if (ssgMatchResult.pagesDir === undefined && pageModels.length > 0) {
+    let pagesDir = ssgMatchResult.pagesDir;
+    if (pagesDir === undefined && pageModels.length > 0) {
         const result = extractLowestCommonAncestorFolderFromModels(pageModels);
-        if (result) {
-            commonPageModelsDir = getDir(ssgDir, result.commonDir);
-            pageModels = result.models;
-        }
+        pagesDir = getDir(ssgDir, result.commonDir);
+        pageModels = result.models;
     }
-    let commonDataModelsDir;
-    if (ssgMatchResult.dataDir === undefined && dataModels.length > 0) {
+    let dataDir = ssgMatchResult.dataDir;
+    if (dataDir === undefined && dataModels.length > 0) {
         const result = extractLowestCommonAncestorFolderFromModels(dataModels);
-        if (result) {
-            commonDataModelsDir = getDir(ssgDir, result.commonDir);
-            dataModels = result.models;
-        }
+        dataDir = getDir(ssgDir, result.commonDir);
+        dataModels = result.models;
     }
 
     const objectModels: ObjectModel[] = _.map(
@@ -99,8 +93,8 @@ export async function generateSchema({ ssgMatchResult, ...fileBrowserOptions }: 
 
     return {
         models: models,
-        ...(commonPageModelsDir && { pagesDir: commonPageModelsDir }),
-        ...(commonDataModelsDir && { dataDir: commonDataModelsDir })
+        pagesDir: pagesDir,
+        dataDir: dataDir
     };
 }
 
@@ -1005,7 +999,10 @@ function extractLowestCommonAncestorFolderFromModels<T extends PageModel | DataM
     }
     const commonDirString = commonDir === null ? '' : commonDir.join(path.sep);
     if (commonDirString === '') {
-        return null;
+        return {
+            models,
+            commonDir: ''
+        };
     }
     const adjustedModels = _.map(
         models,
