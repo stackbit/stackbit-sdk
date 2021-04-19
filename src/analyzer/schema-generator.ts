@@ -12,7 +12,7 @@ import { Field, FieldType, FieldListItems, FieldListProps, FieldPartialProps, Fi
 type FieldPath = (string | number)[];
 type StringFieldTypes = Exclude<FieldType, 'number' | 'boolean' | 'enum' | 'object' | 'model' | 'reference' | 'list'>;
 type PartialObjectModel = Omit<ObjectModel, 'label'> & { refFieldPaths?: FieldPath[]; refFields?: FieldModelProps[] };
-type PartialPageModel = Omit<PageModel, 'label' | 'fields'> & { fields: Field[], filePaths: string[] };
+type PartialPageModel = Omit<PageModel, 'label' | 'fields'> & { fields: Field[]; filePaths: string[] };
 type PartialDataModel = Omit<DataModel, 'label'> & { filePaths: string[] };
 type PartialModel = PartialPageModel | PartialDataModel;
 
@@ -217,17 +217,17 @@ async function generateDataModelsForFiles({
     objectModels
 }: GenerateDataModelsOptions): Promise<{ dataModels: PartialDataModel[]; objectModels: PartialObjectModel[] }> {
     const dataModels: PartialDataModel[] = [];
+    let modelNameCounter = 1;
     for (const filePath of filePaths) {
         let data = await fileBrowser.getFileData(path.join(dirPath, filePath));
-        const pathObject = path.parse(filePath);
-        const modelName = _.snakeCase(pathObject.name);
+        const modelName = `data_${modelNameCounter++}`;
         if (_.isPlainObject(data)) {
             const result = generateObjectFields(data, [modelName], objectModels);
             // generally, pages can be defined as JSON files as well.
             if (result) {
                 objectModels = result.objectModels;
                 const dataFieldsList = dataModels.filter((dataModel) => dataModel.fields).map((dataModel) => dataModel.fields!);
-                const mergeResult = mergeSimilarFields(result.fields, dataFieldsList, [modelName], DATA_DSC_COEFFICIENT, objectModels);
+                const mergeResult = mergeSimilarFields(result.fields, dataFieldsList, [modelName], objectModels, 'dsc', DATA_DSC_COEFFICIENT);
                 objectModels = mergeResult.objectModels;
                 const mergedDataModels = _.pullAt(dataModels, mergeResult.mergedIndexes);
                 const mergedFilePaths = _.flatten(mergedDataModels.map((dataModel) => dataModel.filePaths));
@@ -504,10 +504,7 @@ function consolidateListItems(
                 };
             case 'object':
                 const fieldsList = _.map(listItemModels, 'fields') as Field[][];
-                const result = consolidateObjectFieldsListWithDSC(fieldsList, fieldPath, LIST_OBJECT_DSC_COEFFICIENT, objectModels);
-                if (!result) {
-                    return null;
-                }
+                const result = consolidateObjectFieldsListWithOverlap(fieldsList, fieldPath, LIST_OBJECT_DSC_COEFFICIENT, objectModels);
                 if (result.fieldsList.length === 1) {
                     return {
                         items: {
@@ -539,11 +536,11 @@ function consolidateListItems(
                     };
                 }
             case 'model':
-                const models = _.compact(_.uniq(_.flatten(_.map(listItemModels, 'models'))));
+                const modelNames = _.compact(_.uniq(_.flatten(_.map(listItemModels, 'models'))));
                 return {
                     items: {
                         type: 'model',
-                        models: models
+                        models: modelNames
                     },
                     objectModels
                 };
@@ -557,6 +554,33 @@ function consolidateListItems(
                     objectModels
                 };
         }
+    }
+    if (_.every(itemTypes, (itemsType) => ['object', 'model'].includes(itemsType))) {
+        const modelListItems = _.filter(listItemModels, { type: 'model' });
+        const modelNames = _.compact(_.uniq(_.flatten(_.map(modelListItems, 'models'))));
+        const objectListItems = _.filter(listItemModels, { type: 'object' });
+        const fieldsList = _.map(objectListItems, 'fields') as Field[][];
+        const result = consolidateObjectFieldsListWithOverlap(fieldsList, fieldPath, LIST_OBJECT_DSC_COEFFICIENT, objectModels);
+        const models = result.fieldsList.map(
+            (fields): PartialObjectModel => {
+                const modelName = generateRandomModelName();
+                return {
+                    type: 'object',
+                    name: modelName,
+                    fields: fields
+                    // refFields: [items],
+                    // refFieldPaths: [fieldPath]
+                };
+            }
+        );
+        const items: FieldListItems = {
+            type: 'model',
+            models: modelNames.concat(_.map(models, 'name'))
+        };
+        return {
+            items: items,
+            objectModels: result.objectModels.concat(models)
+        };
     }
     const fieldType = coerceSimpleFieldTypes(itemTypes);
     return fieldType
@@ -605,20 +629,20 @@ function consolidateObjectFieldsList(
     };
 }
 
-// https://en.wikipedia.org/wiki/S%C3%B8rensen%E2%80%93Dice_coefficient
-function consolidateObjectFieldsListWithDSC(
+function consolidateObjectFieldsListWithOverlap(
     fieldsList: Field[][],
     fieldPath: FieldPath,
     minCoefficient: number,
     objectModels: PartialObjectModel[]
 ): { fieldsList: Field[][]; objectModels: PartialObjectModel[] } {
-    let unmergedFieldsList = fieldsList.slice();
+    // to reduce fragmentation sort fields arrays by length to merge the larger objects with smaller objects first
+    let unmergedFieldsList = _.orderBy(fieldsList.slice(), ['length'], ['desc']);
     let idx = 0;
     const mergedFieldsList = [];
 
     while (unmergedFieldsList.length > 0) {
-        const fields = unmergedFieldsList.pop()!;
-        const result = mergeSimilarFields(fields, unmergedFieldsList, fieldPath, minCoefficient, objectModels);
+        const fields = unmergedFieldsList.shift()!;
+        const result = mergeSimilarFields(fields, unmergedFieldsList, fieldPath, objectModels, 'overlap', minCoefficient);
         unmergedFieldsList = result.unmergedFieldsList;
         mergedFieldsList.push(result.mergedFields);
         objectModels = result.objectModels;
@@ -631,14 +655,24 @@ function consolidateObjectFieldsListWithDSC(
     };
 }
 
-function mergeSimilarFields(fields: Field[], fieldsList: Field[][], fieldPath: FieldPath, minCoefficient: number, objectModels: PartialObjectModel[]) {
+type SimilarityType = 'dsc' | 'overlap';
+
+function mergeSimilarFields(
+    fields: Field[],
+    fieldsList: Field[][],
+    fieldPath: FieldPath,
+    objectModels: PartialObjectModel[],
+    type: SimilarityType,
+    minCoefficient: number
+) {
     const unmergedFieldsList: Field[][] = [];
     const mergedIndexes: number[] = [];
     const unmergedIndexes: number[] = [];
+    const similarityFunction = type === 'dsc' ? computeDSC : computeOverlap;
     let mergedFields = fields;
     for (let i = 0; i < fieldsList.length; i++) {
         const otherFields = fieldsList[i]!;
-        const dscCoefficient = computeDSC(mergedFields, otherFields);
+        const dscCoefficient = similarityFunction(mergedFields, otherFields);
         // TODO: check if intersected fields have same types, otherwise don't try to merge
         if (dscCoefficient >= minCoefficient) {
             const result = mergeObjectFieldsList([mergedFields, otherFields], fieldPath, objectModels);
@@ -658,10 +692,34 @@ function mergeSimilarFields(fields: Field[], fieldsList: Field[][], fieldPath: F
     return { mergedFields, unmergedFieldsList, mergedIndexes, unmergedIndexes, objectModels };
 }
 
+/**
+ * https://en.wikipedia.org/wiki/S%C3%B8rensen%E2%80%93Dice_coefficient
+ *
+ * The Sørensen–Dice coefficient gives better values than Jaccard index when
+ * more elements in the two sets match in relation to sets sizes
+ *
+ * @param fieldsA
+ * @param fieldsB
+ */
 function computeDSC(fieldsA: Field[], fieldsB: Field[]) {
     const setA = getFieldsSet(fieldsA);
     const setB = getFieldsSet(fieldsB);
     return (2 * _.intersection(setA, setB).length) / (setA.length + setB.length);
+}
+
+/**
+ * https://en.wikipedia.org/wiki/Overlap_coefficient
+ *
+ * The Overlap coefficient gives higher values than the Sørensen–Dice coefficient
+ * if one set is a subset of another
+ *
+ * @param fieldsA
+ * @param fieldsB
+ */
+function computeOverlap(fieldsA: Field[], fieldsB: Field[]) {
+    const setA = getFieldsSet(fieldsA);
+    const setB = getFieldsSet(fieldsB);
+    return _.intersection(setA, setB).length / Math.min(setA.length, setB.length);
 }
 
 function getFieldsSet(fields: Field[]): string[] {
@@ -742,7 +800,7 @@ function consolidateFields(
                 };
             case 'list':
                 const listItemsArr = _.map(fields, 'items') as FieldListItems[];
-                const itemsResult = consolidateListItems(listItemsArr, fieldPath, []);
+                const itemsResult = consolidateListItems(listItemsArr, fieldPath, objectModels);
                 if (!itemsResult) {
                     return null;
                 }
@@ -818,51 +876,61 @@ interface MergeSimilarPageModelsResult {
     objectModels: PartialObjectModel[];
 }
 
-function mergeFieldsWithSimilarPageModels({ pageLayout, fields, filePath, modelName, pageModels, objectModels }: MergeSimilarPageModelsOptions): MergeSimilarPageModelsResult {
-    const result = pageModels.reduce((accum, pageModel) => {
-        if (accum.pageLayout && pageModel.layout) {
-            if (accum.pageLayout !== pageModel.layout) {
-                // do not merge page models with different layouts
-                accum.pageModels.push(pageModel);
-                return accum;
-            } else {
-                const mergeResult = mergeObjectFieldsList([accum.fields, pageModel.fields], [modelName], accum.objectModels);
-                if (mergeResult) {
-                    accum.fields = mergeResult.fields;
-                    accum.objectModels = mergeResult.objectModels;
-                    accum.filePaths = accum.filePaths.concat(pageModel.filePaths);
-                    return accum;
-                } else {
+function mergeFieldsWithSimilarPageModels({
+    pageLayout,
+    fields,
+    filePath,
+    modelName,
+    pageModels,
+    objectModels
+}: MergeSimilarPageModelsOptions): MergeSimilarPageModelsResult {
+    const result = pageModels.reduce(
+        (accum, pageModel) => {
+            if (accum.pageLayout && pageModel.layout) {
+                if (accum.pageLayout !== pageModel.layout) {
+                    // do not merge page models with different layouts
                     accum.pageModels.push(pageModel);
                     return accum;
-                }
-            }
-        } else {
-            const dscCoefficient = computeDSC(accum.fields, pageModel.fields);
-            const sameFolder = allFilePathInSameFolder([...accum.filePaths, ...pageModel.filePaths]);
-            const minCoefficient = sameFolder ? SAME_FOLDER_PAGE_DSC_COEFFICIENT : DIFF_FOLDER_PAGE_DSC_COEFFICIENT;
-            if (dscCoefficient >= minCoefficient) {
-                const mergeResult = mergeObjectFieldsList([accum.fields, pageModel.fields], [modelName], accum.objectModels);
-                if (mergeResult) {
-                    accum.fields = mergeResult.fields;
-                    accum.objectModels = mergeResult.objectModels;
-                    accum.filePaths = accum.filePaths.concat(pageModel.filePaths);
-                    if (pageModel.layout) {
-                        accum.pageLayout = pageModel.layout;
+                } else {
+                    const mergeResult = mergeObjectFieldsList([accum.fields, pageModel.fields], [modelName], accum.objectModels);
+                    if (mergeResult) {
+                        accum.fields = mergeResult.fields;
+                        accum.objectModels = mergeResult.objectModels;
+                        accum.filePaths = accum.filePaths.concat(pageModel.filePaths);
+                        return accum;
+                    } else {
+                        accum.pageModels.push(pageModel);
+                        return accum;
                     }
-                    return accum;
                 }
+            } else {
+                const dscCoefficient = computeDSC(accum.fields, pageModel.fields);
+                const sameFolder = allFilePathInSameFolder([...accum.filePaths, ...pageModel.filePaths]);
+                const minCoefficient = sameFolder ? SAME_FOLDER_PAGE_DSC_COEFFICIENT : DIFF_FOLDER_PAGE_DSC_COEFFICIENT;
+                if (dscCoefficient >= minCoefficient) {
+                    const mergeResult = mergeObjectFieldsList([accum.fields, pageModel.fields], [modelName], accum.objectModels);
+                    if (mergeResult) {
+                        accum.fields = mergeResult.fields;
+                        accum.objectModels = mergeResult.objectModels;
+                        accum.filePaths = accum.filePaths.concat(pageModel.filePaths);
+                        if (pageModel.layout) {
+                            accum.pageLayout = pageModel.layout;
+                        }
+                        return accum;
+                    }
+                }
+                accum.pageModels.push(pageModel);
+                return accum;
             }
-            accum.pageModels.push(pageModel);
-            return accum;
+        },
+        {
+            pageLayout: pageLayout,
+            fields: fields,
+            filePaths: [filePath],
+            pageModels: [] as PartialPageModel[],
+            objectModels: objectModels
         }
-    }, {
-        pageLayout: pageLayout,
-        fields: fields,
-        filePaths: [filePath],
-        pageModels: [] as PartialPageModel[],
-        objectModels: objectModels
-    });
+    );
     return {
         pageModels: result.pageModels.concat({
             type: 'page',
@@ -872,7 +940,7 @@ function mergeFieldsWithSimilarPageModels({ pageLayout, fields, filePath, modelN
             filePaths: result.filePaths
         }),
         objectModels: result.objectModels
-    }
+    };
 }
 
 function analyzePageFileMatchingProperties(pageModelsWithFilePaths: PartialPageModel[]) {
@@ -881,16 +949,10 @@ function analyzePageFileMatchingProperties(pageModelsWithFilePaths: PartialPageM
         pageModelsWithFilePaths,
         (pageModel: PartialPageModel): PartialPageModel => {
             const folder = findCommonAncestorFolder(pageModel.filePaths);
-            const lastPart = _.last(folder.split(path.sep));
             const sameFolder = allFilePathInSameFolder(pageModel.filePaths);
             let modelName;
-            if (lastPart) {
-                if (_.endsWith(lastPart, 's')) {
-                    modelName = lastPart.substring(0, lastPart.length - 1);
-                } else {
-                    modelName = lastPart;
-                }
-                modelName = _.snakeCase(modelName);
+            if (folder !== '') {
+                modelName = getModelNameFromFilePath(folder);
             } else {
                 modelName = `page_${pageCount++}`;
             }
@@ -937,6 +999,7 @@ function analyzePageFileMatchingProperties(pageModelsWithFilePaths: PartialPageM
 function analyzeDataFileMatchingProperties(dataModelsWithFilePaths: PartialDataModel[]) {
     const dataModels: DataModel[] = [];
     const modelNames: string[] = [];
+    let dataCount = 1;
     for (let index = 0; index < dataModelsWithFilePaths.length; index++) {
         const dataModelWithFilePaths = dataModelsWithFilePaths[index]!;
         const otherModels = dataModelsWithFilePaths.slice();
@@ -945,6 +1008,8 @@ function analyzeDataFileMatchingProperties(dataModelsWithFilePaths: PartialDataM
         const modelLabel = _.startCase(modelName);
         modelNames.push(modelName);
         if (dataModelWithFilePaths.filePaths.length === 1) {
+            const pathObject = path.parse(dataModelWithFilePaths.filePaths[0]!);
+            const modelName = _.snakeCase(pathObject.name);
             dataModels.push({
                 type: 'data',
                 name: modelName,
@@ -956,6 +1021,12 @@ function analyzeDataFileMatchingProperties(dataModelsWithFilePaths: PartialDataM
             });
         } else {
             const folder = findCommonAncestorFolder(dataModelWithFilePaths.filePaths);
+            let modelName;
+            if (folder !== '') {
+                modelName = getModelNameFromFilePath(folder);
+            } else {
+                modelName = `data_${dataCount++}`;
+            }
             dataModels.push({
                 type: 'data',
                 name: modelName,
@@ -1071,4 +1142,15 @@ function getUniqueName(name: string, otherNames: string[], idx = 1): string {
         return altName;
     }
     return getUniqueName(name, otherNames, idx + 1);
+}
+
+function getModelNameFromFilePath(filePath: string) {
+    const lastPathPart = _.last(filePath.split(path.sep))!;
+    let modelName;
+    if (_.endsWith(lastPathPart, 's')) {
+        modelName = lastPathPart.substring(0, lastPathPart.length - 1);
+    } else {
+        modelName = lastPathPart;
+    }
+    return _.snakeCase(modelName);
 }
