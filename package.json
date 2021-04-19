@@ -4,6 +4,7 @@
     "description": "Stackbit SDK",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
+    "files": ["/dist", "/src"],
     "scripts": {
         "test": "jest",
         "build": "tsc",
