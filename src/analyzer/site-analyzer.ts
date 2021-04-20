@@ -5,6 +5,7 @@ import { matchSSG, SSGMatchResult } from './ssg-matcher';
 import { CMSMatchResult, matchCMS } from './cms-matcher';
 import { Config } from '../config/config-loader';
 import { generateSchema, SchemaGeneratorResult } from './schema-generator';
+import { AssetsModel } from '../config/config-schema';
 
 export type SiteAnalyzerOptions = GetFileBrowserOptions;
 
@@ -27,6 +28,8 @@ export async function analyzeSite(options: SiteAnalyzerOptions): Promise<SiteAna
     const dataDir = ssgMatchResult?.dataDir !== undefined ? ssgMatchResult.dataDir : schemaGeneratorResult?.dataDir;
     const pagesDir = ssgMatchResult?.pagesDir !== undefined ? ssgMatchResult.pagesDir : schemaGeneratorResult?.pagesDir;
 
+    const assets = generateAssets(ssgMatchResult);
+
     let config: Config = {
         stackbitVersion: '~0.3.0',
         ssgName: ssgMatchResult?.ssgName,
@@ -35,6 +38,7 @@ export async function analyzeSite(options: SiteAnalyzerOptions): Promise<SiteAna
         publishDir: ssgMatchResult?.publishDir,
         dataDir: dataDir,
         pagesDir: pagesDir,
+        assets: assets,
         models: schemaGeneratorResult?.models || []
     };
 
@@ -45,4 +49,16 @@ export async function analyzeSite(options: SiteAnalyzerOptions): Promise<SiteAna
         cmsMatchResult,
         config
     };
+}
+
+function generateAssets(ssgMatchResult: SSGMatchResult | null): AssetsModel | undefined {
+    if (ssgMatchResult?.assetsReferenceType === 'static' && ssgMatchResult?.staticDir) {
+        return {
+            referenceType: 'static',
+            staticDir: ssgMatchResult?.staticDir,
+            uploadDir: 'assets',
+            publicPath: '/'
+        };
+    }
+    return undefined;
 }

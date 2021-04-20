@@ -18,7 +18,7 @@ type PartialModel = PartialPageModel | PartialDataModel;
 
 const SAME_FOLDER_PAGE_DSC_COEFFICIENT = 0.7;
 const DIFF_FOLDER_PAGE_DSC_COEFFICIENT = 0.8;
-const DATA_DSC_COEFFICIENT = 0.8;
+const DATA_MODEL_DSC_COEFFICIENT = 0.8;
 const LIST_OBJECT_DSC_COEFFICIENT = 0.8;
 
 export type SchemaGeneratorOptions = {
@@ -227,7 +227,7 @@ async function generateDataModelsForFiles({
             if (result) {
                 objectModels = result.objectModels;
                 const dataFieldsList = dataModels.filter((dataModel) => dataModel.fields).map((dataModel) => dataModel.fields!);
-                const mergeResult = mergeSimilarFields(result.fields, dataFieldsList, [modelName], objectModels, 'dsc', DATA_DSC_COEFFICIENT);
+                const mergeResult = mergeSimilarFields(result.fields, dataFieldsList, [modelName], objectModels, 'dsc', DATA_MODEL_DSC_COEFFICIENT);
                 objectModels = mergeResult.objectModels;
                 const mergedDataModels = _.pullAt(dataModels, mergeResult.mergedIndexes);
                 const mergedFilePaths = _.flatten(mergedDataModels.map((dataModel) => dataModel.filePaths));
@@ -468,6 +468,7 @@ function fieldFromStringValue(value: string): { type: StringFieldTypes } {
         fieldType = 'text';
     } else if (/\.(?:svg|png|jpg|jpeg)$/.test(value)) {
         fieldType = 'image';
+        // TODO: handle asset referenceTypes
         // if (value.startsWith('./') || value.startsWith('../')) {
         //     fieldProps.referenceType = 'relative';
         // }

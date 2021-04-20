@@ -8,6 +8,8 @@ import { Config } from '../config/config-loader';
 
 export type SSGMatcherOptions = GetFileBrowserOptions;
 
+type AssetsReferenceType = 'static' | 'relative';
+
 export interface SSGMatchResult {
     ssgName: Config['ssgName'];
     ssgDir?: string;
@@ -19,6 +21,7 @@ export interface SSGMatchResult {
     envVars?: string[];
     nodeVersion?: string;
     pageTypeKey?: string;
+    assetsReferenceType?: AssetsReferenceType;
     options?: {
         ssgDirs?: string[];
     };
@@ -56,7 +59,7 @@ async function getFirstMatchedSSG(fileBrowser: FileBrowser): Promise<SSGMatchRes
     }
     return {
         ssgName: ssgMatcher.name,
-        ..._.pick(ssgMatcher, ['publishDir', 'staticDir', 'pageTypeKey']),
+        ..._.pick(ssgMatcher, ['publishDir', 'staticDir', 'pageTypeKey', 'assetsReferenceType']),
         ...partialMatch
     };
 }
@@ -105,6 +108,7 @@ interface SSGMatcher {
     matchNodeVersion?: boolean;
     publishDir?: string;
     staticDir?: string;
+    assetsReferenceType?: AssetsReferenceType;
     pageTypeKey?: string;
     match?: (fileBrowser: FileBrowser) => Promise<SSGMatchPartialResult | null>;
 }
@@ -183,6 +187,7 @@ const SSGMatchers: SSGMatcher[] = [
     {
         name: 'hugo',
         pageTypeKey: 'layout',
+        assetsReferenceType: 'static',
         match: async (fileBrowser) => {
             let configFiles = ['config.toml', 'config.yaml', 'config.json'];
             configFiles = configFiles.concat(_.map(configFiles, (configFile) => 'config/_default/' + configFile));
@@ -229,6 +234,7 @@ const SSGMatchers: SSGMatcher[] = [
     {
         name: 'jekyll',
         pageTypeKey: 'layout',
+        assetsReferenceType: 'static',
         match: async (fileBrowser) => {
             // We (Stackbit) can only run Jekyll sites, or themes, that have explicitly defined specific 'jekyll' or
             // 'github-pages' as a dependency. Having jekyll plugin dependencies such as 'jekyll-paginate' and
