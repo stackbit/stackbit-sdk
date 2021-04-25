@@ -55,6 +55,8 @@ async function getFirstMatchedSSG(fileBrowser: FileBrowser): Promise<SSGMatchRes
         const nodeVersion = await matchNodeVersion(fileBrowser, partialMatch);
         if (nodeVersion) {
             partialMatch.nodeVersion = nodeVersion;
+        } else {
+            partialMatch.nodeVersion = '12';
         }
     }
     return {

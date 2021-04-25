@@ -5,7 +5,9 @@ import micromatch from 'micromatch';
 import { Octokit } from '@octokit/rest';
 import { readDirRecursively, parseDataByFilePath, reducePromise } from '@stackbit/utils';
 
-import { DATA_FILE_EXTENSIONS, GLOBAL_EXCLUDES, MARKDOWN_FILE_EXTENSIONS } from '../consts';
+import { DATA_FILE_EXTENSIONS, MARKDOWN_FILE_EXTENSIONS } from '../consts';
+
+export const EXCLUDED_LIST_FILES = ['**/node_modules/**', '**/.git/**', '.idea/**'];
 
 export interface FileResult {
     filePath: string;
@@ -40,11 +42,12 @@ export class FileSystemFileBrowserAdapter implements FileBrowserAdapterInterface
             includeStats: true,
             filter: (filePath) => {
                 const isIncluded = !includePattern || micromatch.isMatch(filePath, includePattern);
-                excludePattern = excludePattern || GLOBAL_EXCLUDES;
+                excludePattern = excludePattern || EXCLUDED_LIST_FILES;
                 const isExcluded = micromatch.isMatch(filePath, excludePattern);
                 return isIncluded && !isExcluded;
             }
         });
+        // TODO: order files alphabetically so both Git and FileSystem adapters will result same analyze results
         return readDirResult.map((fileResult) => ({
             filePath: fileResult.filePath,
             isFile: fileResult.stats.isFile(),
@@ -134,45 +137,69 @@ export class GitHubFileBrowserAdapter implements FileBrowserAdapterInterface {
         });
         let tree;
         if (!treeResponse.data.truncated) {
+            const { includePattern, excludePattern } = listFilesOptions;
             tree = treeResponse.data.tree;
+            tree = tree.filter((node) => {
+                if (!node.path || !(node.type === 'blob' || node.type === 'tree')) {
+                    return false;
+                }
+                const isIncluded = !includePattern || micromatch.isMatch(node.path, includePattern);
+                const isExcluded = micromatch.isMatch(node.path, excludePattern || EXCLUDED_LIST_FILES);
+                return isIncluded && !isExcluded;
+            });
         } else {
-            tree = await this.listFilesRecursively(treeResponse.data.sha);
+            tree = await this.listFilesRecursively(treeResponse.data.sha, listFilesOptions, '');
         }
-        return tree
-            .filter((node) => node.path && (node.type === 'blob' || node.type === 'tree'))
-            .map((node) => ({
-                filePath: node.path!,
-                isFile: node.type === 'blob',
-                isDirectory: node.type === 'tree'
-            }));
+        // TODO: order files alphabetically so both Git and FileSystem adapters will result same analyze results
+        return tree.map((node) => ({
+            filePath: node.path!,
+            isFile: node.type === 'blob',
+            isDirectory: node.type === 'tree'
+        }));
     }
 
-    async listFilesRecursively(treeSha: string): Promise<OctokitTreeNode[]> {
+    async listFilesRecursively(treeSha: string, listFilesOptions: ListFilesOptions, parentPath: string): Promise<OctokitTreeNode[]> {
         const treeResponse = await this.octokit.git.getTree({
             owner: this.owner,
             repo: this.repo,
             tree_sha: treeSha
         });
+        const { includePattern, excludePattern } = listFilesOptions;
         const { blob: files, tree: folders } = _.groupBy(treeResponse.data.tree, 'type');
-        const filteredFolders = (folders || []).filter((treeNode) => treeNode.path && treeNode.sha);
+        const filter = (fullPath: string) => {
+            const isIncluded = !includePattern || micromatch.isMatch(fullPath, includePattern);
+            const isExcluded = micromatch.isMatch(fullPath, excludePattern || EXCLUDED_LIST_FILES);
+            return isIncluded && !isExcluded;
+        };
+        const filteredFolders = (folders || []).reduce((accum: OctokitTreeNode[], treeNode) => {
+            if (!treeNode.path || !treeNode.sha) {
+                return accum;
+            }
+            const fullPath = (parentPath ? parentPath + '/' : '') + treeNode.path;
+            if (!filter(fullPath)) {
+                return accum;
+            }
+            return accum.concat(Object.assign(treeNode, { path: fullPath }));
+        }, []);
+        const filteredFiles = (files || []).reduce((accum: OctokitTreeNode[], fileNode) => {
+            if (!fileNode.path) {
+                return accum;
+            }
+            const fullPath = (parentPath ? parentPath + '/' : '') + fileNode.path;
+            if (!filter(fullPath)) {
+                return accum;
+            }
+            return accum.concat(Object.assign(fileNode, { path: fullPath }));
+        }, []);
         const folderResults = await reducePromise(
             filteredFolders,
             async (accum: OctokitTreeNode[], treeNode) => {
-                const results = await this.listFilesRecursively(treeNode.sha!);
-                return accum.concat(
-                    treeNode,
-                    results.map((node) => {
-                        return {
-                            ...node,
-                            path: treeNode.path + '/' + node.path
-                        };
-                    })
-                );
+                const results = await this.listFilesRecursively(treeNode.sha!, listFilesOptions, treeNode.path!);
+                return accum.concat(treeNode, results);
             },
             []
         );
-        const fileResults = files || [];
-        return folderResults.concat(fileResults);
+        return folderResults.concat(filteredFiles);
     }
 
     async readFile(filePath: string): Promise<string> {

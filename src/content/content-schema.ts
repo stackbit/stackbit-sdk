@@ -149,9 +149,6 @@ function joiSchemaForField(field: Field | FieldListItems, fieldPath: FieldPath) 
 }
 
 export type FieldPropsByType = {
-    boolean: FieldSimpleNoProps;
-    date: FieldSimpleNoProps;
-    datetime: FieldSimpleNoProps;
     enum: FieldEnumProps;
     number: FieldNumberProps;
     object: FieldObjectProps;
@@ -161,9 +158,6 @@ export type FieldPropsByType = {
 };
 
 const FieldSchemas: { [fieldType in keyof FieldPropsByType]: (field: FieldPropsByType[fieldType], fieldPath: FieldPath) => Joi.Schema } = {
-    boolean: () => Joi.boolean(),
-    date: () => Joi.date(),
-    datetime: () => Joi.date(),
     enum: (field) => {
         if (field.options) {
             const values = (field.options as (FieldEnumValue | FieldEnumOptionWithLabel)[]).map((option) =>
@@ -232,6 +226,7 @@ const FieldSchemas: { [fieldType in keyof FieldPropsByType]: (field: FieldPropsB
                 });
         }
     },
+    // TODO: validate reference by looking if referenced filePath actually exists
     reference: () => Joi.string(),
     list: (field, fieldPath: FieldPath) => {
         if (field.items) {

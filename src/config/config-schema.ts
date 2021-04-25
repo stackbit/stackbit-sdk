@@ -540,6 +540,7 @@ export interface YamlConfig {
     ssgName?: typeof SSG_NAMES[number];
     ssgVersion?: string;
     nodeVersion?: string;
+    devCommand?: string;
     cmsName?: typeof CMS_NAMES[number];
     import?: Import;
     buildCommand?: string;
@@ -561,6 +562,7 @@ const schema = Joi.object<YamlConfig>({
     ssgName: Joi.string().valid(...SSG_NAMES),
     ssgVersion: Joi.string(),
     nodeVersion: Joi.string(),
+    devCommand: Joi.string(),
     cmsName: Joi.string().valid(...CMS_NAMES),
     import: importSchema,
     buildCommand: Joi.string(),

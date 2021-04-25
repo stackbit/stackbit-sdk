@@ -10,7 +10,7 @@ import { Field, FieldModel } from '../config/config-schema';
 import { FileForModelNotFoundError, FileMatchedMultipleModelsError, FileNotMatchedModelError, FileReadError, FolderReadError } from './content-errors';
 import { isConfigModel, isDataModel, isPageModel } from '../schema-utils';
 import { validate } from './content-validator';
-import { DATA_FILE_EXTENSIONS, EXCLUDED_DATA_FILES, EXCLUDED_MARKDOWN_FILES, GLOBAL_EXCLUDES, MARKDOWN_FILE_EXTENSIONS } from '../consts';
+import { DATA_FILE_EXTENSIONS, EXCLUDED_DATA_FILES, EXCLUDED_MARKDOWN_FILES, EXCLUDED_COMMON_FILES, MARKDOWN_FILE_EXTENSIONS } from '../consts';
 
 interface BaseMetadata {
     filePath: string;
@@ -103,7 +103,7 @@ async function loadDataFiles({ dirPath, config, skipUnmodeledContent }: ContentL
         return { contentItems, errors };
     }
 
-    const excludedFiles = [...GLOBAL_EXCLUDES];
+    const excludedFiles = [...EXCLUDED_COMMON_FILES];
     const dataModels = config.models.filter(isDataModel);
 
     if (dataDir === '') {
@@ -160,7 +160,7 @@ async function loadPageFiles({ dirPath, config, skipUnmodeledContent }: ContentL
     }
 
     const pageLayoutKey = config.pageLayoutKey;
-    const excludedFiles = _.castArray(config.excludePages || []).concat(GLOBAL_EXCLUDES);
+    const excludedFiles = _.castArray(config.excludePages || []).concat(EXCLUDED_COMMON_FILES);
     const pageModels = config.models.filter(isPageModel);
 
     if (pagesDir === '') {

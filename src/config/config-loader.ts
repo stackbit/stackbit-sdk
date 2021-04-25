@@ -73,7 +73,7 @@ export async function loadConfig({ dirPath }: ConfigLoaderOptions): Promise<Conf
             errors: [
                 {
                     name: 'ConfigLoadError',
-                    message: 'Stackbit configuration not found, please refer Stackbit documentation: https://www.stackbit.com/docs/stackbit-yaml/'
+                    message: 'stackbit.yaml not found, please refer Stackbit documentation: https://www.stackbit.com/docs/stackbit-yaml/'
                 }
             ]
         };

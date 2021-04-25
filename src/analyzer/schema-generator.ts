@@ -5,24 +5,37 @@ import moment from 'moment';
 
 import { FileBrowser, FileResult, getFileBrowserFromOptions, GetFileBrowserOptions } from './file-browser';
 import { SSGMatchResult } from './ssg-matcher';
-import { DATA_FILE_EXTENSIONS, EXCLUDED_DATA_FILES, EXCLUDED_MARKDOWN_FILES, GLOBAL_EXCLUDES, MARKDOWN_FILE_EXTENSIONS } from '../consts';
+import { DATA_FILE_EXTENSIONS, EXCLUDED_DATA_FILES, EXCLUDED_MARKDOWN_FILES, EXCLUDED_COMMON_FILES, MARKDOWN_FILE_EXTENSIONS } from '../consts';
 import { DataModel, Model, ObjectModel, PageModel } from '../config/config-loader';
-import { Field, FieldType, FieldListItems, FieldListProps, FieldPartialProps, FieldModelProps } from '../config/config-schema';
+import {
+    Field,
+    FieldType,
+    FieldListItems,
+    FieldModelProps,
+} from '../config/config-schema';
+import {
+    FieldListItemsWithUnknown,
+    FieldListPropsWithUnknown,
+    FieldPartialPropsWithUnknown,
+    FieldTypeWithUnknown,
+    FieldWithUnknown
+} from './analyze-schema-types';
 
 type FieldPath = (string | number)[];
 type StringFieldTypes = Exclude<FieldType, 'number' | 'boolean' | 'enum' | 'object' | 'model' | 'reference' | 'list'>;
-type PartialObjectModel = Omit<ObjectModel, 'label'> & { refFieldPaths?: FieldPath[]; refFields?: FieldModelProps[] };
-type PartialPageModel = Omit<PageModel, 'label' | 'fields'> & { fields: Field[]; filePaths: string[] };
-type PartialDataModel = Omit<DataModel, 'label'> & { filePaths: string[] };
+type PartialObjectModel = Omit<ObjectModel, 'label' | 'fields'> & { fields: FieldWithUnknown[]; refFieldPaths?: FieldPath[]; refFields?: FieldModelProps[] };
+type PartialPageModel = Omit<PageModel, 'label' | 'fields'> & { fields: FieldWithUnknown[]; filePaths: string[] };
+type PartialDataModel = Omit<DataModel, 'label' | 'fields' | 'items'> & { fields?: FieldWithUnknown[]; items?: FieldListItemsWithUnknown, filePaths: string[] };
 type PartialModel = PartialPageModel | PartialDataModel;
 
-const SAME_FOLDER_PAGE_DSC_COEFFICIENT = 0.7;
+const SUBFOLDER_PAGE_DSC_COEFFICIENT = 0.6;
+const SAME_FOLDER_PAGE_DSC_COEFFICIENT = 0.6;
 const DIFF_FOLDER_PAGE_DSC_COEFFICIENT = 0.8;
 const DATA_MODEL_DSC_COEFFICIENT = 0.8;
 const LIST_OBJECT_DSC_COEFFICIENT = 0.8;
 
 export type SchemaGeneratorOptions = {
-    ssgMatchResult: SSGMatchResult;
+    ssgMatchResult: SSGMatchResult | null;
 } & GetFileBrowserOptions;
 
 export interface SchemaGeneratorResult {
@@ -35,12 +48,12 @@ export async function generateSchema({ ssgMatchResult, ...fileBrowserOptions }: 
     const fileBrowser = getFileBrowserFromOptions(fileBrowserOptions);
     await fileBrowser.listFiles();
 
-    const ssgDir = ssgMatchResult.ssgDir ?? '';
-    const rootPagesDir = getDir(ssgDir, ssgMatchResult.pagesDir ?? '');
-    const rootDataDir = getDir(ssgDir, ssgMatchResult.dataDir ?? '');
+    const ssgDir = ssgMatchResult?.ssgDir ?? '';
+    const rootPagesDir = getDir(ssgDir, ssgMatchResult?.pagesDir ?? '');
+    const rootDataDir = getDir(ssgDir, ssgMatchResult?.dataDir ?? '');
 
-    const excludedPageFiles = getExcludedPageFiles(ssgMatchResult, rootPagesDir);
-    const excludedDataFiles = getExcludedDataFiles(ssgMatchResult, rootDataDir);
+    const excludedPageFiles = getExcludedPageFiles(rootPagesDir, ssgMatchResult);
+    const excludedDataFiles = getExcludedDataFiles(rootDataDir, ssgMatchResult);
 
     // TODO: in some projects, pages can be defined as JSON files as well
     const pageFiles = await readDirRecursivelyWithFilter(fileBrowser, rootPagesDir, excludedPageFiles, MARKDOWN_FILE_EXTENSIONS);
@@ -50,7 +63,7 @@ export async function generateSchema({ ssgMatchResult, ...fileBrowserOptions }: 
         filePaths: pageFiles,
         dirPath: rootPagesDir,
         fileBrowser: fileBrowser,
-        pageTypeKey: ssgMatchResult.pageTypeKey,
+        pageTypeKey: ssgMatchResult?.pageTypeKey,
         objectModels: []
     });
     const dataModelsResults = await generateDataModelsForFiles({
@@ -63,13 +76,13 @@ export async function generateSchema({ ssgMatchResult, ...fileBrowserOptions }: 
     let pageModels = analyzePageFileMatchingProperties(pageModelsResults.pageModels);
     let dataModels = analyzeDataFileMatchingProperties(dataModelsResults.dataModels);
 
-    let pagesDir = ssgMatchResult.pagesDir;
+    let pagesDir = ssgMatchResult?.pagesDir;
     if (pagesDir === undefined && pageModels.length > 0) {
         const result = extractLowestCommonAncestorFolderFromModels(pageModels);
         pagesDir = getDir(ssgDir, result.commonDir);
         pageModels = result.models;
     }
-    let dataDir = ssgMatchResult.dataDir;
+    let dataDir = ssgMatchResult?.dataDir;
     if (dataDir === undefined && dataModels.length > 0) {
         const result = extractLowestCommonAncestorFolderFromModels(dataModels);
         dataDir = getDir(ssgDir, result.commonDir);
@@ -84,7 +97,7 @@ export async function generateSchema({ ssgMatchResult, ...fileBrowserOptions }: 
                 type: 'object',
                 name: objectModel.name,
                 label: _.startCase(modelName),
-                fields: objectModel.fields
+                fields: removeUnknownTypesFromFields(objectModel.fields)
             };
         }
     );
@@ -103,35 +116,35 @@ function getDir(ssgDir: string, contentDir: string) {
     return fullDir === '.' ? '' : fullDir;
 }
 
-function getExcludedPageFiles(ssgMatchResult: SSGMatchResult, rootPagesDir: string): string[] {
-    const excludedPageFiles = [...GLOBAL_EXCLUDES, ...EXCLUDED_MARKDOWN_FILES];
+function getExcludedPageFiles(rootPagesDir: string, ssgMatchResult: SSGMatchResult | null): string[] {
+    const excludedPageFiles = [...EXCLUDED_COMMON_FILES, ...EXCLUDED_MARKDOWN_FILES];
     if (rootPagesDir === '') {
         // if pagesDir wasn't specifically set to empty string, ignore content files in the root folder
-        if (ssgMatchResult.pagesDir === undefined) {
+        if (ssgMatchResult?.pagesDir === undefined) {
             excludedPageFiles.push('*.*');
         }
-        if (ssgMatchResult.publishDir) {
+        if (ssgMatchResult?.publishDir) {
             excludedPageFiles.push(ssgMatchResult.publishDir);
         }
-        if (ssgMatchResult.staticDir) {
+        if (ssgMatchResult?.staticDir) {
             excludedPageFiles.push(ssgMatchResult.staticDir);
         }
     }
     return excludedPageFiles;
 }
 
-function getExcludedDataFiles(ssgMatchResult: SSGMatchResult, rootDataDir: string): string[] {
-    const excludedDataFiles = [...GLOBAL_EXCLUDES, ...EXCLUDED_DATA_FILES];
+function getExcludedDataFiles(rootDataDir: string, ssgMatchResult: SSGMatchResult | null): string[] {
+    const excludedDataFiles = [...EXCLUDED_COMMON_FILES, ...EXCLUDED_DATA_FILES];
     if (rootDataDir === '') {
         excludedDataFiles.push('config.*', '_config.*');
         // if dataDir wasn't specifically set to empty string, ignore content files in the root folder
-        if (ssgMatchResult.dataDir === undefined) {
+        if (ssgMatchResult?.dataDir === undefined) {
             excludedDataFiles.push('*.*');
         }
-        if (ssgMatchResult.publishDir) {
+        if (ssgMatchResult?.publishDir) {
             excludedDataFiles.push(ssgMatchResult.publishDir);
         }
-        if (ssgMatchResult.staticDir) {
+        if (ssgMatchResult?.staticDir) {
             excludedDataFiles.push(ssgMatchResult.staticDir);
         }
     }
@@ -183,6 +196,7 @@ async function generatePageModelsForFiles({
             const result = generateObjectFields(data, [modelName], objectModels);
             if (result) {
                 const pageLayout: string | undefined = pageTypeKey && typeof data[pageTypeKey] === 'string' ? data[pageTypeKey] : undefined;
+                // TODO: merge models at the end. First merge models from same folders, then models from different folders.
                 const mergeResult = mergeFieldsWithSimilarPageModels({
                     pageLayout,
                     fields: result.fields,
@@ -263,13 +277,13 @@ function generateObjectFields(
     value: any,
     fieldPath: FieldPath,
     objectModels: PartialObjectModel[]
-): { fields: Field[]; objectModels: PartialObjectModel[] } | null {
+): { fields: FieldWithUnknown[]; objectModels: PartialObjectModel[] } | null {
     if (_.isEmpty(value)) {
         return null;
     }
     const result = _.reduce(
         value,
-        (accum: { fields: Field[]; objectModels: PartialObjectModel[] }, fieldValue: any, fieldName: string) => {
+        (accum: { fields: FieldWithUnknown[]; objectModels: PartialObjectModel[] }, fieldValue: any, fieldName: string) => {
             const result = generateField(fieldValue, fieldName, fieldPath.concat(fieldName), accum.objectModels);
             return {
                 fields: result.field ? accum.fields.concat(result.field) : accum.fields,
@@ -289,24 +303,33 @@ function generateField(
     fieldName: string,
     fieldPath: FieldPath,
     objectModels: PartialObjectModel[]
-): { field: Field | null; objectModels: PartialObjectModel[] } {
-    let field: Field | null = null;
-    if (fieldValue === null) {
-        // TODO: return 'unknown' field type and coerce it to string, or consolidate with anything else
-        // we don't know what is the type of the field
-        field = null;
-    }
+): { field: FieldWithUnknown | null; objectModels: PartialObjectModel[] } {
+    let field: FieldWithUnknown | null = null;
     if (fieldName === 'markdown_content') {
         field = {
             type: 'markdown',
             name: fieldName,
             label: 'Content'
         };
+    } else if (fieldValue === null) {
+        // we don't know what is the type of the field
+        field = {
+            type: 'unknown',
+            name: fieldName,
+            label: _.startCase(fieldName)
+        };
     } else if (_.isString(fieldValue)) {
         field = {
             ...fieldFromStringValue(fieldValue),
             name: fieldName,
             label: _.startCase(fieldName)
+        };
+    } else if (_.isDate(fieldValue)) {
+        // @iarna/toml returns date objects
+        field = {
+            type: 'datetime',
+            name: fieldName,
+            label: _.startCase(fieldName),
         };
     } else if (_.isNumber(fieldValue)) {
         field = {
@@ -365,29 +388,39 @@ function generateListField(
     value: any[],
     fieldPath: FieldPath,
     objectModels: PartialObjectModel[]
-): { field: FieldListProps; objectModels: PartialObjectModel[] } | null {
+): { field: FieldListPropsWithUnknown; objectModels: PartialObjectModel[] } | null {
     if (_.isEmpty(value)) {
-        // we don't know what is the type of array items
-        return null;
+        // the array is empty, so we don't know what is the type of its items, but we know there is an array.
+        // This fact will help us when we will try to consolidate this array with another array
+        return {
+            field: listFieldWithUnknownItems(),
+            objectModels: objectModels
+        };
     }
-    const listItemsArr: FieldListItems[] = [];
+    const listItemsArr: FieldListItemsWithUnknown[] = [];
+    let updatedObjectModels = objectModels;
     for (let index = 0; index < value.length; index++) {
         const listItem = value[index];
         if (_.isArray(listItem)) {
             // array of arrays are not supported
             return null;
         }
-        const result = generateFieldListItems(listItem, fieldPath, objectModels);
+        const result = generateFieldListItems(listItem, fieldPath, updatedObjectModels);
         if (result === null) {
             continue;
         }
-        objectModels = result.objectModels;
+        updatedObjectModels = result.objectModels;
         listItemsArr.push(result.items);
     }
     if (listItemsArr.length === 0) {
-        return null;
+        // the array is empty, so we don't know what is the type of its items, but we know there is an array.
+        // This fact will help us when we will try to consolidate this array with another array
+        return {
+            field: listFieldWithUnknownItems(),
+            objectModels: objectModels
+        };
     }
-    const result = consolidateListItems(listItemsArr, fieldPath, objectModels);
+    const result = consolidateListItems(listItemsArr, fieldPath, updatedObjectModels);
     if (result === null) {
         return null;
     }
@@ -400,17 +433,30 @@ function generateListField(
     };
 }
 
+function listFieldWithUnknownItems(): FieldListPropsWithUnknown {
+    return {
+        type: 'list',
+        items: { type: 'unknown' }
+    };
+}
+
 function generateFieldListItems(
     value: any,
     fieldPath: FieldPath,
     objectModels: PartialObjectModel[]
-): { items: FieldListItems; objectModels: PartialObjectModel[] } | null {
-    let items: FieldListItems | null = null;
+): { items: FieldListItemsWithUnknown; objectModels: PartialObjectModel[] } | null {
+    let items: FieldListItemsWithUnknown | null = null;
     if (value === null) {
-        // type-less value
+        // type-less value, return null to ignore. If array doesn't have any other items with types then items of that
+        // array will be marked as 'unknown'
         return null;
     } else if (_.isString(value)) {
         items = fieldFromStringValue(value);
+    } else if (_.isDate(value)) {
+        // @iarna/toml returns date objects
+        items = {
+            type: 'datetime'
+        };
     } else if (_.isNumber(value)) {
         items = {
             type: 'number',
@@ -483,28 +529,37 @@ function fieldFromStringValue(value: string): { type: StringFieldTypes } {
 }
 
 function consolidateListItems(
-    listItemModels: FieldListItems[],
+    listItemModels: FieldListItemsWithUnknown[],
     fieldPath: FieldPath,
     objectModels: PartialObjectModel[]
-): { items: FieldListItems; objectModels: PartialObjectModel[] } | null {
-    const itemTypes = _.uniq(_.map(listItemModels, 'type'));
+): { items: FieldListItemsWithUnknown; objectModels: PartialObjectModel[] } | null {
+    let itemTypes = _.uniq(_.map(listItemModels, 'type'));
+    // if list items have multiple types and one of them 'unknown', then we assume that 'unknown' item type is actually
+    // one of the other item types. So we remove it in favor of other types.
+    if (itemTypes.length > 1 && itemTypes.includes('unknown')) {
+        itemTypes = _.without(itemTypes, 'unknown');
+    }
     if (itemTypes.length === 1) {
         const type = itemTypes[0]!;
         // handle fields with extra properties
         switch (type) {
+            case 'unknown':
+                return {
+                    items: { type: 'unknown' },
+                    objectModels
+                };
             case 'number':
                 const subtypes = _.compact(_.uniq(_.map(listItemModels, 'subtype')));
                 const subtype = subtypes.length === 1 ? subtypes[0] : 'float';
                 return {
                     items: {
                         type: 'number',
-                        // name: fieldName,
                         ...(subtype && { subtype })
                     },
                     objectModels
                 };
             case 'object':
-                const fieldsList = _.map(listItemModels, 'fields') as Field[][];
+                const fieldsList = _.map(listItemModels, (itemModels) => itemModels.fields!);
                 const result = consolidateObjectFieldsListWithOverlap(fieldsList, fieldPath, LIST_OBJECT_DSC_COEFFICIENT, objectModels);
                 if (result.fieldsList.length === 1) {
                     return {
@@ -527,7 +582,7 @@ function consolidateListItems(
                             };
                         }
                     );
-                    const items: FieldListItems = {
+                    const items: FieldModelProps = {
                         type: 'model',
                         models: _.map(models, 'name')
                     };
@@ -560,7 +615,7 @@ function consolidateListItems(
         const modelListItems = _.filter(listItemModels, { type: 'model' });
         const modelNames = _.compact(_.uniq(_.flatten(_.map(modelListItems, 'models'))));
         const objectListItems = _.filter(listItemModels, { type: 'object' });
-        const fieldsList = _.map(objectListItems, 'fields') as Field[][];
+        const fieldsList = _.map(objectListItems, (listItems) => listItems.fields!);
         const result = consolidateObjectFieldsListWithOverlap(fieldsList, fieldPath, LIST_OBJECT_DSC_COEFFICIENT, objectModels);
         const models = result.fieldsList.map(
             (fields): PartialObjectModel => {
@@ -574,7 +629,7 @@ function consolidateListItems(
                 };
             }
         );
-        const items: FieldListItems = {
+        const items: FieldListItemsWithUnknown = {
             type: 'model',
             models: modelNames.concat(_.map(models, 'name'))
         };
@@ -592,16 +647,16 @@ function consolidateListItems(
         : null;
 }
 
-type FieldNameTypeMap = Record<Field['name'], FieldType>;
+type FieldNameTypeMap = Record<Field['name'], FieldTypeWithUnknown>;
 
 function consolidateObjectFieldsList(
-    fieldsList: Field[][],
+    fieldsList: FieldWithUnknown[][],
     fieldPath: FieldPath,
     objectModels: PartialObjectModel[]
-): { fieldsList: Field[][]; objectModels: PartialObjectModel[] } | null {
-    const fieldsListGroups: { fieldNameTypeMap: FieldNameTypeMap; fieldsList: Field[][] }[] = [];
+): { fieldsList: FieldWithUnknown[][]; objectModels: PartialObjectModel[] } | null {
+    const fieldsListGroups: { fieldNameTypeMap: FieldNameTypeMap; fieldsList: FieldWithUnknown[][] }[] = [];
     for (const fields of fieldsList) {
-        const fieldNameTypeMap = fields.reduce((fieldMap: FieldNameTypeMap, field: Field) => {
+        const fieldNameTypeMap = fields.reduce((fieldMap: FieldNameTypeMap, field: FieldWithUnknown) => {
             const type = STRING_TYPES.includes(field.type) ? 'string' : field.type;
             return { ...fieldMap, [field.name]: type };
         }, {});
@@ -631,11 +686,11 @@ function consolidateObjectFieldsList(
 }
 
 function consolidateObjectFieldsListWithOverlap(
-    fieldsList: Field[][],
+    fieldsList: FieldWithUnknown[][],
     fieldPath: FieldPath,
     minCoefficient: number,
     objectModels: PartialObjectModel[]
-): { fieldsList: Field[][]; objectModels: PartialObjectModel[] } {
+): { fieldsList: FieldWithUnknown[][]; objectModels: PartialObjectModel[] } {
     // to reduce fragmentation sort fields arrays by length to merge the larger objects with smaller objects first
     let unmergedFieldsList = _.orderBy(fieldsList.slice(), ['length'], ['desc']);
     let idx = 0;
@@ -659,14 +714,14 @@ function consolidateObjectFieldsListWithOverlap(
 type SimilarityType = 'dsc' | 'overlap';
 
 function mergeSimilarFields(
-    fields: Field[],
-    fieldsList: Field[][],
+    fields: FieldWithUnknown[],
+    fieldsList: FieldWithUnknown[][],
     fieldPath: FieldPath,
     objectModels: PartialObjectModel[],
     type: SimilarityType,
     minCoefficient: number
 ) {
-    const unmergedFieldsList: Field[][] = [];
+    const unmergedFieldsList: FieldWithUnknown[][] = [];
     const mergedIndexes: number[] = [];
     const unmergedIndexes: number[] = [];
     const similarityFunction = type === 'dsc' ? computeDSC : computeOverlap;
@@ -702,7 +757,7 @@ function mergeSimilarFields(
  * @param fieldsA
  * @param fieldsB
  */
-function computeDSC(fieldsA: Field[], fieldsB: Field[]) {
+function computeDSC(fieldsA: FieldWithUnknown[], fieldsB: FieldWithUnknown[]) {
     const setA = getFieldsSet(fieldsA);
     const setB = getFieldsSet(fieldsB);
     return (2 * _.intersection(setA, setB).length) / (setA.length + setB.length);
@@ -717,27 +772,30 @@ function computeDSC(fieldsA: Field[], fieldsB: Field[]) {
  * @param fieldsA
  * @param fieldsB
  */
-function computeOverlap(fieldsA: Field[], fieldsB: Field[]) {
+function computeOverlap(fieldsA: FieldWithUnknown[], fieldsB: FieldWithUnknown[]) {
     const setA = getFieldsSet(fieldsA);
     const setB = getFieldsSet(fieldsB);
     return _.intersection(setA, setB).length / Math.min(setA.length, setB.length);
 }
 
-function getFieldsSet(fields: Field[]): string[] {
+function getFieldsSet(fields: FieldWithUnknown[]): string[] {
+    // TODO: 'unknown' field type can be anything
+    // TODO: do we even need to include type when computing similarity?
     return _.map(fields, (field) => {
-        const type = STRING_TYPES.includes(field.type) ? 'string' : field.type;
-        return `${field.name}:${type}`;
+        // const type = STRING_TYPES.includes(field.type) ? 'string' : field.type;
+        // return `${field.name}:${type}`;
+        return field.name;
     });
 }
 
 function mergeObjectFieldsList(
-    fieldsList: Field[][],
+    fieldsList: FieldWithUnknown[][],
     fieldPath: FieldPath,
     objectModels: PartialObjectModel[]
-): { fields: Field[]; objectModels: PartialObjectModel[] } | null {
-    const fieldsByName: Record<string, Field[]> = _.groupBy(_.flatten(fieldsList), 'name');
+): { fields: FieldWithUnknown[]; objectModels: PartialObjectModel[] } | null {
+    const fieldsByName: Record<string, FieldWithUnknown[]> = _.groupBy(_.flatten(fieldsList), 'name');
     const fieldNames = Object.keys(fieldsByName);
-    const consolidatedFields: Field[] = [];
+    const consolidatedFields: FieldWithUnknown[] = [];
     for (const fieldName of fieldNames) {
         const fields = fieldsByName[fieldName]!;
         const result = consolidateFields(fields, fieldPath.concat(fieldName), objectModels);
@@ -746,10 +804,11 @@ function mergeObjectFieldsList(
             return null;
         }
         objectModels = result.objectModels;
-        consolidatedFields.push({
+        consolidatedFields.push(_.defaults({
+            type: result.field.type,
             name: fieldName,
-            ...result.field
-        });
+            label: _.startCase(fieldName),
+        }, result.field));
     }
     return {
         fields: consolidatedFields,
@@ -758,35 +817,44 @@ function mergeObjectFieldsList(
 }
 
 function consolidateFields(
-    fields: Field[],
+    fields: FieldWithUnknown[],
     fieldPath: FieldPath,
     objectModels: PartialObjectModel[]
-): { field: FieldPartialProps; objectModels: PartialObjectModel[] } | null {
+): { field: FieldPartialPropsWithUnknown; objectModels: PartialObjectModel[] } | null {
     if (fields.length === 1) {
+        const field = fields[0]!;
         return {
-            field: fields[0]!,
+            field: field,
             objectModels
         };
     }
-    // TODO: merge field labels
-    const fieldTypes = _.uniq(_.map(fields, 'type'));
+    let fieldTypes = _.uniq(_.map(fields, 'type'));
+    // if field types have multiple types and one of them 'unknown', then we assume that 'unknown' type is actually
+    // one of the other field types. So we remove it in favor of other types.
+    if (fieldTypes.length > 1 && fieldTypes.includes('unknown')) {
+        fieldTypes = _.without(fieldTypes, 'unknown');
+    }
     if (fieldTypes.length === 1) {
         const type = fieldTypes[0]!;
         // handle fields with extra properties
         switch (type) {
+            case 'unknown':
+                return {
+                    field: { type: 'unknown' },
+                    objectModels
+                };
             case 'number':
                 const subtypes = _.compact(_.uniq(_.map(fields, 'subtype')));
                 const subtype = subtypes.length === 1 ? subtypes[0] : 'float';
                 return {
                     field: {
                         type: 'number',
-                        // name: fieldName,
                         ...(subtype && { subtype })
                     },
                     objectModels
                 };
             case 'object':
-                const fieldsList = _.map(fields, 'fields') as Field[][];
+                const fieldsList = _.map(fields, (field) => field.fields!);
                 const mergeResult = mergeObjectFieldsList(fieldsList, fieldPath, objectModels);
                 if (!mergeResult) {
                     return null;
@@ -794,13 +862,12 @@ function consolidateFields(
                 return {
                     field: {
                         type: 'object',
-                        // name: fieldName,
                         fields: mergeResult.fields
                     },
                     objectModels: mergeResult.objectModels
                 };
             case 'list':
-                const listItemsArr = _.map(fields, 'items') as FieldListItems[];
+                const listItemsArr = _.map(fields, (field) => field.items!);
                 const itemsResult = consolidateListItems(listItemsArr, fieldPath, objectModels);
                 if (!itemsResult) {
                     return null;
@@ -834,19 +901,23 @@ function consolidateFields(
         : null;
 }
 
-function coerceSimpleFieldTypes(fieldTypes: FieldType[]): 'string' | 'text' | 'markdown' | null {
+function coerceSimpleFieldTypes(fieldTypes: FieldTypeWithUnknown[]): 'string' | 'text' | 'markdown' | 'datetime' | null {
+    if (_.isEmpty(_.difference(fieldTypes, ['date', 'datetime']))) {
+        return 'datetime';
+    }
+
     // use markdown as the most specific type
-    if (fieldTypes.includes('markdown') && _.isEmpty(_.difference(fieldTypes, ['string', 'text', 'markdown']))) {
+    if (fieldTypes.includes('markdown') && _.isEmpty(_.difference(fieldTypes, ['string', 'text', 'markdown', 'unknown']))) {
         return 'markdown';
     }
 
     // use text as the most specific type
-    if (fieldTypes.includes('text') && _.isEmpty(_.difference(fieldTypes, ['string', 'text']))) {
+    if (fieldTypes.includes('text') && _.isEmpty(_.difference(fieldTypes, ['string', 'text', 'unknown']))) {
         return 'text';
     }
 
     // use string if all other types can be derived from it
-    if (_.every(fieldTypes, (fieldType) => STRING_TYPES.includes(fieldType))) {
+    if (_.every(fieldTypes, (fieldType) => STRING_TYPES.concat('unknown').includes(fieldType))) {
         return 'string';
     }
 
@@ -865,7 +936,7 @@ function generateRandomModelName(length = 10) {
 
 interface MergeSimilarPageModelsOptions {
     pageLayout: string | undefined;
-    fields: Field[];
+    fields: FieldWithUnknown[];
     filePath: string;
     modelName: string;
     pageModels: PartialPageModel[];
@@ -984,6 +1055,10 @@ function analyzePageFileMatchingProperties(pageModelsWithFilePaths: PartialPageM
         } else if (otherModelMatchedFiles.length === 1) {
             exclude = _.map(otherModelMatchedFiles, (filePath) => path.relative(model.folder || '', filePath));
         }
+        const fields = removeUnknownTypesFromFields(model.fields);
+        if (_.isEmpty(fields)) {
+            continue;
+        }
         pageModels.push({
             type: 'page',
             name: modelName,
@@ -991,7 +1066,7 @@ function analyzePageFileMatchingProperties(pageModelsWithFilePaths: PartialPageM
             ...(model.folder && { folder: model.folder }),
             match: match,
             ...(!_.isEmpty(exclude) && { exclude }),
-            fields: model.fields
+            fields: fields
         });
     }
     return pageModels;
@@ -1006,19 +1081,30 @@ function analyzeDataFileMatchingProperties(dataModelsWithFilePaths: PartialDataM
         const otherModels = dataModelsWithFilePaths.slice();
         otherModels.splice(index, 1);
         const modelName = getUniqueName(dataModelWithFilePaths.name, modelNames);
-        const modelLabel = _.startCase(modelName);
         modelNames.push(modelName);
         if (dataModelWithFilePaths.filePaths.length === 1) {
             const pathObject = path.parse(dataModelWithFilePaths.filePaths[0]!);
             const modelName = _.snakeCase(pathObject.name);
+            const modelLabel = _.startCase(modelName);
+            let items: undefined | null | FieldListItems;
+            let fields: undefined | Field[];
+            if (dataModelWithFilePaths.isList && dataModelWithFilePaths.items) {
+                items = removeUnknownTypesFromListItem(dataModelWithFilePaths.items);
+                if (!items) {
+                    continue;
+                }
+            } else {
+                fields = removeUnknownTypesFromFields(dataModelWithFilePaths.fields!);
+                if (_.isEmpty(fields)) {
+                    continue;
+                }
+            }
             dataModels.push({
                 type: 'data',
                 name: modelName,
                 label: modelLabel,
                 file: dataModelWithFilePaths.filePaths[0]!,
-                ...(dataModelWithFilePaths.isList && dataModelWithFilePaths.items
-                    ? { isList: true, items: dataModelWithFilePaths.items }
-                    : { fields: dataModelWithFilePaths.fields })
+                ...(items ? { isList: true, items } : { fields })
             });
         } else {
             const folder = findCommonAncestorFolder(dataModelWithFilePaths.filePaths);
@@ -1028,18 +1114,66 @@ function analyzeDataFileMatchingProperties(dataModelsWithFilePaths: PartialDataM
             } else {
                 modelName = `data_${dataCount++}`;
             }
+            const modelLabel = _.startCase(modelName);
+            let items: undefined | null | FieldListItems;
+            let fields: undefined | Field[];
+            if (dataModelWithFilePaths.isList && dataModelWithFilePaths.items) {
+                items = removeUnknownTypesFromListItem(dataModelWithFilePaths.items);
+                if (!items) {
+                    continue;
+                }
+            } else {
+                fields = removeUnknownTypesFromFields(dataModelWithFilePaths.fields!);
+                if (_.isEmpty(fields)) {
+                    continue;
+                }
+            }
             dataModels.push({
                 type: 'data',
                 name: modelName,
                 label: modelLabel,
                 folder: folder,
-                ...(dataModelWithFilePaths.isList && dataModelWithFilePaths.items
-                    ? { isList: true, items: dataModelWithFilePaths.items }
-                    : { fields: dataModelWithFilePaths.fields })
+                ...(items ? { isList: true, items } : { fields })
             });
         }
     }
     return dataModels;
+}
+
+function removeUnknownTypesFromFields(fields: FieldWithUnknown[]): Field[] {
+    return _.reduce(fields, (accum: Field[], field: FieldWithUnknown) => {
+        switch (field.type) {
+            case 'unknown':
+                return accum;
+            case 'object':
+                const fields = removeUnknownTypesFromFields(field.fields!);
+                if (_.isEmpty(fields)) {
+                    return accum;
+                }
+                return accum.concat(Object.assign(field,{ fields }));
+            case 'list':
+                const items = removeUnknownTypesFromListItem(field.items!);
+                if (!items) {
+                    return accum;
+                }
+                return accum.concat(Object.assign(field, { items }));
+            default:
+                return accum.concat(field);
+        }
+    }, []);
+}
+
+function removeUnknownTypesFromListItem(items: FieldListItemsWithUnknown): FieldListItems | null {
+    if (items.type === 'unknown') {
+        return null;
+    } else if (items.type === 'object') {
+        const fields = removeUnknownTypesFromFields(items.fields);
+        if (_.isEmpty(fields)) {
+            return null;
+        }
+        return Object.assign(items, { fields });
+    }
+    return items;
 }
 
 function extractLowestCommonAncestorFolderFromModels<T extends PageModel | DataModel>(models: T[]) {

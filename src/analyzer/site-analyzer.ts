@@ -21,7 +21,7 @@ export async function analyzeSite(options: SiteAnalyzerOptions): Promise<SiteAna
     const ssgMatchResult = await matchSSG({ fileBrowser });
     const cmsMatchResult = await matchCMS({ fileBrowser });
     let schemaGeneratorResult: SchemaGeneratorResult | null = null;
-    if (ssgMatchResult && !cmsMatchResult) {
+    if (!cmsMatchResult) {
         schemaGeneratorResult = await generateSchema({ ssgMatchResult, fileBrowser });
     }
 
