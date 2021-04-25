@@ -345,7 +345,7 @@ interface BaseMatch {
 
 const baseModelSchema = Joi.object({
     type: Joi.string().valid('page', 'data', 'config', 'object').required(),
-    label: Joi.string().required(),
+    label: Joi.string().required().when(Joi.ref('/import'), { is: Joi.exist(), then: Joi.optional() }),
     description: Joi.string(),
     extends: Joi.array().items(validObjectModelNames).single(),
     labelField: inFields,
