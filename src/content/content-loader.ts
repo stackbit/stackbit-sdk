@@ -295,6 +295,9 @@ async function loadContentItems({
             errors.push(new FileReadError({ filePath: filePathRelativeToProject, error: error }));
             return;
         }
+        if (data === null) {
+            return;
+        }
         const matchedModels = getModelsByQuery(
             {
                 filePath: filePath,
@@ -327,6 +330,9 @@ async function loadFile(filePath: string) {
     // =>
     // { ...fields, markdown_content: '...md...' }
     if (MARKDOWN_FILE_EXTENSIONS.includes(extension) && _.has(data, 'frontmatter') && _.has(data, 'markdown')) {
+        if (_.get(data, 'frontmatter') === null) {
+            return null;
+        }
         data = _.assign(data.frontmatter, { markdown_content: data.markdown });
     }
     return data;
