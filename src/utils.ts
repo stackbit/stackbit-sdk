@@ -8,3 +8,5 @@ type StricterUnionMember<T, Union, Keys extends string = UnionKeys<Union> extend
     ForbiddenPropertiesOfUnionMember<T, Union, Keys>;
 
 export type StricterUnion<Union, Union2 = Union> = Union2 extends any ? StricterUnionMember<Union2, Union> : never;
+
+export type Logger = Pick<Console, 'log' | 'info' | 'warn' | 'error' | 'group' | 'groupEnd'>;
