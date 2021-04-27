@@ -41,7 +41,7 @@ export interface SchemaGeneratorResult {
     dataDir?: string | null;
 }
 
-export async function generateSchema({ ssgMatchResult, ...fileBrowserOptions }: SchemaGeneratorOptions): Promise<SchemaGeneratorResult | null> {
+export async function generateSchema({ ssgMatchResult, ...fileBrowserOptions }: SchemaGeneratorOptions): Promise<SchemaGeneratorResult> {
     const fileBrowser = getFileBrowserFromOptions(fileBrowserOptions);
     await fileBrowser.listFiles();
 
@@ -100,10 +100,6 @@ export async function generateSchema({ ssgMatchResult, ...fileBrowserOptions }: 
     );
 
     const models = _.concat<Model>(pageModels, dataModels, objectModels);
-
-    if (!models.length && !pagesDir && !dataDir) {
-        return null;
-    }
 
     return {
         models: models,
@@ -183,6 +179,14 @@ async function generatePageModelsForFiles({
 }: GeneratePageModelsOptions): Promise<{ pageModels: PartialPageModelWithFilePaths[]; objectModels: PartialObjectModel[] }> {
     let pageModels: PartialPageModel[] = [];
     let modelNameCounter = 1;
+
+    if (filePaths.length === 0) {
+        return {
+            pageModels: [],
+            objectModels: []
+        }
+    }
+
     for (const filePath of filePaths) {
         let data = await fileBrowser.getFileData(path.join(dirPath, filePath));
         const extension = path.extname(filePath).substring(1);
@@ -275,6 +279,14 @@ async function generateDataModelsForFiles({
 }: GenerateDataModelsOptions): Promise<{ dataModels: PartialDataModel[]; objectModels: PartialObjectModel[] }> {
     const dataModels: PartialDataModel[] = [];
     let modelNameCounter = 1;
+
+    if (filePaths.length === 0) {
+        return {
+            dataModels: [],
+            objectModels: []
+        };
+    }
+
     for (const filePath of filePaths) {
         let data = await fileBrowser.getFileData(path.join(dirPath, filePath));
         const modelName = `data_${modelNameCounter++}`;
@@ -1242,7 +1254,10 @@ function extractLowestCommonAncestorFolderFromModels<T extends PageModel | DataM
 }
 
 function findLowestCommonAncestorFolder(filePaths: string[]): string {
-    let commonDir = path.parse(filePaths[0] ?? '').dir;
+    if (filePaths.length === 0) {
+        throw new Error('findLowestCommonAncestorFolder can not be called with empty array');
+    }
+    let commonDir = path.parse(filePaths[0]!).dir;
     if (commonDir === '') {
         return '';
     }
