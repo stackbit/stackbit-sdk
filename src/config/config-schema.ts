@@ -87,6 +87,8 @@ const inFields = Joi.string()
 export interface ContentfulImport {
     type: 'contentful';
     contentFile: string;
+    uploadAssets?: boolean;
+    assetsDirectory?: string;
     spaceIdEnvVar?: string;
     accessTokenEnvVar?: string;
 }
@@ -94,9 +96,11 @@ export interface ContentfulImport {
 const contentfulImportSchema = Joi.object<ContentfulImport>({
     type: Joi.string().valid('contentful').required(),
     contentFile: Joi.string().required(),
+    uploadAssets: Joi.boolean(),
+    assetsDirectory: Joi.string(),
     spaceIdEnvVar: Joi.string(),
     accessTokenEnvVar: Joi.string()
-});
+}).and('uploadAssets', 'assetsDirectory');
 
 export interface SanityImport {
     type: 'sanity';
