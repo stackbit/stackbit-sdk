@@ -101,6 +101,10 @@ export async function generateSchema({ ssgMatchResult, ...fileBrowserOptions }: 
 
     const models = _.concat<Model>(pageModels, dataModels, objectModels);
 
+    if (!models.length && !pagesDir && !dataDir) {
+        return null;
+    }
+
     return {
         models: models,
         pagesDir: pagesDir,
@@ -1238,7 +1242,7 @@ function extractLowestCommonAncestorFolderFromModels<T extends PageModel | DataM
 }
 
 function findLowestCommonAncestorFolder(filePaths: string[]): string {
-    let commonDir = path.parse(filePaths[0]!).dir;
+    let commonDir = path.parse(filePaths[0] ?? '').dir;
     if (commonDir === '') {
         return '';
     }
