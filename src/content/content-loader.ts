@@ -55,6 +55,7 @@ export interface ContentLoaderOptions {
 }
 
 export interface ContentLoaderResult {
+    valid: boolean;
     contentItems: ContentItem[];
     errors: Error[];
 }
@@ -64,9 +65,11 @@ export async function loadContent({ dirPath, config, skipUnmodeledContent }: Con
     const { contentItems: pageItems, errors: pageErrors } = await loadPageFiles({ dirPath, config, skipUnmodeledContent });
     const contentItems = _.concat(dataItems, pageItems);
     const validationResult = validate({ contentItems, config });
+    const errors = _.concat(dataErrors, pageErrors, validationResult.errors);
     return {
+        valid: _.isEmpty(errors),
         contentItems: validationResult.value,
-        errors: _.concat(dataErrors, pageErrors, validationResult.errors)
+        errors: errors
     };
 }
 

@@ -17,6 +17,7 @@ test.each(['azimuth', 'diy', 'starter'])('load %s stackbit.yaml', async (subfold
             config: result.config,
             skipUnmodeledContent: false
         });
+        expect(contentResult.valid).toBeTruthy();
         expect(contentResult.errors).toHaveLength(0);
     }
 });
@@ -40,6 +41,7 @@ test('modelName is returned in metadata of invalid objects', async () => {
 
     const errors = contentResult.errors.map((error) => _.pick(error, ['message', 'type', 'modelName', 'filePath', 'fieldPath']));
 
+    expect(contentResult.valid).toBeFalsy();
     expect(errors).toHaveLength(11);
     expect(errors).toMatchObject([
         { ...commonErrorFields, fieldPath: ['title'] },
@@ -93,6 +95,7 @@ test('invalid models should not affect loading and matching content to valid mod
 
     const errors = contentResult.errors.map((error) => _.pick(error, ['message', 'filePath']));
 
+    expect(contentResult.valid).toBeFalsy();
     expect(errors).toMatchObject([
         {
             filePath: 'content/contact.md'
