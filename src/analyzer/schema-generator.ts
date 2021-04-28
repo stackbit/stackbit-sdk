@@ -180,13 +180,6 @@ async function generatePageModelsForFiles({
     let pageModels: PartialPageModel[] = [];
     let modelNameCounter = 1;
 
-    if (filePaths.length === 0) {
-        return {
-            pageModels: [],
-            objectModels: []
-        }
-    }
-
     for (const filePath of filePaths) {
         let data = await fileBrowser.getFileData(path.join(dirPath, filePath));
         const extension = path.extname(filePath).substring(1);
@@ -211,6 +204,13 @@ async function generatePageModelsForFiles({
                 });
             }
         }
+    }
+
+    if (pageModels.length === 0) {
+        return {
+            pageModels: [],
+            objectModels
+        };
     }
 
     // group models by folders, models from LCA folder put in a separate array and handle later with merged folder
@@ -279,13 +279,6 @@ async function generateDataModelsForFiles({
 }: GenerateDataModelsOptions): Promise<{ dataModels: PartialDataModel[]; objectModels: PartialObjectModel[] }> {
     const dataModels: PartialDataModel[] = [];
     let modelNameCounter = 1;
-
-    if (filePaths.length === 0) {
-        return {
-            dataModels: [],
-            objectModels: []
-        };
-    }
 
     for (const filePath of filePaths) {
         let data = await fileBrowser.getFileData(path.join(dirPath, filePath));
