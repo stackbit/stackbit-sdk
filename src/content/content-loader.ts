@@ -291,9 +291,10 @@ async function loadContentItems({
     await forEachPromise(filePaths, async (filePath) => {
         const absFilePath = path.join(absContentDir, filePath);
         const filePathRelativeToProject = path.join(contentDir, filePath);
+        const fileIsInProjectDir = path.parse(filePathRelativeToProject).dir === '';
         let data;
         try {
-            data = await loadFile(absFilePath);
+            data = await loadFile(absFilePath, fileIsInProjectDir);
         } catch (error) {
             errors.push(new FileReadError({ filePath: filePathRelativeToProject, error: error }));
             return;
@@ -325,7 +326,7 @@ async function loadContentItems({
     return { contentItems, errors };
 }
 
-async function loadFile(filePath: string) {
+async function loadFile(filePath: string, fileIsInProjectDir = false) {
     let data = await parseFile(filePath);
     const extension = path.extname(filePath).substring(1);
     // transform markdown files by unwrapping 'frontmatter' and renaming 'markdown' to 'markdown_content'
@@ -333,7 +334,7 @@ async function loadFile(filePath: string) {
     // =>
     // { ...fields, markdown_content: '...md...' }
     if (MARKDOWN_FILE_EXTENSIONS.includes(extension) && _.has(data, 'frontmatter') && _.has(data, 'markdown')) {
-        if (_.get(data, 'frontmatter') === null) {
+        if (fileIsInProjectDir && _.get(data, 'frontmatter') === null) {
             return null;
         }
         data = _.assign(data.frontmatter, { markdown_content: data.markdown });

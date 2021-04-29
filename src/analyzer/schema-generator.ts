@@ -181,9 +181,13 @@ async function generatePageModelsForFiles({
     let modelNameCounter = 1;
 
     for (const filePath of filePaths) {
-        let data = await fileBrowser.getFileData(path.join(dirPath, filePath));
-        const extension = path.extname(filePath).substring(1);
-        if (MARKDOWN_FILE_EXTENSIONS.includes(extension) && _.get(data, 'frontmatter') === null) {
+        const rootFilePath = path.join(dirPath, filePath);
+        const rootFilePathObject = path.parse(rootFilePath)
+        let data = await fileBrowser.getFileData(rootFilePath);
+        const extension = rootFilePathObject.ext.substring(1);
+        // don't load plain files from root dir, even though we ignore files such as README.md when reading files,
+        // there still might be plain markdown files we don't want to include
+        if (rootFilePathObject.dir === '' && MARKDOWN_FILE_EXTENSIONS.includes(extension) && _.get(data, 'frontmatter') === null) {
             continue;
         }
         if (_.has(data, 'frontmatter') && _.has(data, 'markdown')) {
@@ -1081,17 +1085,15 @@ function analyzePageFileMatchingProperties(partialPageModels: PartialPageModelWi
 
 function analyzeDataFileMatchingProperties(partialDataModels: PartialDataModel[]) {
     const dataModels: DataModel[] = [];
-    const modelNames: string[] = [];
     let dataCount = 1;
     for (let index = 0; index < partialDataModels.length; index++) {
         const dataModelWithFilePaths = partialDataModels[index]!;
         const otherModels = partialDataModels.slice();
         otherModels.splice(index, 1);
-        const modelName = getUniqueName(dataModelWithFilePaths.name, modelNames);
-        modelNames.push(modelName);
         if (dataModelWithFilePaths.filePaths.length === 1) {
             const pathObject = path.parse(dataModelWithFilePaths.filePaths[0]!);
-            const modelName = _.snakeCase(pathObject.name);
+            const otherNames = _.map(dataModels, 'name');
+            const modelName = getUniqueName(_.snakeCase(pathObject.name), otherNames);
             const modelLabel = _.startCase(modelName);
             let items: undefined | null | FieldListItems;
             let fields: undefined | Field[];
@@ -1121,6 +1123,8 @@ function analyzeDataFileMatchingProperties(partialDataModels: PartialDataModel[]
             } else {
                 modelName = `data_${dataCount++}`;
             }
+            const otherNames = _.map(dataModels, 'name');
+            modelName = getUniqueName(modelName, otherNames);
             const modelLabel = _.startCase(modelName);
             let items: undefined | null | FieldListItems;
             let fields: undefined | Field[];
@@ -1282,15 +1286,17 @@ function allFilePathInSameFolder(filePaths: string[]): boolean {
     return _.every(filePaths, (filePath) => path.parse(filePath).dir === folder);
 }
 
-function getUniqueName(name: string, otherNames: string[], idx = 1): string {
+function getUniqueName(name: string, otherNames: string[]): string {
     if (!otherNames.includes(name)) {
         return name;
     }
-    const altName = `${name}_${idx}`;
-    if (!otherNames.includes(altName)) {
-        return altName;
+    let idx = 1;
+    let altName = `${name}_${idx}`;
+    while (otherNames.includes(altName)) {
+        idx += 1;
+        altName = `${name}_${idx}`;
     }
-    return getUniqueName(name, otherNames, idx + 1);
+    return altName;
 }
 
 function getModelNameFromFilePath(filePath: string) {
