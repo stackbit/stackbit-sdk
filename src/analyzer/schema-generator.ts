@@ -182,7 +182,7 @@ async function generatePageModelsForFiles({
 
     for (const filePath of filePaths) {
         const rootFilePath = path.join(dirPath, filePath);
-        const rootFilePathObject = path.parse(rootFilePath)
+        const rootFilePathObject = path.parse(rootFilePath);
         let data = await fileBrowser.getFileData(rootFilePath);
         const extension = rootFilePathObject.ext.substring(1);
         // don't load plain files from root dir, even though we ignore files such as README.md when reading files,
