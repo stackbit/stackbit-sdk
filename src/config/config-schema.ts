@@ -129,7 +129,7 @@ export type Import = ContentfulImport | SanityImport;
 const importSchema = Joi.alternatives().conditional('.type', {
     switch: [
         { is: 'contentful', then: contentfulImportSchema },
-        { is: 'contentful', then: sanityImportSchema }
+        { is: 'sanity', then: sanityImportSchema }
     ]
 });
 
