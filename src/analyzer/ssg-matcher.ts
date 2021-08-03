@@ -3,7 +3,11 @@ import _ from 'lodash';
 import semver from 'semver';
 
 import { FileBrowser, getFileBrowserFromOptions, GetFileBrowserOptions } from './file-browser';
-import { extractNodeEnvironmentVariablesFromFile, findDirsWithPackageDependency } from './analyzer-utils';
+import {
+    extractNodeEnvironmentVariablesFromFile,
+    findDirsWithPackageDependency,
+    getGatsbySourceFilesystemOptions
+} from './analyzer-utils';
 import { Config } from '../config/config-loader';
 
 export type SSGMatcherOptions = GetFileBrowserOptions;
@@ -18,6 +22,7 @@ export interface SSGMatchResult {
     staticDir?: string;
     pagesDir?: string;
     dataDir?: string;
+    contentDirs?: string[];
     envVars?: string[];
     nodeVersion?: string;
     pageTypeKey?: string;
@@ -127,10 +132,20 @@ const SSGMatchers: SSGMatcher[] = [
                 return partialMatch;
             }
             const gatsbyConfigPath = path.join(partialMatch.ssgDir, 'gatsby-config.js');
-            const envVars = await extractNodeEnvironmentVariablesFromFile(fileBrowser, gatsbyConfigPath);
-            if (!_.isEmpty(envVars)) {
-                partialMatch.envVars = envVars;
+            const configData = await fileBrowser.getFileData(gatsbyConfigPath);
+            if (configData && typeof configData === 'string') {
+                // extract env vars from gatsby config
+                const envVars = await extractNodeEnvironmentVariablesFromFile(configData);
+                if (!_.isEmpty(envVars)) {
+                    partialMatch.envVars = envVars;
+                }
+
+                // extract gatsby-source-filesystem paths
+                const gatsbySourceFilesystemOptions = getGatsbySourceFilesystemOptions(configData);
+                partialMatch.contentDirs = _.map(gatsbySourceFilesystemOptions, 'path');
             }
+
+            // find node version
             const nodeVesion = await matchNodeVersion(fileBrowser, partialMatch);
             if (nodeVesion) {
                 partialMatch.nodeVersion = nodeVesion;
@@ -142,6 +157,7 @@ const SSGMatchers: SSGMatcher[] = [
                     partialMatch.nodeVersion = '12';
                 }
             }
+
             return partialMatch;
         }
     },
