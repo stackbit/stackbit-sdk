@@ -3,11 +3,7 @@ import _ from 'lodash';
 import semver from 'semver';
 
 import { FileBrowser, getFileBrowserFromOptions, GetFileBrowserOptions } from './file-browser';
-import {
-    extractNodeEnvironmentVariablesFromFile,
-    findDirsWithPackageDependency,
-    getGatsbySourceFilesystemOptions
-} from './analyzer-utils';
+import { extractNodeEnvironmentVariablesFromFile, findDirsWithPackageDependency, getGatsbySourceFilesystemOptions } from './analyzer-utils';
 import { Config } from '../config/config-loader';
 
 export type SSGMatcherOptions = GetFileBrowserOptions;

@@ -2,7 +2,7 @@ import path from 'path';
 import _ from 'lodash';
 import micromatch from 'micromatch';
 import moment from 'moment';
-import {append, reducePromise} from '@stackbit/utils';
+import { append, reducePromise } from '@stackbit/utils';
 
 import { FileBrowser, FileResult, getFileBrowserFromOptions, GetFileBrowserOptions } from './file-browser';
 import { SSGMatchResult } from './ssg-matcher';
@@ -145,15 +145,27 @@ async function listContentFiles({ fileBrowser, contentDir, ssgMatchResult, exclu
         filePaths = await readDirRecursivelyWithFilter({ fileBrowser, contentDir, ssgMatchResult, excludedFiles, allowedExtensions, excludedFilesInSSGDir });
     } else {
         contentDirFromRoot = ssgDir;
-        filePaths = await reducePromise(contentDirs, async (pageFiles: string[], contentDir) => {
-            const files = await readDirRecursivelyWithFilter({ fileBrowser, contentDir, ssgMatchResult, excludedFiles, allowedExtensions, excludedFilesInSSGDir, filesRelativeToSSGDir: true });
-            return pageFiles.concat(files);
-        }, []);
+        filePaths = await reducePromise(
+            contentDirs,
+            async (pageFiles: string[], contentDir) => {
+                const files = await readDirRecursivelyWithFilter({
+                    fileBrowser,
+                    contentDir,
+                    ssgMatchResult,
+                    excludedFiles,
+                    allowedExtensions,
+                    excludedFilesInSSGDir,
+                    filesRelativeToSSGDir: true
+                });
+                return pageFiles.concat(files);
+            },
+            []
+        );
     }
     return {
         contentDirFromRoot,
         filePaths
-    }
+    };
 }
 
 interface ReadDirOptions {
@@ -163,7 +175,7 @@ interface ReadDirOptions {
     excludedFiles: string[];
     allowedExtensions: string[];
     excludedFilesInSSGDir?: string[];
-    filesRelativeToSSGDir?: boolean
+    filesRelativeToSSGDir?: boolean;
 }
 
 async function readDirRecursivelyWithFilter(options: ReadDirOptions) {
@@ -1263,7 +1275,7 @@ function getLowestCommonAncestorFolderFromModels<T extends PageModel | DataModel
             }
             commonDir = common;
         }
-        if (commonDir.length === 0 || commonDir.length === 1 && commonDir[0] === '') {
+        if (commonDir.length === 0 || (commonDir.length === 1 && commonDir[0] === '')) {
             break;
         }
     }
