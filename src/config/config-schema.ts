@@ -488,7 +488,7 @@ const modelSchema = Joi.object<YamlModel>({
     ]
 });
 
-const modelNamePattern = /^[a-z]([a-z0-9_]*[a-z0-9])?$/;
+const modelNamePattern = /^[a-zA-Z]([a-zA-Z0-9_]*[a-zA-Z0-9])?$/;
 const modelNamePatternMatchErrorCode = 'model.name.pattern.match';
 const modelFileExclusiveErrorCode = 'model.file.only';
 const modelIsListItemsRequiredErrorCode = 'model.isList.items.required';
@@ -527,7 +527,7 @@ const modelsSchema = Joi.object<YamlModels>()
     .prefs({
         messages: {
             [modelNamePatternMatchErrorCode]:
-                'Invalid model name "{{#key}}" at "{{#label}}". A model name must contain only lower case alphanumeric characters and underscores, must start with a lower case letter, and end with alphanumeric character.',
+                'Invalid model name "{{#key}}" at "{{#label}}". A model name must contain only alphanumeric characters and underscores, must start with a letter, and end with alphanumeric character.',
             [modelFileExclusiveErrorCode]: '{{#label}} cannot be used with "file"',
             [modelIsListItemsRequiredErrorCode]: '{{#label}} is required when "isList" is true',
             [modelIsListFieldsForbiddenErrorCode]: '{{#label}} is not allowed when "isList" is true',
