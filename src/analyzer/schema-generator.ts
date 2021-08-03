@@ -2,7 +2,7 @@ import path from 'path';
 import _ from 'lodash';
 import micromatch from 'micromatch';
 import moment from 'moment';
-import { append } from '@stackbit/utils';
+import {append, reducePromise} from '@stackbit/utils';
 
 import { FileBrowser, FileResult, getFileBrowserFromOptions, GetFileBrowserOptions } from './file-browser';
 import { SSGMatchResult } from './ssg-matcher';
@@ -46,26 +46,36 @@ export async function generateSchema({ ssgMatchResult, ...fileBrowserOptions }: 
     await fileBrowser.listFiles();
 
     const ssgDir = ssgMatchResult?.ssgDir ?? '';
-    const rootPagesDir = getDir(ssgDir, ssgMatchResult?.pagesDir ?? '');
-    const rootDataDir = getDir(ssgDir, ssgMatchResult?.dataDir ?? '');
+    let pagesDir = ssgMatchResult?.pagesDir;
+    let dataDir = ssgMatchResult?.dataDir;
 
-    const excludedPageFiles = getExcludedPageFiles(rootPagesDir, ssgMatchResult);
-    const excludedDataFiles = getExcludedDataFiles(rootDataDir, ssgMatchResult);
+    const { filePaths: pageFiles, contentDirFromRoot: pagesDirFromRoot } = await listContentFiles({
+        fileBrowser,
+        contentDir: pagesDir,
+        ssgMatchResult,
+        excludedFiles: EXCLUDED_MARKDOWN_FILES,
+        allowedExtensions: MARKDOWN_FILE_EXTENSIONS
+    });
 
-    // TODO: in some projects, pages can be defined as JSON files as well
-    const pageFiles = await readDirRecursivelyWithFilter(fileBrowser, rootPagesDir, excludedPageFiles, MARKDOWN_FILE_EXTENSIONS);
-    const dataFiles = await readDirRecursivelyWithFilter(fileBrowser, rootDataDir, excludedDataFiles, DATA_FILE_EXTENSIONS);
+    const { filePaths: dataFiles, contentDirFromRoot: dataDirFromRoot } = await listContentFiles({
+        fileBrowser,
+        contentDir: dataDir,
+        ssgMatchResult,
+        excludedFiles: EXCLUDED_DATA_FILES,
+        allowedExtensions: DATA_FILE_EXTENSIONS,
+        excludedFilesInSSGDir: ['config.*', '_config.*']
+    });
 
     const pageModelsResults = await generatePageModelsForFiles({
         filePaths: pageFiles,
-        dirPath: rootPagesDir,
+        dirPathFromRoot: pagesDirFromRoot,
         fileBrowser: fileBrowser,
         pageTypeKey: ssgMatchResult?.pageTypeKey,
         objectModels: []
     });
     const dataModelsResults = await generateDataModelsForFiles({
         filePaths: dataFiles,
-        dirPath: rootDataDir,
+        dirPathFromRoot: dataDirFromRoot,
         fileBrowser: fileBrowser,
         objectModels: pageModelsResults.objectModels
     });
@@ -73,17 +83,19 @@ export async function generateSchema({ ssgMatchResult, ...fileBrowserOptions }: 
     let pageModels = analyzePageFileMatchingProperties(pageModelsResults.pageModels);
     let dataModels = analyzeDataFileMatchingProperties(dataModelsResults.dataModels);
 
-    let pagesDir = ssgMatchResult?.pagesDir;
     if (pagesDir === undefined && pageModels.length > 0) {
-        const result = extractLowestCommonAncestorFolderFromModels(pageModels);
-        pagesDir = getDir(ssgDir, result.commonDir);
-        pageModels = result.models;
+        const pagesLCADir = getLowestCommonAncestorFolderFromModels(pageModels);
+        pagesDir = getDir(ssgDir, pagesLCADir);
+        if (pagesLCADir !== '') {
+            pageModels = adjustModelsWithLowestCommonAncestor(pageModels, pagesLCADir);
+        }
     }
-    let dataDir = ssgMatchResult?.dataDir;
     if (dataDir === undefined && dataModels.length > 0) {
-        const result = extractLowestCommonAncestorFolderFromModels(dataModels);
-        dataDir = getDir(ssgDir, result.commonDir);
-        dataModels = result.models;
+        const dataLCADir = getLowestCommonAncestorFolderFromModels(dataModels);
+        dataDir = getDir(ssgDir, dataLCADir);
+        if (dataLCADir !== '') {
+            dataModels = adjustModelsWithLowestCommonAncestor(dataModels, dataLCADir);
+        }
     }
 
     const objectModels: ObjectModel[] = _.map(
@@ -113,43 +125,56 @@ function getDir(ssgDir: string, contentDir: string) {
     return fullDir === '.' ? '' : fullDir;
 }
 
-function getExcludedPageFiles(rootPagesDir: string, ssgMatchResult: SSGMatchResult | null): string[] {
-    const excludedPageFiles = [...EXCLUDED_COMMON_FILES, ...EXCLUDED_MARKDOWN_FILES];
-    if (rootPagesDir === '') {
-        // if pagesDir wasn't specifically set to empty string, ignore content files in the root folder
-        if (ssgMatchResult?.pagesDir === undefined) {
-            excludedPageFiles.push('*.*');
-        }
-        if (ssgMatchResult?.publishDir) {
-            excludedPageFiles.push(ssgMatchResult.publishDir);
-        }
-        if (ssgMatchResult?.staticDir) {
-            excludedPageFiles.push(ssgMatchResult.staticDir);
-        }
-    }
-    return excludedPageFiles;
+interface ListContentFilesOption {
+    fileBrowser: FileBrowser;
+    contentDir: string | undefined;
+    ssgMatchResult: SSGMatchResult | null;
+    excludedFiles: string[];
+    allowedExtensions: string[];
+    excludedFilesInSSGDir?: string[];
 }
 
-function getExcludedDataFiles(rootDataDir: string, ssgMatchResult: SSGMatchResult | null): string[] {
-    const excludedDataFiles = [...EXCLUDED_COMMON_FILES, ...EXCLUDED_DATA_FILES];
-    if (rootDataDir === '') {
-        excludedDataFiles.push('config.*', '_config.*');
-        // if dataDir wasn't specifically set to empty string, ignore content files in the root folder
-        if (ssgMatchResult?.dataDir === undefined) {
-            excludedDataFiles.push('*.*');
-        }
-        if (ssgMatchResult?.publishDir) {
-            excludedDataFiles.push(ssgMatchResult.publishDir);
-        }
-        if (ssgMatchResult?.staticDir) {
-            excludedDataFiles.push(ssgMatchResult.staticDir);
-        }
+async function listContentFiles({ fileBrowser, contentDir, ssgMatchResult, excludedFiles, allowedExtensions, excludedFilesInSSGDir }: ListContentFilesOption) {
+    const ssgDir = ssgMatchResult?.ssgDir ?? '';
+    const contentDirs = ssgMatchResult?.contentDirs ?? [];
+    let filePaths: string[];
+    let contentDirFromRoot;
+    if (contentDir !== undefined || contentDirs.length === 0) {
+        contentDirFromRoot = getDir(ssgDir, contentDir ?? '');
+        // TODO: in some projects, pages can be defined as JSON files as well
+        filePaths = await readDirRecursivelyWithFilter({ fileBrowser, contentDir, ssgMatchResult, excludedFiles, allowedExtensions, excludedFilesInSSGDir });
+    } else {
+        contentDirFromRoot = ssgDir;
+        filePaths = await reducePromise(contentDirs, async (pageFiles: string[], contentDir) => {
+            const files = await readDirRecursivelyWithFilter({ fileBrowser, contentDir, ssgMatchResult, excludedFiles, allowedExtensions, excludedFilesInSSGDir, filesRelativeToSSGDir: true });
+            return pageFiles.concat(files);
+        }, []);
     }
-    return excludedDataFiles;
+    return {
+        contentDirFromRoot,
+        filePaths
+    }
 }
 
-async function readDirRecursivelyWithFilter(fileBrowser: FileBrowser, dirPath: string, excludedFiles: string[], allowedExtensions: string[]) {
-    return fileBrowser.readFilesRecursively(dirPath, {
+interface ReadDirOptions {
+    fileBrowser: FileBrowser;
+    contentDir: string | undefined;
+    ssgMatchResult: SSGMatchResult | null;
+    excludedFiles: string[];
+    allowedExtensions: string[];
+    excludedFilesInSSGDir?: string[];
+    filesRelativeToSSGDir?: boolean
+}
+
+async function readDirRecursivelyWithFilter(options: ReadDirOptions) {
+    const excludedFiles = [
+        ...EXCLUDED_COMMON_FILES,
+        ...options.excludedFiles,
+        ...getExcludedFiles(options.contentDir, options.excludedFilesInSSGDir, options.ssgMatchResult)
+    ];
+    const ssgDir = options.ssgMatchResult?.ssgDir ?? '';
+    const contentDirFromRoot = getDir(ssgDir, options.contentDir ?? '');
+    const filePaths = options.fileBrowser.readFilesRecursively(contentDirFromRoot, {
         filter: (fileResult: FileResult) => {
             if (micromatch.isMatch(fileResult.filePath, excludedFiles)) {
                 return false;
@@ -158,21 +183,45 @@ async function readDirRecursivelyWithFilter(fileBrowser: FileBrowser, dirPath: s
                 return true;
             }
             const extension = path.extname(fileResult.filePath).substring(1);
-            return allowedExtensions.includes(extension);
+            return options.allowedExtensions.includes(extension);
         }
     });
+    if (options.filesRelativeToSSGDir) {
+        return _.map(filePaths, (filePath) => path.join(options.contentDir ?? '', filePath));
+    }
+    return filePaths;
+}
+
+function getExcludedFiles(contentDir: string | undefined, excludedFilesInSSGDir: string[] | undefined, ssgMatchResult: SSGMatchResult | null): string[] {
+    const excludedFiles = [];
+    if (contentDir === undefined || contentDir === '') {
+        if (excludedFilesInSSGDir) {
+            excludedFiles.push(...excludedFilesInSSGDir);
+        }
+        // if contentDir (pagesDir or dataDir) wasn't specifically set to empty string, ignore content files in the root folder
+        if (contentDir === undefined) {
+            excludedFiles.push('*.*');
+        }
+        if (ssgMatchResult?.publishDir) {
+            excludedFiles.push(ssgMatchResult.publishDir);
+        }
+        if (ssgMatchResult?.staticDir) {
+            excludedFiles.push(ssgMatchResult.staticDir);
+        }
+    }
+    return excludedFiles;
 }
 
 interface GeneratePageModelsOptions {
     filePaths: string[];
-    dirPath: string;
+    dirPathFromRoot: string;
     fileBrowser: FileBrowser;
     pageTypeKey?: string;
     objectModels: PartialObjectModel[];
 }
 async function generatePageModelsForFiles({
     filePaths,
-    dirPath,
+    dirPathFromRoot,
     fileBrowser,
     pageTypeKey,
     objectModels
@@ -181,13 +230,13 @@ async function generatePageModelsForFiles({
     let modelNameCounter = 1;
 
     for (const filePath of filePaths) {
-        const rootFilePath = path.join(dirPath, filePath);
-        const rootFilePathObject = path.parse(rootFilePath);
-        let data = await fileBrowser.getFileData(rootFilePath);
-        const extension = rootFilePathObject.ext.substring(1);
+        const filePathFromRoot = path.join(dirPathFromRoot, filePath);
+        const filePathObjectFromRoot = path.parse(filePathFromRoot);
+        let data = await fileBrowser.getFileData(filePathFromRoot);
+        const extension = filePathObjectFromRoot.ext.substring(1);
         // don't load plain files from root dir, even though we ignore files such as README.md when reading files,
         // there still might be plain markdown files we don't want to include
-        if (rootFilePathObject.dir === '' && MARKDOWN_FILE_EXTENSIONS.includes(extension) && _.get(data, 'frontmatter') === null) {
+        if (filePathObjectFromRoot.dir === '' && MARKDOWN_FILE_EXTENSIONS.includes(extension) && _.get(data, 'frontmatter') === null) {
             continue;
         }
         if (_.has(data, 'frontmatter') && _.has(data, 'markdown')) {
@@ -270,14 +319,14 @@ async function generatePageModelsForFiles({
 
 interface GenerateDataModelsOptions {
     filePaths: string[];
-    dirPath: string;
+    dirPathFromRoot: string;
     fileBrowser: FileBrowser;
     objectModels: PartialObjectModel[];
 }
 
 async function generateDataModelsForFiles({
     filePaths,
-    dirPath,
+    dirPathFromRoot,
     fileBrowser,
     objectModels
 }: GenerateDataModelsOptions): Promise<{ dataModels: PartialDataModel[]; objectModels: PartialObjectModel[] }> {
@@ -285,7 +334,7 @@ async function generateDataModelsForFiles({
     let modelNameCounter = 1;
 
     for (const filePath of filePaths) {
-        let data = await fileBrowser.getFileData(path.join(dirPath, filePath));
+        let data = await fileBrowser.getFileData(path.join(dirPathFromRoot, filePath));
         const modelName = `data_${modelNameCounter++}`;
         if (_.isPlainObject(data)) {
             const result = generateObjectFields(data, [modelName], objectModels);
@@ -1191,7 +1240,7 @@ function removeUnknownTypesFromListItem(items: FieldListItemsWithUnknown): Field
     return items;
 }
 
-function extractLowestCommonAncestorFolderFromModels<T extends PageModel | DataModel>(models: T[]) {
+function getLowestCommonAncestorFolderFromModels<T extends PageModel | DataModel>(models: T[]): string {
     let commonDir: null | string[] = null;
     for (let model of models) {
         let dir;
@@ -1214,26 +1263,23 @@ function extractLowestCommonAncestorFolderFromModels<T extends PageModel | DataM
             }
             commonDir = common;
         }
-        if (commonDir.length === 1 && commonDir[0] === '') {
+        if (commonDir.length === 0 || commonDir.length === 1 && commonDir[0] === '') {
             break;
         }
     }
-    const commonDirString = commonDir === null ? '' : commonDir.join(path.sep);
-    if (commonDirString === '') {
-        return {
-            models,
-            commonDir: ''
-        };
-    }
-    const adjustedModels = _.map(
+    return commonDir === null ? '' : commonDir.join(path.sep);
+}
+
+function adjustModelsWithLowestCommonAncestor<T extends PageModel | DataModel>(models: T[], lowestCommonAncestorDir: string) {
+    return _.map(
         models,
         (model): T => {
             if (model.file) {
                 return Object.assign(model, {
-                    file: path.relative(commonDirString, model.file)
+                    file: path.relative(lowestCommonAncestorDir, model.file)
                 });
             } else {
-                const folder = path.relative(commonDirString, model.folder!);
+                const folder = path.relative(lowestCommonAncestorDir, model.folder!);
                 if (folder) {
                     return Object.assign(model, {
                         folder: folder
@@ -1244,10 +1290,6 @@ function extractLowestCommonAncestorFolderFromModels<T extends PageModel | DataM
             }
         }
     );
-    return {
-        models: adjustedModels,
-        commonDir: commonDirString
-    };
 }
 
 function findLowestCommonAncestorFolder(filePaths: string[]): string {
