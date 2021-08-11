@@ -15,7 +15,7 @@ afterAll(async () => {
 // TODO: prepare another set of example that will pass the test.
 //  Currently the saved config is different, but in a good way because we adjust it.
 test.skip.each(['azimuth', 'diy', 'starter'])('load and write %s stackbit.yaml', async (subfolder) => {
-    const dirPath = path.join(__dirname, `./data/${subfolder}`);
+    const dirPath = path.join(__dirname, `./fixtures/${subfolder}`);
     const result = await loadConfig({ dirPath: dirPath });
     expect(result.errors).toHaveLength(0);
     await writeConfig({ dirPath: __dirname, config: result.config });

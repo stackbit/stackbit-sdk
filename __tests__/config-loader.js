@@ -4,7 +4,7 @@ const _ = require('lodash');
 
 const { loadConfig } = require('../src/config/config-loader');
 
-const azimuthStackbitYamlPath = path.join(__dirname, 'data/schema-with-errors');
+const azimuthStackbitYamlPath = path.join(__dirname, 'fixtures/schema-with-errors');
 
 test('normalized validation error should have normFieldPath with the normalized path', async () => {
     const result = await loadConfig({ dirPath: azimuthStackbitYamlPath });

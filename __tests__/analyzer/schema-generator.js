@@ -6,14 +6,14 @@ const { generateSchema } = require('../../src/analyzer/schema-generator');
 
 describe('generate schema', () => {
     test('empty repo', async () => {
-        const emptyRepoPath = join(__dirname, '../data/empty-repo');
+        const emptyRepoPath = join(__dirname, '../fixtures/empty-repo');
         const fileBrowserAdapter = new FileSystemFileBrowserAdapter({ dirPath: emptyRepoPath });
         const schemaGeneratorResult = await generateSchema({ ssgMatchResult: null, fileBrowserAdapter });
         expect(schemaGeneratorResult).toStrictEqual({ dataDir: undefined, models: [], pagesDir: undefined });
     });
 
     test('gatsby-starter-blog', async () => {
-        const sitePath = join(__dirname, '../data/gatsby-sites/gatsby-starter-blog');
+        const sitePath = join(__dirname, '../fixtures/gatsby-sites/gatsby-starter-blog');
         const fileBrowserAdapter = new FileSystemFileBrowserAdapter({ dirPath: sitePath });
         const fileBrowser = new FileBrowser({ fileBrowserAdapter });
         const ssgMatchResult = await matchSSG({ fileBrowser });

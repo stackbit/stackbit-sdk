@@ -6,7 +6,7 @@ const { loadConfig } = require('../src/config/config-loader');
 const { loadContent } = require('../src/content/content-loader');
 
 test.each(['azimuth', 'diy', 'starter'])('load %s stackbit.yaml', async (subfolder) => {
-    const dirPath = path.join(__dirname, `./data/${subfolder}`);
+    const dirPath = path.join(__dirname, `./fixtures/${subfolder}`);
     const result = await loadConfig({ dirPath: dirPath });
     // expect(result.errors).toHaveLength(0);
 
@@ -23,7 +23,7 @@ test.each(['azimuth', 'diy', 'starter'])('load %s stackbit.yaml', async (subfold
 });
 
 test('modelName is returned in metadata of invalid objects', async () => {
-    const dirPath = path.join(__dirname, `./data/content-with-errors`);
+    const dirPath = path.join(__dirname, `./fixtures/content-with-errors`);
     const result = await loadConfig({ dirPath: dirPath });
     expect(result.errors).toHaveLength(0);
 
@@ -84,7 +84,7 @@ test('modelName is returned in metadata of invalid objects', async () => {
 });
 
 test('invalid models should not affect loading and matching content to valid models', async () => {
-    const dirPath = path.join(__dirname, 'data/schema-with-errors');
+    const dirPath = path.join(__dirname, 'fixtures/schema-with-errors');
     const result = await loadConfig({ dirPath: dirPath });
 
     const contentResult = await loadContent({
