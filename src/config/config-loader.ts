@@ -121,7 +121,12 @@ async function loadExternalModels(dirPath: string, config: any) {
         const defaultModelDirs = ['node_modules/@stackbit/components/models', '.stackbit/models'];
         const modelDirs = _.castArray(_.get(modelsSource, 'modelDirs', defaultModelDirs)).map((modelDir: string) => _.trim(modelDir, '/'));
         const modelFiles = await reducePromise(modelDirs, async (modelFiles: string[], modelDir) => {
-            const files = await readModelFilesFromDir(path.join(dirPath, modelDir));
+            const absModelsDir = path.join(dirPath, modelDir);
+            const dirExists = await fse.pathExists(absModelsDir)
+            if (!dirExists) {
+                return modelFiles;
+            }
+            const files = await readModelFilesFromDir(absModelsDir);
             return modelFiles.concat(files.map((filePath) => path.join(modelDir, filePath)));
         }, []);
         return reducePromise(
