@@ -151,12 +151,12 @@ export interface RelativeAssetsModal {
 
 export interface ModelsSource {
     type: 'files';
-    modelsDir: string[];
+    modelDirs: string[];
 }
 
 const modelsSourceSchema = Joi.object<ModelsSource>({
     type: 'files',
-    modelsDir: Joi.array().items(Joi.string()).required()
+    modelDirs: Joi.array().items(Joi.string()).required()
 });
 
 export type AssetsModel = StricterUnion<StaticAssetsModal | RelativeAssetsModal>;
