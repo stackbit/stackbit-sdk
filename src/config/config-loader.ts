@@ -3,11 +3,12 @@ import fse from 'fs-extra';
 import yaml from 'js-yaml';
 import _ from 'lodash';
 import { extendModels, iterateModelFieldsRecursively, isListField } from '@stackbit/schema';
-import { StricterUnion } from '../utils';
 
 import { validate, ConfigValidationResult, ConfigValidationError } from './config-validator';
 import { Field, YamlConfigModel, YamlDataModel, YamlModel, YamlObjectModel, YamlPageModel, YamlConfig } from './config-schema';
+import { StricterUnion } from '../utils';
 import { isPageModel } from '../schema-utils';
+import { parseFile, readDirRecursively, reducePromise } from '@stackbit/utils';
 
 export type BaseModel = {
     name: string;
@@ -91,24 +92,66 @@ export async function loadConfig({ dirPath }: ConfigLoaderOptions): Promise<Conf
 
 async function loadConfigFromDir(dirPath: string) {
     let config = await loadConfigFromStackbitYaml(dirPath);
-    if (config) {
-        return config;
+    if (!config) {
+        return null;
     }
-    config = await loadConfigFromDotStackbit(dirPath);
-    if (config) {
-        return config;
-    }
-    return null;
+    const models = await loadExternalModels(dirPath, config);
+    config.models = _.assign(models, config.models);
+    return config;
 }
 
-async function loadConfigFromStackbitYaml(dirPath: string) {
+async function loadConfigFromStackbitYaml(dirPath: string): Promise<any> {
     const stackbitYamlPath = path.join(dirPath, 'stackbit.yaml');
     const stackbitYamlExists = await fse.pathExists(stackbitYamlPath);
     if (!stackbitYamlExists) {
         return null;
     }
     const stackbitYaml = await fse.readFile(stackbitYamlPath);
-    return yaml.load(stackbitYaml.toString('utf8'), { schema: yaml.JSON_SCHEMA });
+    const config = yaml.load(stackbitYaml.toString('utf8'), { schema: yaml.JSON_SCHEMA });
+    if (!config || typeof config !== 'object') {
+        return null;
+    }
+    return config;
+}
+
+async function loadExternalModels(dirPath: string, config: any) {
+    const modelsSource = _.get(config, 'modelsSource', {});
+    const sourceType = _.get(modelsSource, 'type', 'files');
+    if (sourceType === 'files') {
+        const defaultModelDirs = ['node_modules/@stackbit/components/models', '.stackbit/models'];
+        const modelDirs = _.castArray(_.get(modelsSource, 'modelDirs', defaultModelDirs)).map((modelDir: string) => _.trim(modelDir, '/'));
+        const modelFiles = await readDirRecursively(dirPath, {
+            filter: (filePath, stats) => {
+                if (stats.isDirectory()) {
+                    return _.some(modelDirs, (modelDir) => {
+                        return arrayStartsWithArray(modelDir.split('/'), filePath.split('/'));
+                    });
+                } else if (stats.isFile()) {
+                    return modelDirs.includes(path.parse(filePath).dir) && path.extname(filePath) === '.yaml';
+                }
+                return false;
+            }
+        });
+        return reducePromise(
+            modelFiles,
+            async (models: any, modelFile) => {
+                const model = await parseFile(modelFile);
+                models[model.name] = _.omit(model, 'name');
+                return models;
+            },
+            {}
+        );
+    }
+    return null;
+}
+
+function arrayStartsWithArray(base: string[], start: string[]) {
+    for (let i = 0; i < start.length; i++) {
+        if (base[i] !== start[i]) {
+            return false;
+        }
+    }
+    return true;
 }
 
 async function loadConfigFromDotStackbit(dirPath: string) {

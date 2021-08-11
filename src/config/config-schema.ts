@@ -149,6 +149,16 @@ export interface RelativeAssetsModal {
     uploadDir?: string;
 }
 
+export interface ModelsSource {
+    type: 'files';
+    modelsDir: string[];
+}
+
+const modelsSourceSchema = Joi.object<ModelsSource>({
+    type: 'files',
+    modelsDir: Joi.array().items(Joi.string()).required()
+});
+
 export type AssetsModel = StricterUnion<StaticAssetsModal | RelativeAssetsModal>;
 
 const assetsSchema = Joi.object<AssetsModel>({
@@ -558,6 +568,7 @@ export interface YamlConfig {
     objectTypeKey?: string;
     excludePages?: string | string[];
     logicFields?: LogicField[];
+    modelsSource?: ModelsSource;
     models?: YamlModels;
 }
 
@@ -580,6 +591,7 @@ const schema = Joi.object<YamlConfig>({
     objectTypeKey: Joi.string(),
     excludePages: Joi.array().items(Joi.string()).single(),
     logicFields: Joi.array().items(logicField),
+    modelsSource: modelsSourceSchema,
     models: modelsSchema
 })
     .unknown(true)
