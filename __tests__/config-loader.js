@@ -49,3 +49,39 @@ test('normalized validation error should have normFieldPath with the normalized 
         }
     ]);
 });
+
+test('load and override model files', async () => {
+    const stackbitYamlPath = path.join(__dirname, 'fixtures/model-files');
+    const result = await loadConfig({ dirPath: stackbitYamlPath });
+    expect(result.valid).toBeTruthy();
+    expect(_.sortBy(result.config.models, 'name')).toMatchObject([
+        {
+            name: 'model_1',
+            description: 'Model defined in stackbit.yaml'
+        },
+        {
+            name: 'model_components_1',
+            description: 'Model defined in @stackbit/components'
+        },
+        {
+            name: 'model_components_2',
+            description: 'Model defined in @stackbit/components, overriden by .stackbit/models, overriden by stackbit.yaml'
+        },
+        {
+            name: 'model_components_3',
+            description: 'Model defined in @stackbit/components, overriden by .stackbit/models'
+        },
+        {
+            name: 'model_components_4',
+            description: 'Model defined in @stackbit/components, overriden by stackbit.yaml'
+        },
+        {
+            name: 'model_stackbit_1',
+            description: 'Model defined in .stackbit/models'
+        },
+        {
+            name: 'model_stackbit_2',
+            description: 'Model defined in .stackbit/models overriden by stackbit.yaml'
+        }
+    ]);
+})

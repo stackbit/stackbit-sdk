@@ -120,22 +120,14 @@ async function loadExternalModels(dirPath: string, config: any) {
     if (sourceType === 'files') {
         const defaultModelDirs = ['node_modules/@stackbit/components/models', '.stackbit/models'];
         const modelDirs = _.castArray(_.get(modelsSource, 'modelDirs', defaultModelDirs)).map((modelDir: string) => _.trim(modelDir, '/'));
-        const modelFiles = await readDirRecursively(dirPath, {
-            filter: (filePath, stats) => {
-                if (stats.isDirectory()) {
-                    return _.some(modelDirs, (modelDir) => {
-                        return arrayStartsWithArray(modelDir.split('/'), filePath.split('/'));
-                    });
-                } else if (stats.isFile()) {
-                    return modelDirs.includes(path.parse(filePath).dir) && path.extname(filePath) === '.yaml';
-                }
-                return false;
-            }
-        });
+        const modelFiles = await reducePromise(modelDirs, async (modelFiles: string[], modelDir) => {
+            const files = await readModelFilesFromDir(path.join(dirPath, modelDir));
+            return modelFiles.concat(files.map((filePath) => path.join(modelDir, filePath)));
+        }, []);
         return reducePromise(
             modelFiles,
             async (models: any, modelFile) => {
-                const model = await parseFile(modelFile);
+                const model = await parseFile(path.join(dirPath, modelFile));
                 models[model.name] = _.omit(model, 'name');
                 return models;
             },
@@ -145,13 +137,12 @@ async function loadExternalModels(dirPath: string, config: any) {
     return null;
 }
 
-function arrayStartsWithArray(base: string[], start: string[]) {
-    for (let i = 0; i < start.length; i++) {
-        if (base[i] !== start[i]) {
-            return false;
+async function readModelFilesFromDir(modelsDir: string) {
+    return await readDirRecursively(modelsDir, {
+        filter: (filePath, stats) => {
+            return stats.isFile() && path.extname(filePath) === '.yaml';
         }
-    }
-    return true;
+    });
 }
 
 async function loadConfigFromDotStackbit(dirPath: string) {

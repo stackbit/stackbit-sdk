@@ -1,0 +1,7 @@
+name: model_stackbit_2
+type: object
+label: Model Stackbit 2
+description: Model defined in .stackbit/models
+fields:
+  - type: string
+    name: title
