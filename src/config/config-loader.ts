@@ -137,7 +137,11 @@ async function loadExternalModels(dirPath: string, config: any) {
             modelFiles,
             async (models: any, modelFile) => {
                 const model = await parseFile(path.join(dirPath, modelFile));
-                models[model.name] = _.omit(model, 'name');
+                const modelName = model.name;
+                if (!modelName) {
+                    return models;
+                }
+                models[modelName] = _.omit(model, 'name');
                 return models;
             },
             {}
