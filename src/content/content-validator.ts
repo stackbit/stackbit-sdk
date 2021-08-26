@@ -1,11 +1,11 @@
+import Joi from 'joi';
 import _ from 'lodash';
 
 import { ContentItem } from './content-loader';
 import { Config } from '../config/config-loader';
 import { joiSchemasForModels } from './content-schema';
 import { ContentValidationError } from './content-errors';
-import { getModelByName, isConfigModel, isPageModel } from '../schema-utils';
-import Joi from 'joi';
+import { getModelByName, isConfigModel, isPageModel } from '../utils';
 
 interface ContentValidationOptions {
     contentItems: ContentItem[];
@@ -41,7 +41,7 @@ export function validate({ contentItems, config }: ContentValidationOptions): Co
                 }
             };
 
-            const model = getModelByName(modelName, config.models);
+            const model = getModelByName(config.models, modelName);
             if (model) {
                 if (isConfigModel(model)) {
                     if (config.ssgName === 'unibit') {

@@ -14,7 +14,8 @@ module.exports = {
     expectValidationResultToIncludeSingleError,
     expectValidationResultToMatchAllErrors,
     expectArrayToIncludeObjectContaining,
-    inspectValidationResultErrors
+    inspectValidationResultErrors,
+    getFieldOfModel
 }
 
 function expectPassingValidation(validatedConfig) {
@@ -48,4 +49,9 @@ function expectArrayToIncludeObjectContaining(array, object) {
 
 function inspectValidationResultErrors(result) {
     console.log('error.details: ', util.inspect(result.errors, { showHidden: true, depth: 5, colors: true, compact: false }));
+}
+
+function getFieldOfModel(models, modelName, fieldName) {
+    const model = _.find(models, { name: modelName });
+    return _.find(model?.fields, { name: fieldName });
 }

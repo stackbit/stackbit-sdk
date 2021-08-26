@@ -8,7 +8,7 @@ const SSG_NAMES = ['unibit', 'jekyll', 'hugo', 'gatsby', 'nextjs', 'custom', 'el
 // CMSes Stackbit Stuio supports
 const CMS_NAMES = ['git', 'contentful', 'sanity', 'forestry', 'netlifycms'] as const;
 
-const FIELD_TYPES = [
+export const FIELD_TYPES = [
     'string',
     'url',
     'slug',
@@ -251,11 +251,15 @@ export type FieldListItems = StricterUnion<Exclude<NonStrictFieldPartialProps, F
 
 export type SimpleField = FieldSimpleNoProps & FieldCommonProps;
 export type FieldEnum = FieldEnumProps & FieldCommonProps;
-export type FieldObject = FieldObjectProps & FieldCommonProps;
-export type FieldList = FieldListProps & FieldCommonProps;
 export type FieldNumber = FieldNumberProps & FieldCommonProps;
+export type FieldObject = FieldObjectProps & FieldCommonProps;
 export type FieldModel = FieldModelProps & FieldCommonProps;
 export type FieldReference = FieldReferenceProps & FieldCommonProps;
+
+export type FieldList = FieldListProps & FieldCommonProps;
+export type FieldListObject = FieldList & { items?: FieldObjectProps };
+export type FieldListModel = FieldList & { items?: FieldModelProps };
+export type FieldListReference = FieldList & { items?: FieldReferenceProps };
 
 export type Field = FieldPartialProps & FieldCommonProps;
 

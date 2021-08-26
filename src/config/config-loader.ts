@@ -1,14 +1,24 @@
 import path from 'path';
 import fse from 'fs-extra';
 import yaml from 'js-yaml';
+import semver from 'semver';
 import _ from 'lodash';
-import { extendModels, iterateModelFieldsRecursively, isListField } from '@stackbit/schema';
 
 import { validate, ConfigValidationResult, ConfigValidationError } from './config-validator';
-import { Field, YamlConfigModel, YamlDataModel, YamlModel, YamlObjectModel, YamlPageModel, YamlConfig } from './config-schema';
-import { StricterUnion } from '../utils';
-import { isPageModel } from '../schema-utils';
-import { parseFile, readDirRecursively, reducePromise } from '@stackbit/utils';
+import { YamlConfigModel, YamlDataModel, YamlModel, YamlObjectModel, YamlPageModel, YamlConfig, Field, FieldModel, FieldListModel } from './config-schema';
+import {
+    isListDataModel,
+    isObjectListItems,
+    isObjectField,
+    StricterUnion,
+    isCustomModelField,
+    isModelField,
+    isReferenceField,
+    getListItemsField,
+    assignLabelFieldIfNeeded
+} from '../utils';
+import { isPageModel, isListField, extendModels, iterateModelFieldsRecursively } from '../utils';
+import { append, parseFile, readDirRecursively, reducePromise, rename } from '@stackbit/utils';
 
 export type BaseModel = {
     name: string;
@@ -80,8 +90,9 @@ export async function loadConfig({ dirPath }: ConfigLoaderOptions): Promise<Conf
         };
     }
 
+    config = normalizeConfig(config);
     const validationResult = validate(config);
-    const normalizedConfig = normalizeConfig(validationResult);
+    const normalizedConfig = convertToTypedConfig(validationResult);
     const normalizedErrors = normalizeErrors(normalizedConfig, validationResult.errors);
     return {
         valid: validationResult.valid,
@@ -191,7 +202,172 @@ async function loadConfigFromDotStackbit(dirPath: string) {
     return _.isEmpty(config) ? null : config;
 }
 
-function normalizeConfig(validationResult: ConfigValidationResult): Config {
+function normalizeConfig(config: any): any {
+    const pageLayoutKey = _.get(config, 'pageLayoutKey', 'layout');
+    const objectTypeKey = _.get(config, 'objectTypeKey', 'type');
+    const stackbitYamlVersion = String(_.get(config, 'stackbitVersion', ''));
+    const ver = semver.coerce(stackbitYamlVersion);
+    const isStackbitYamlV2 = ver ? semver.satisfies(ver, '<0.3.0') : false;
+    const models = config?.models || {};
+    let polymorphicModelNames: string[] = [];
+
+    _.forEach(models, (model) => {
+        if (!model) {
+            return;
+        }
+
+        if (isPageModel(model)) {
+            // rename old 'template' property to 'layout'
+            rename(model, 'template', 'layout');
+
+            addMarkdownContentField(model);
+
+            // TODO: update schema-editor to not show layout field
+            addLayoutFieldToPageModel(model, pageLayoutKey);
+        }
+
+        if (isListDataModel(model)) {
+            // 'items.type' of list model defaults to 'string', set it explicitly
+            if (!_.has(model, 'items.type')) {
+                _.set(model, 'items.type', 'string');
+            }
+            if (isObjectListItems(model.items)) {
+                assignLabelFieldIfNeeded(model.items);
+            }
+        } else if (!_.has(model, 'labelField')) {
+            assignLabelFieldIfNeeded(model);
+        }
+
+        iterateModelFieldsRecursively(model, (field: any, fieldPath) => {
+            // add field label if label is not set
+            if (!_.has(field, 'label')) {
+                field.label = _.startCase(field.name);
+            }
+
+            if (isListField(field)) {
+                // 'items.type' of list field default to 'string', set it explicitly
+                if (!_.has(field, 'items.type')) {
+                    _.set(field, 'items.type', 'string');
+                }
+                field = getListItemsField(field);
+            }
+
+            if (isObjectField(field)) {
+                assignLabelFieldIfNeeded(field);
+            } else if (isCustomModelField(field, models)) {
+                // stackbit v0.2.0 compatibility
+                // convert the old custom model field type: { type: 'action' }
+                // to the new 'model' field type: { type: 'model', models: ['action'] }
+                field.models = [field.type];
+                field.type = 'model';
+            } else if (field.type === 'models') {
+                // stackbit v0.2.0 compatibility
+                // convert the old 'models' field type: { type: 'models', models: ['link', 'button'] }
+                // to the new 'model' field type: { type: 'model', models: ['link', 'button'] }
+                field.type = 'model';
+                field.models = _.get(field, 'models', []);
+            } else if (field.type === 'model' && _.has(field, 'model')) {
+                // stackbit v0.2.0 compatibility
+                // convert the old 'model' field type: { type: 'model', model: 'link' }
+                // to the new 'model' field type: { type: 'model', models: ['link'] }
+                field.models = [field.model];
+                delete field.model;
+            }
+
+            if (isStackbitYamlV2) {
+                // in stackbit.yaml v0.2.x, the 'reference' field was what we have today as 'model' field:
+                if (isReferenceField(field)) {
+                    field = (field as unknown) as FieldModel;
+                    field.type = 'model';
+                    field.models = _.get(field, 'models', []);
+                }
+            }
+
+            polymorphicModelNames = _.union(polymorphicModelNames, getPolymorphicModelNames(field));
+        });
+    });
+
+    _.forEach(polymorphicModelNames, (modelName) => {
+        const model = models[modelName];
+        // don't add objectTypeKey to page models, they have pageLayoutKey
+        if (!model || model.type === 'page') {
+            return;
+        }
+
+        // TODO: update schema-editor to not show type field
+        addObjectTypeKeyField(model, objectTypeKey, modelName);
+    });
+
+    return config;
+}
+
+function addMarkdownContentField(model: PageModel) {
+    if (!model.hideContent) {
+        append(model, 'fields', {
+            type: 'markdown',
+            name: 'markdown_content',
+            label: 'Content',
+            description: 'Page content'
+        });
+    }
+}
+
+function addLayoutFieldToPageModel(model: any, pageLayoutKey: any) {
+    const modelLayout = _.get(model, 'layout');
+    if (!modelLayout) {
+        return;
+    }
+    const hasLayoutField = _.find(_.get(model, 'fields'), { name: pageLayoutKey });
+    if (hasLayoutField) {
+        return;
+    }
+    append(model, 'fields', {
+        type: 'string',
+        name: pageLayoutKey,
+        label: _.startCase(pageLayoutKey),
+        const: modelLayout,
+        hidden: true
+    });
+}
+
+function addObjectTypeKeyField(model: any, objectTypeKey: string, modelName: string) {
+    const hasObjectTypeField = _.find(_.get(model, 'fields'), { name: objectTypeKey });
+    if (hasObjectTypeField) {
+        return;
+    }
+    append(model, 'fields', {
+        type: 'string',
+        name: objectTypeKey,
+        label: 'Object Type',
+        description: 'The type of the object',
+        const: modelName,
+        hidden: true
+    });
+}
+
+/**
+ * Returns model names referenced by polymorphic 'model' and 'reference' fields.
+ * That is, fields that can have hold objects of different types.
+ *
+ * @param field
+ */
+function getPolymorphicModelNames(field: any) {
+    if (isListField(field)) {
+        field = getListItemsField(field);
+    }
+    // only 'model' and 'reference' having more than one 'models' are polymorphic
+    let polymorphicModelNames: string[] = [];
+    if (isModelField(field) && field.models?.length > 1) {
+        const modelNames = field.models;
+        polymorphicModelNames = _.union(polymorphicModelNames, modelNames);
+    } else if (isReferenceField(field) && field.models?.length > 1) {
+        const modelNames = field.models;
+        polymorphicModelNames = _.union(polymorphicModelNames, modelNames);
+    }
+    return polymorphicModelNames;
+}
+
+function convertToTypedConfig(validationResult: ConfigValidationResult): Config {
     const config = _.cloneDeep(validationResult.value);
 
     const invalidModelNames = _.reduce(
@@ -220,31 +396,16 @@ function normalizeConfig(validationResult: ConfigValidationResult): Config {
             if (invalidModelNames.includes(modelName)) {
                 _.set(model, '__metadata.invalid', true);
             }
-            if (isPageModel(model) && !model.hideContent && model.fields) {
-                model.fields.push({
-                    type: 'markdown',
-                    name: 'markdown_content',
-                    label: 'Content',
-                    description: 'Page content'
-                });
-            }
             return model;
         }
     );
-    models = extendModels(models);
-    _.forEach(models, (model: Model) => {
-        iterateModelFieldsRecursively(model, (field: Field) => {
-            // add field label if label is not set but name is set
-            // 'name' can be unset for nested 'object' fields or list items fields
-            if (!_.has(field, 'label')) {
-                field.label = _.startCase(field.name);
-            }
 
-            if (isListField(field) && !_.has(field, 'items.type')) {
-                _.set(field, 'items.type', 'string');
-            }
-        });
-    });
+    try {
+        models = extendModels(models);
+    } catch (error) {
+        throw error;
+    }
+
     return {
         ...config,
         models: models

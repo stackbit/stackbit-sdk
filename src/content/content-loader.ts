@@ -3,12 +3,22 @@ import fse from 'fs-extra';
 import path from 'path';
 import micromatch from 'micromatch';
 import { findPromise, forEachPromise, parseFile, readDirRecursively } from '@stackbit/utils';
-import { getListItemsField, getModelsByQuery, isListField } from '@stackbit/schema';
 
 import { Config, ConfigModel, Model } from '../config/config-loader';
-import { Field, FieldModel } from '../config/config-schema';
+import { Field, FieldListItems, FieldModelProps } from '../config/config-schema';
 import { FileForModelNotFoundError, FileMatchedMultipleModelsError, FileNotMatchedModelError, FileReadError, FolderReadError } from './content-errors';
-import { isConfigModel, isDataModel, isPageModel } from '../schema-utils';
+import {
+    isConfigModel,
+    isDataModel,
+    isPageModel,
+    getModelsByQuery,
+    getListItemsField,
+    isListField,
+    isModelField,
+    isListDataModel,
+    isModelListItems,
+    getModelOfObject
+} from '../utils';
 import { validate } from './content-validator';
 import { DATA_FILE_EXTENSIONS, EXCLUDED_DATA_FILES, EXCLUDED_MARKDOWN_FILES, EXCLUDED_COMMON_FILES, MARKDOWN_FILE_EXTENSIONS } from '../consts';
 
@@ -106,6 +116,7 @@ async function loadDataFiles({ dirPath, config, skipUnmodeledContent }: ContentL
         return { contentItems, errors };
     }
 
+    const objectTypeKey = config.objectTypeKey || 'type';
     const excludedFiles = [...EXCLUDED_COMMON_FILES];
     const dataModels = config.models.filter(isDataModel);
 
@@ -135,7 +146,7 @@ async function loadDataFiles({ dirPath, config, skipUnmodeledContent }: ContentL
         filePaths,
         models: dataModels,
         config: config,
-        objectTypeKeyPath: 'type',
+        objectTypeKeyPath: objectTypeKey,
         modelTypeKeyPath: 'name',
         skipUnmodeledContent
     });
@@ -162,7 +173,7 @@ async function loadPageFiles({ dirPath, config, skipUnmodeledContent }: ContentL
         return { contentItems, errors };
     }
 
-    const pageLayoutKey = config.pageLayoutKey;
+    const pageLayoutKey = config.pageLayoutKey || 'layout';
     const excludedFiles = _.castArray(config.excludePages || []).concat(EXCLUDED_COMMON_FILES);
     const pageModels = config.models.filter(isPageModel);
 
@@ -188,7 +199,7 @@ async function loadPageFiles({ dirPath, config, skipUnmodeledContent }: ContentL
         filePaths,
         models: pageModels,
         config: config,
-        objectTypeKeyPath: pageLayoutKey ? pageLayoutKey : null,
+        objectTypeKeyPath: pageLayoutKey,
         modelTypeKeyPath: 'layout',
         skipUnmodeledContent
     });
@@ -311,7 +322,7 @@ async function loadContentItems({
             models
         );
         if (matchedModels.length === 1) {
-            contentItems.push(modeledDataItem(filePathRelativeToProject, data, matchedModels[0], config));
+            contentItems.push(modeledDataItem(filePathRelativeToProject, data, matchedModels[0]!, config));
         } else {
             if (matchedModels.length === 0) {
                 errors.push(new FileNotMatchedModelError({ filePath: filePathRelativeToProject }));
@@ -343,19 +354,24 @@ async function loadFile(filePath: string, fileIsInProjectDir = false) {
 }
 
 function modeledDataItem(filePath: string, data: any, model: Model, config: Config): ContentItem {
-    if (isDataModel(model) && model.isList && _.isArray(data)) {
-        data = { items: data };
-    } else if (isPageModel(model)) {
+    if (isPageModel(model)) {
         if (model.hideContent) {
             data = _.omit(data, 'markdown_content');
         }
+    }
+    const pageLayoutKey = config.pageLayoutKey || 'layout';
+    const objectTypeKey = config.objectTypeKey || 'type';
+    const modelsByName = _.keyBy(config.models, 'name');
+    data = addMetadataRecursively({ value: data, model, modelsByName, pageLayoutKey, objectTypeKey, valueId: filePath });
+    if (isListDataModel(model) && _.isArray(data)) {
+        data = { items: data };
     }
     return {
         __metadata: {
             filePath,
             modelName: model.name
         },
-        ...addMetadataRecursively(data, model, _.keyBy(config.models, 'name'))
+        ...data
     };
 }
 
@@ -369,112 +385,131 @@ function unmodeledDataItem(filePath: string, data: any): ContentItem {
     };
 }
 
-function addMetadataRecursively(
-    value: any,
-    model: Model | Field | null,
-    modelsByName: Record<string, Model>,
-    { objectTypeKey = 'type', _modelKeyPath }: { objectTypeKey?: string; _modelKeyPath?: string[] } = {}
-) {
+function addMetadataRecursively({
+    value,
+    model,
+    modelsByName,
+    pageLayoutKey,
+    objectTypeKey,
+    valueId
+}: {
+    value: any;
+    model: Model;
+    modelsByName: Record<string, Model>;
+    pageLayoutKey: string;
+    objectTypeKey: string;
+    valueId?: string;
+}) {
     if (!model) {
         return value;
     }
 
-    _modelKeyPath = _modelKeyPath || [model.name];
+    function _mapDeep({
+        value,
+        model,
+        field,
+        fieldListItem,
+        valueKeyPath,
+        modelKeyPath
+    }: {
+        value: any;
+        model: Model | null;
+        field: Field | null;
+        fieldListItem: FieldListItems | null;
+        valueKeyPath: (string | number)[];
+        modelKeyPath: string[];
+    }) {
+        let modelField: FieldModelProps | null = null;
+        if (field && isModelField(field)) {
+            modelField = field;
+        } else if (fieldListItem && isModelListItems(fieldListItem)) {
+            modelField = fieldListItem;
+        }
 
-    if (_.isPlainObject(value) && model && model.type === 'model') {
-        const modelResult = getModelOfObject(value, model, modelsByName, objectTypeKey, _modelKeyPath);
-        if (modelResult.error !== undefined) {
-            return {
+        if (_.isPlainObject(value) && modelField) {
+            const modelResult = getModelOfObject({
+                object: value,
+                field: modelField,
+                modelsByName,
+                pageLayoutKey,
+                objectTypeKey,
+                valueKeyPath,
+                modelKeyPath
+            });
+            if ('error' in modelResult) {
+                return {
+                    __metadata: {
+                        modelName: null,
+                        error: modelResult.error
+                    },
+                    ...value
+                };
+            }
+            model = modelResult.model;
+            field = null;
+            fieldListItem = null;
+            modelKeyPath = [model.name];
+            value = {
                 __metadata: {
-                    modelName: null,
-                    error: modelResult.error
+                    modelName: model.name
                 },
                 ...value
             };
         }
-        model = modelResult.model;
-        _modelKeyPath = [model.name];
-        value = {
-            __metadata: {
-                modelName: model.name
-            },
-            ...value
-        };
-    }
 
-    // Use lodash methods here, the models and values can be invalid, and therefore not all required properties might exist
-    if (_.isPlainObject(value)) {
-        const fields = _.get(model, 'fields', []);
-        const fieldsByName = _.keyBy(fields, 'name');
-        value = _.mapValues(value, (val, key) => {
-            if (key === '__metadata') {
-                return val;
+        // Use lodash methods here, the models and values can be invalid, and therefore not all required properties might exist
+        if (_.isPlainObject(value)) {
+            const modelOrField = model || field || fieldListItem;
+            const fields = _.get(modelOrField, 'fields', []);
+            const fieldsByName = _.keyBy(fields, 'name');
+            value = _.mapValues(value, (val, key) => {
+                if (key === '__metadata') {
+                    return val;
+                }
+                // field might not be defined in the model, for example implicit fields like 'layout' and 'type'
+                // or for nested objects with unmatched models
+                const field = _.get(fieldsByName, key, null);
+                return _mapDeep({
+                    value: val,
+                    model: null,
+                    field: field,
+                    fieldListItem: null,
+                    valueKeyPath: _.concat(valueKeyPath, key),
+                    modelKeyPath: _.concat(modelKeyPath, ['fields', key])
+                });
+            });
+        } else if (_.isArray(value)) {
+            let fieldListItems: FieldListItems;
+            if (field && isListField(field)) {
+                fieldListItems = getListItemsField(field);
+            } else if (model && isListDataModel(model)) {
+                fieldListItems = model.items;
+            } else {
+                return value;
             }
-            // field might not be defined in the model, for example implicit fields like 'layout' and 'type'
-            // or for nested objects with unmatched models
-            const field = _.get(fieldsByName, key, null);
-            return addMetadataRecursively(val, field, modelsByName, {
-                objectTypeKey,
-                _modelKeyPath: _.concat(_modelKeyPath!, ['fields', key])
+            value = _.map(value, (val, idx) => {
+                return _mapDeep({
+                    value: val,
+                    model: null,
+                    field: null,
+                    fieldListItem: fieldListItems,
+                    valueKeyPath: _.concat(valueKeyPath, idx),
+                    modelKeyPath: _.concat(modelKeyPath, 'items')
+                });
             });
-        });
-    } else if (_.isArray(value)) {
-        if (!isListField(model)) {
-            return value;
         }
-        const itemsModel = getListItemsField(model);
-        value = _.map(value, (val) => {
-            return addMetadataRecursively(val, itemsModel, modelsByName, {
-                objectTypeKey,
-                _modelKeyPath: _.concat(_modelKeyPath!, 'items')
-            });
-        });
+
+        return value;
     }
 
-    return value;
-}
-
-function getModelOfObject(object: any, field: FieldModel, modelsByName: Record<string, Model>, objectTypeKey: string, modelKeyPath: string[]) {
-    // Use lodash methods here, the models and values can be invalid, and therefore not all required properties might exist
-    const modelNames = _.get(field, 'models', []);
-    let modelName: string;
-    if (modelNames.length === 0) {
-        return {
-            modelName: null,
-            error: `invalid model, no 'models' defined at ${modelKeyPath.join('.')}`
-        };
-    } else if (modelNames.length === 1) {
-        modelName = modelNames[0]!;
-        const model = _.get(modelsByName, modelName);
-        if (!model) {
-            return {
-                modelName: null,
-                error: `invalid model, invalid model name '${modelName}' at ${modelKeyPath.join('.')}`
-            };
-        }
-        return {
-            modelName: modelName,
-            model: model
-        };
-    }
-    modelName = _.get(object, objectTypeKey);
-    if (!modelName) {
-        return {
-            modelName: null,
-            error: `invalid content, no 'type' field`
-        };
-    }
-    const model = _.get(modelsByName, modelName);
-    if (!model) {
-        return {
-            modelName: null,
-            error: `invalid content, type '${modelName}' doesn't match any model name`
-        };
-    }
-    return {
-        modelName: modelName,
-        model: model
-    };
+    return _mapDeep({
+        value: value,
+        model: model,
+        field: null,
+        fieldListItem: null,
+        valueKeyPath: valueId ? [valueId] : [],
+        modelKeyPath: [model.name]
+    });
 }
 
 const configFilesSSGMap: Record<string, string[]> = {

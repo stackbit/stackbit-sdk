@@ -1,0 +1,37 @@
+stackbitVersion: 0.2.0
+pagesDir: null
+dataDir: null
+models:
+  page_1:
+    type: page
+    label: Page 2
+    template: layout_1
+    fields:
+      - type: model_1
+        name: custom_model_field
+      - type: list
+        name: custom_model_list
+        items:
+          type: model_1
+      - type: models
+        name: models_field
+        models: [model_1]
+      - type: list
+        name: models_list
+        items:
+          type: models
+          models: [model_1]
+      - type: reference
+        name: reference_field
+        models: [model_1]
+      - type: list
+        name: reference_list
+        items:
+          type: reference
+          models: [model_1]
+  model_1:
+    type: object
+    label: Model 1
+    fields:
+      - type: string
+        name: text

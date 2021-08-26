@@ -1,0 +1,35 @@
+stackbitVersion: 0.3.0
+pagesDir: null
+dataDir: null
+models:
+  config_model:
+    type: config
+    label: Config Model
+  page_model_1:
+    type: page
+    label: Page Model 1
+    fields:
+      - type: list
+        name: model_list
+        items:
+          type: model
+          models: [object_model_1]
+  page_model_file:
+    type: page
+    label: Page Model 1
+    file: foo.md
+    singleInstance: true
+  data_model_1:
+    type: data
+    label: Data Model 1
+  data_model_file:
+    type: data
+    label: Data Model 1
+    file: foo.json
+  data_list_model_1:
+    type: data
+    label: Data List Model
+    isList: true
+  object_model_1:
+    type: object
+    label: Object Model

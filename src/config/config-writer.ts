@@ -31,6 +31,12 @@ export function convertToYamlConfig({ config }: { config: Config }): YamlConfig 
                 if (yamlModel.type === 'page' && !yamlModel.hideContent && yamlModel.fields) {
                     _.remove(yamlModel.fields, (field) => field.name === 'markdown_content');
                 }
+                if (yamlModel.type === 'page' && yamlModel.fields) {
+                    _.remove(yamlModel.fields, (field) => field.name === (config.pageLayoutKey || 'layout'));
+                }
+                if (yamlModel.type === 'data' && yamlModel.fields) {
+                    _.remove(yamlModel.fields, (field) => field.name === (config.objectTypeKey || 'type'));
+                }
                 yamlModels[model.name] = yamlModel;
                 return yamlModels;
             },

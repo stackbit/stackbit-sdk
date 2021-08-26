@@ -19,4 +19,5 @@ export { loadContent, ContentItem, ContentLoaderOptions, ContentLoaderResult } f
 export { matchSSG, SSGMatcherOptions, SSGMatchResult } from './analyzer/ssg-matcher';
 export { matchCMS, CMSMatcherOptions, CMSMatchResult } from './analyzer/cms-matcher';
 export { analyzeSite, SiteAnalyzerOptions, SiteAnalyzerResult } from './analyzer/site-analyzer';
+export * from './utils';
 export * from './analyzer/file-browser';

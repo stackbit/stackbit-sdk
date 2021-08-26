@@ -4,7 +4,6 @@ import _ from 'lodash';
 import { Model } from '../config/config-loader';
 import {
     Field,
-    FieldSimpleNoProps,
     FieldNumberProps,
     FieldEnumProps,
     FieldEnumValue,
@@ -15,7 +14,7 @@ import {
     FieldListProps,
     FieldListItems
 } from '..';
-import { isDataModel, isPageModel } from '../schema-utils';
+import { isDataModel, isPageModel } from '../utils';
 
 type FieldPath = (string | number)[];
 
