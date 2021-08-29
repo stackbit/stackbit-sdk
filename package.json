@@ -10,7 +10,7 @@
     ],
     "scripts": {
         "test": "jest",
-        "build": "tsc",
+        "build": "rm -rf ./dist && tsc",
         "prettier": "prettier --write src",
         "prepack": "npm test && npm run build",
         "version-minor": "npm version minor -m \"bumped version to v%s\"",

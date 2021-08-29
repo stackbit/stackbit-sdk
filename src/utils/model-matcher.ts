@@ -26,7 +26,7 @@ type ModelQuery = BaseModelQuery | TypedModelQuery;
  * @param {Array.<Object>} models Array of stackbit.yaml `models`.
  * @return {Object} stackbit.yaml model matching the `query`.
  */
-function getModelByQuery(query: ModelQuery, models: Model[]): { model: Model | null; error: Error | null } {
+export function getModelByQuery(query: ModelQuery, models: Model[]): { model: Model | null; error: Error | null } {
     const matchedModels = getModelsByQuery(query, models);
     const filePath = _.get(query, 'filePath');
     if (matchedModels.length === 0) {
