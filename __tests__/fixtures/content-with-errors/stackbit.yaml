@@ -47,6 +47,31 @@ models:
       - type: string
         name: icon_type
         label: Icon Type
-      - type: string
+      - type: enum
         name: icon_color
         label: Icon Color
+        options: [red, blue]
+  data_model_1:
+    type: data
+    label: Data Model 1
+    file: poly-data.json
+    fields:
+      - type: list
+        name: poly_model_list
+        items:
+          type: model
+          models:
+            - object_model_1
+            - object_model_2
+  object_model_1:
+    type: object
+    label: Object Model 1
+    fields:
+      - type: string
+        name: object_model_1_string
+  object_model_2:
+    type: object
+    label: Object Model 2
+    fields:
+      - type: string
+        name: object_model_2_string

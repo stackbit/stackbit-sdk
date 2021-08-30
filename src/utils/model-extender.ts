@@ -2,17 +2,26 @@ import _ from 'lodash';
 import { copyIfNotSet } from '@stackbit/utils';
 
 import { Model } from '../config/config-loader';
+import { YamlModel, YamlModels } from '../config/config-schema';
 
 export function extendModels(models: Model[]): Model[] {
-    const memorized = _.memoize(extendModel, (model: Model) => model.name);
+    const memorized = _.memoize(extendModel, (model: YamlModel, modelName: string) => modelName);
     const modelsByName = _.keyBy(models, 'name');
     return _.map(models, (model) => {
-        return memorized(model, modelsByName);
+        // YamlModel is the same as Model just without 'name' and '__metadata' properties
+        return memorized(model as YamlModel, model.name, modelsByName) as Model;
     });
 }
 
-function extendModel(model: Model, modelsByName: Record<string, Model>, _extendPath: string[] = []) {
-    assert(!_.includes(_extendPath, model.name), `cyclic dependency detected in model extend tree: ${_extendPath.join(' -> ')} -> ${model.name}`);
+export function extendModelMap(models: YamlModels): YamlModels {
+    const memorized = _.memoize(extendModel, (model: YamlModel, modelName: string) => modelName);
+    return _.mapValues(models, (model, modelName) => {
+        return memorized(model, modelName, models);
+    });
+}
+
+function extendModel(model: YamlModel, modelName: string, modelsByName: Record<string, YamlModel>, _extendPath: string[] = []) {
+    assert(!_.includes(_extendPath, modelName), `cyclic dependency detected in model extend tree: ${_extendPath.join(' -> ')} -> ${modelName}`);
 
     let _extends = _.get(model, 'extends');
     let fields = _.get(model, 'fields');
@@ -34,9 +43,9 @@ function extendModel(model: Model, modelsByName: Record<string, Model>, _extendP
 
     _.forEach(_extends, (superModelName) => {
         let superModel = _.get(modelsByName, superModelName);
-        assert(superModel, `model '${model.name}' extends non defined model '${superModelName}'`);
+        assert(superModel, `model '${modelName}' extends non defined model '${superModelName}'`);
         assert(superModel.type === 'object', `only object model types can be extended`);
-        superModel = extendModel(superModel, modelsByName, _extendPath.concat(model.name));
+        superModel = extendModel(superModel, superModelName, modelsByName, _extendPath.concat(modelName));
         copyIfNotSet(superModel, 'hideContent', model, 'hideContent');
         copyIfNotSet(superModel, 'singleInstance', model, 'singleInstance');
         copyIfNotSet(superModel, 'labelField', model, 'labelField');

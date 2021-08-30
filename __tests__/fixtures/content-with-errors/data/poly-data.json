@@ -1,0 +1,18 @@
+{
+    "poly_model_list": [
+        {
+            "object_model_1_string": "foo"
+        },
+        {
+            "object_model_2_string": "foo"
+        },
+        {
+            "type": "object_model_2",
+            "object_model_2_string": 1
+        },
+        {
+            "type": "object_model_2",
+            "object_model_2_string": "foo"
+        }
+    ]
+}

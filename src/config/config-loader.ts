@@ -15,9 +15,12 @@ import {
     isModelField,
     isReferenceField,
     getListItemsField,
-    assignLabelFieldIfNeeded
+    assignLabelFieldIfNeeded,
+    extendModelMap,
+    isPageModel,
+    isListField,
+    iterateModelFieldsRecursively
 } from '../utils';
-import { isPageModel, isListField, extendModels, iterateModelFieldsRecursively } from '../utils';
 import { append, parseFile, readDirRecursively, reducePromise, rename } from '@stackbit/utils';
 
 export type BaseModel = {
@@ -208,8 +211,15 @@ function normalizeConfig(config: any): any {
     const stackbitYamlVersion = String(_.get(config, 'stackbitVersion', ''));
     const ver = semver.coerce(stackbitYamlVersion);
     const isStackbitYamlV2 = ver ? semver.satisfies(ver, '<0.3.0') : false;
-    const models = config?.models || {};
-    let polymorphicModelNames: string[] = [];
+    let models = config?.models || {};
+    let referencedModelNames: string[] = [];
+
+    try {
+        models = extendModelMap(models);
+    } catch (error) {
+        // TODO: gracefully extend and return error rather throwing
+        throw error;
+    }
 
     _.forEach(models, (model) => {
         if (!model) {
@@ -283,11 +293,11 @@ function normalizeConfig(config: any): any {
                 }
             }
 
-            polymorphicModelNames = _.union(polymorphicModelNames, getPolymorphicModelNames(field));
+            referencedModelNames = _.union(referencedModelNames, getReferencedModelNames(field));
         });
     });
 
-    _.forEach(polymorphicModelNames, (modelName) => {
+    _.forEach(referencedModelNames, (modelName) => {
         const model = models[modelName];
         // don't add objectTypeKey to page models, they have pageLayoutKey
         if (!model || model.type === 'page') {
@@ -347,24 +357,27 @@ function addObjectTypeKeyField(model: any, objectTypeKey: string, modelName: str
 
 /**
  * Returns model names referenced by polymorphic 'model' and 'reference' fields.
- * That is, fields that can have hold objects of different types.
+ * That is, fields that can hold objects of different types.
  *
  * @param field
  */
-function getPolymorphicModelNames(field: any) {
+function getReferencedModelNames(field: any) {
     if (isListField(field)) {
         field = getListItemsField(field);
     }
-    // only 'model' and 'reference' having more than one 'models' are polymorphic
-    let polymorphicModelNames: string[] = [];
+    // TODO: add type field to model fields inside container update/create object logic rather adding type to schema
+    // 'object' models referenced by 'model' fields should have 'type' field
+    // if these fields have than 1 model.
+    // 'data' models referenced by 'reference' fields should always have 'type' field.
+    let referencedModelNames: string[] = [];
     if (isModelField(field) && field.models?.length > 1) {
         const modelNames = field.models;
-        polymorphicModelNames = _.union(polymorphicModelNames, modelNames);
-    } else if (isReferenceField(field) && field.models?.length > 1) {
+        referencedModelNames = _.union(referencedModelNames, modelNames);
+    } else if (isReferenceField(field) && field.models?.length > 0) {
         const modelNames = field.models;
-        polymorphicModelNames = _.union(polymorphicModelNames, modelNames);
+        referencedModelNames = _.union(referencedModelNames, modelNames);
     }
-    return polymorphicModelNames;
+    return referencedModelNames;
 }
 
 function convertToTypedConfig(validationResult: ConfigValidationResult): Config {
@@ -399,12 +412,6 @@ function convertToTypedConfig(validationResult: ConfigValidationResult): Config 
             return model;
         }
     );
-
-    try {
-        models = extendModels(models);
-    } catch (error) {
-        throw error;
-    }
 
     return {
         ...config,

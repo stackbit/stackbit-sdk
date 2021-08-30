@@ -195,6 +195,7 @@ const FieldSchemas: { [fieldType in keyof FieldPropsByType]: (field: FieldPropsB
                 .concat(
                     Joi.object({
                         __metadata: metadataSchema,
+                        // TODO: change to objectTypeKey
                         type: typeSchema
                     })
                 );
@@ -211,6 +212,7 @@ const FieldSchemas: { [fieldType in keyof FieldPropsByType]: (field: FieldPropsB
                                 .concat(
                                     Joi.object({
                                         __metadata: metadataSchema,
+                                        // TODO: change to objectTypeKey
                                         type: Joi.string()
                                     })
                                 )
