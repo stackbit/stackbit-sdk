@@ -6,6 +6,7 @@ import _ from 'lodash';
 
 import { validate, ConfigValidationResult, ConfigValidationError } from './config-validator';
 import { YamlConfigModel, YamlDataModel, YamlModel, YamlObjectModel, YamlPageModel, YamlConfig, Field, FieldModel, FieldListModel } from './config-schema';
+import { ConfigLoadError } from './config-errors';
 import {
     isListDataModel,
     isObjectListItems,
@@ -26,6 +27,7 @@ import { append, parseFile, readDirRecursively, reducePromise, rename } from '@s
 export type BaseModel = {
     name: string;
     __metadata?: {
+        filePath?: string;
         invalid?: boolean;
     };
 };
@@ -43,13 +45,6 @@ export interface ConfigNormalizedValidationError extends ConfigValidationError {
     normFieldPath: (string | number)[];
 }
 
-export interface ConfigLoadError {
-    name: 'ConfigLoadError';
-    message: string;
-    internalError?: Error;
-    normFieldPath?: undefined;
-}
-
 export type ConfigError = ConfigLoadError | ConfigNormalizedValidationError;
 
 export interface ConfigLoaderOptions {
@@ -63,69 +58,64 @@ export interface ConfigLoaderResult {
 }
 
 export async function loadConfig({ dirPath }: ConfigLoaderOptions): Promise<ConfigLoaderResult> {
-    let config;
+    let configLoadResult;
     try {
-        config = await loadConfigFromDir(dirPath);
+        configLoadResult = await loadConfigFromDir(dirPath);
     } catch (error) {
         return {
             valid: false,
             config: null,
-            errors: [
-                {
-                    name: 'ConfigLoadError',
-                    message: `Error loading Stackbit configuration: ${error.message}`,
-                    internalError: error
-                }
-            ]
+            errors: [new ConfigLoadError(`Error loading Stackbit configuration: ${error.message}`, { originalError: error })]
         };
     }
 
-    if (!config) {
+    if (!configLoadResult.config) {
         return {
             valid: false,
             config: null,
-            errors: [
-                {
-                    name: 'ConfigLoadError',
-                    message: 'stackbit.yaml not found, please refer Stackbit documentation: https://www.stackbit.com/docs/stackbit-yaml/'
-                }
-            ]
+            errors: configLoadResult.errors
         };
     }
 
-    config = normalizeConfig(config);
+    const config = normalizeConfig(configLoadResult.config);
     const validationResult = validate(config);
-    const normalizedConfig = convertToTypedConfig(validationResult);
-    const normalizedErrors = normalizeErrors(normalizedConfig, validationResult.errors);
+    const convertedResult = convertModelsToArray(validationResult);
+    const errors = [...configLoadResult.errors, ...convertedResult.errors];
     return {
         valid: validationResult.valid,
-        config: normalizedConfig,
-        errors: normalizedErrors
+        config: convertedResult.config,
+        errors: errors
     };
 }
 
-async function loadConfigFromDir(dirPath: string) {
-    let config = await loadConfigFromStackbitYaml(dirPath);
-    if (!config) {
-        return null;
+async function loadConfigFromDir(dirPath: string): Promise<{ config?: any; errors: ConfigLoadError[] }> {
+    let { config, error } = await loadConfigFromStackbitYaml(dirPath);
+    if (error) {
+        return { errors: [error] };
     }
-    const models = await loadExternalModels(dirPath, config);
-    config.models = _.assign(models, config.models);
-    return config;
+    const externalModelsResult = await loadExternalModels(dirPath, config);
+    config.models = _.assign(externalModelsResult.models, config.models);
+    return { config, errors: externalModelsResult.errors };
 }
 
-async function loadConfigFromStackbitYaml(dirPath: string): Promise<any> {
+type LoadConfigFromStackbitYamlResult = { config: any; error?: undefined } | { config?: undefined; error: ConfigLoadError };
+
+async function loadConfigFromStackbitYaml(dirPath: string): Promise<LoadConfigFromStackbitYamlResult> {
     const stackbitYamlPath = path.join(dirPath, 'stackbit.yaml');
     const stackbitYamlExists = await fse.pathExists(stackbitYamlPath);
     if (!stackbitYamlExists) {
-        return null;
+        return {
+            error: new ConfigLoadError('stackbit.yaml was not found, please refer Stackbit documentation: https://www.stackbit.com/docs/stackbit-yaml/')
+        };
     }
     const stackbitYaml = await fse.readFile(stackbitYamlPath);
     const config = yaml.load(stackbitYaml.toString('utf8'), { schema: yaml.JSON_SCHEMA });
     if (!config || typeof config !== 'object') {
-        return null;
+        return {
+            error: new ConfigLoadError('error parsing stackbit.yaml, please refer Stackbit documentation: https://www.stackbit.com/docs/stackbit-yaml/')
+        };
     }
-    return config;
+    return { config };
 }
 
 async function loadExternalModels(dirPath: string, config: any) {
@@ -149,19 +139,33 @@ async function loadExternalModels(dirPath: string, config: any) {
         );
         return reducePromise(
             modelFiles,
-            async (models: any, modelFile) => {
-                const model = await parseFile(path.join(dirPath, modelFile));
+            async (result: { models: any; errors: ConfigLoadError[] }, modelFile) => {
+                let model;
+                try {
+                    model = await parseFile(path.join(dirPath, modelFile));
+                } catch (error) {
+                    return {
+                        models: result.models,
+                        errors: result.errors.concat(new ConfigLoadError(`error parsing model, file: ${modelFile}`))
+                    };
+                }
                 const modelName = model.name;
                 if (!modelName) {
-                    return models;
+                    return {
+                        models: result.models,
+                        errors: result.errors.concat(new ConfigLoadError(`model does not have a name, file: ${modelFile}`))
+                    };
                 }
-                models[modelName] = _.omit(model, 'name');
-                return models;
+                result.models[modelName] = _.omit(model, 'name');
+                result.models[modelName].__metadata = {
+                    filePath: modelFile
+                };
+                return result;
             },
-            {}
+            { models: {}, errors: [] }
         );
     }
-    return null;
+    return { models: {}, errors: [] };
 }
 
 async function readModelFilesFromDir(modelsDir: string) {
@@ -305,6 +309,8 @@ function normalizeConfig(config: any): any {
         }
 
         // TODO: update schema-editor to not show type field
+        // TODO: do not add objectTypeKey field to models, API/container should
+        //  be able to add it automatically when data object or polymorphic nested model is added
         addObjectTypeKeyField(model, objectTypeKey, modelName);
     });
 
@@ -380,9 +386,11 @@ function getReferencedModelNames(field: any) {
     return referencedModelNames;
 }
 
-function convertToTypedConfig(validationResult: ConfigValidationResult): Config {
+function convertModelsToArray(validationResult: ConfigValidationResult): { config: Config, errors: ConfigNormalizedValidationError[] } {
     const config = _.cloneDeep(validationResult.value);
 
+    // get array of invalid model names by iterating errors and filtering these
+    // having fieldPath starting with ['models', modelName]
     const invalidModelNames = _.reduce(
         validationResult.errors,
         (modelNames: string[], error: ConfigValidationError) => {
@@ -395,11 +403,11 @@ function convertToTypedConfig(validationResult: ConfigValidationResult): Config 
         []
     );
 
-    // in stackbit.yaml 'models' are defined as object where keys are model names,
-    // convert 'models' to array of objects while 'name' property set to the
+    // in stackbit.yaml 'models' are defined as object where keys are the model names,
+    // convert 'models' to array of objects and set their 'name' property to the
     // model name
     const modelMap = config.models ?? {};
-    let models: Model[] = _.map(
+    let modelArray: Model[] = _.map(
         modelMap,
         (yamlModel: YamlModel, modelName: string): Model => {
             const model: Model = {
@@ -413,17 +421,10 @@ function convertToTypedConfig(validationResult: ConfigValidationResult): Config 
         }
     );
 
-    return {
-        ...config,
-        models: models
-    };
-}
-
-function normalizeErrors(config: Config, errors: ConfigValidationError[]): ConfigNormalizedValidationError[] {
-    return _.map(errors, (error: ConfigValidationError) => {
+    const convertedErrors = _.map(validationResult.errors, (error: ConfigValidationError) => {
         if (error.fieldPath[0] === 'models' && typeof error.fieldPath[1] == 'string') {
             const modelName = error.fieldPath[1];
-            const modelIndex = _.findIndex(config.models, { name: modelName });
+            const modelIndex = _.findIndex(modelArray, { name: modelName });
             const normFieldPath = error.fieldPath.slice();
             normFieldPath[1] = modelIndex;
             return {
@@ -436,4 +437,12 @@ function normalizeErrors(config: Config, errors: ConfigValidationError[]): Confi
             normFieldPath: error.fieldPath
         };
     });
+
+    return {
+        config: {
+            ...config,
+            models: modelArray,
+        },
+        errors: convertedErrors
+    };
 }

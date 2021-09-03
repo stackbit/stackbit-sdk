@@ -11,9 +11,9 @@ export {
     ConfigLoaderResult,
     Config,
     ConfigError,
-    ConfigLoadError,
     ConfigNormalizedValidationError
 } from './config/config-loader';
+export * from './config/config-errors';
 export { writeConfig, WriteConfigOptions, convertToYamlConfig } from './config/config-writer';
 export { loadContent, ContentItem, ContentLoaderOptions, ContentLoaderResult } from './content/content-loader';
 export { matchSSG, SSGMatcherOptions, SSGMatchResult } from './analyzer/ssg-matcher';

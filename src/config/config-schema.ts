@@ -362,6 +362,9 @@ interface BaseMatch {
 }
 
 const baseModelSchema = Joi.object({
+    __metadata: Joi.object({
+        filePath: Joi.string()
+    }),
     type: Joi.string().valid('page', 'data', 'config', 'object').required(),
     label: Joi.string().required().when(Joi.ref('/import'), { is: Joi.exist(), then: Joi.optional() }),
     description: Joi.string(),

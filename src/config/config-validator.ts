@@ -6,6 +6,7 @@ export interface ConfigValidationError {
     type: string;
     message: string;
     fieldPath: (string | number)[];
+    normFieldPath?: (string | number)[];
     value?: any;
 }
 
