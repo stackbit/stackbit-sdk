@@ -464,6 +464,7 @@ export interface YamlBaseModel {
     extends?: string | string[];
     labelField?: string;
     fieldGroups?: FieldGroupItem[];
+    variantField?: string;
     fields?: Field[];
 }
 
@@ -483,18 +484,17 @@ const baseModelSchema = Joi.object({
     extends: Joi.array().items(validObjectModelNames).single(),
     labelField: labelFieldSchema,
     fieldGroups: fieldGroupsSchema,
+    variantField: variantFieldSchema,
     fields: Joi.link('#fieldsSchema')
 });
 
 export interface YamlObjectModel extends YamlBaseModel {
     type: 'object';
-    variantField?: string;
 }
 
 const objectModelSchema = baseModelSchema.concat(
     Joi.object({
-        type: Joi.string().valid('object').required(),
-        variantField: variantFieldSchema
+        type: Joi.string().valid('object').required()
     })
 );
 
