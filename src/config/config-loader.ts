@@ -4,23 +4,23 @@ import yaml from 'js-yaml';
 import semver from 'semver';
 import _ from 'lodash';
 
-import { validate, ConfigValidationResult, ConfigValidationError } from './config-validator';
-import { YamlConfigModel, YamlDataModel, YamlModel, YamlObjectModel, YamlPageModel, YamlConfig, FieldModel, FieldObjectProps } from './config-schema';
+import { ConfigValidationError, ConfigValidationResult, validate } from './config-validator';
+import { FieldModel, FieldObjectProps, YamlConfig, YamlConfigModel, YamlDataModel, YamlModel, YamlObjectModel, YamlPageModel } from './config-schema';
 import { ConfigLoadError } from './config-errors';
 import {
-    isListDataModel,
-    isObjectListItems,
-    isObjectField,
-    StricterUnion,
-    isCustomModelField,
-    isModelField,
-    isReferenceField,
-    getListItemsField,
     assignLabelFieldIfNeeded,
     extendModelMap,
-    isPageModel,
+    getListItemsField,
+    isCustomModelField,
+    isListDataModel,
     isListField,
-    iterateModelFieldsRecursively
+    isModelField,
+    isObjectField,
+    isObjectListItems,
+    isPageModel,
+    isReferenceField,
+    iterateModelFieldsRecursively,
+    StricterUnion
 } from '../utils';
 import { append, parseFile, readDirRecursively, reducePromise, rename } from '@stackbit/utils';
 
@@ -398,20 +398,6 @@ function getReferencedModelNames(field: any) {
 function convertModelsToArray(validationResult: ConfigValidationResult): { config: Config; errors: ConfigNormalizedValidationError[] } {
     const config = _.cloneDeep(validationResult.value);
 
-    // get array of invalid model names by iterating errors and filtering these
-    // having fieldPath starting with ['models', modelName]
-    const invalidModelNames = _.reduce(
-        validationResult.errors,
-        (modelNames: string[], error: ConfigValidationError) => {
-            if (error.fieldPath[0] === 'models' && typeof error.fieldPath[1] == 'string') {
-                const modelName = error.fieldPath[1];
-                modelNames.push(modelName);
-            }
-            return modelNames;
-        },
-        []
-    );
-
     // in stackbit.yaml 'models' are defined as object where keys are the model names,
     // convert 'models' to array of objects and set their 'name' property to the
     // model name
@@ -419,14 +405,10 @@ function convertModelsToArray(validationResult: ConfigValidationResult): { confi
     let modelArray: Model[] = _.map(
         modelMap,
         (yamlModel: YamlModel, modelName: string): Model => {
-            const model: Model = {
+            return {
                 name: modelName,
                 ...yamlModel
             };
-            if (invalidModelNames.includes(modelName)) {
-                _.set(model, '__metadata.invalid', true);
-            }
-            return model;
         }
     );
 
