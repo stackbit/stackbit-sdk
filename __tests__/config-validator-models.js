@@ -6,9 +6,8 @@ const {
 } = require('./test-utils');
 
 
-describe('model names', () => {
-
-    test('model names must adhere naming rules', () => {
+describe('model name', () => {
+    test('should fail validation if set to illegal value', () => {
         expectValidationResultToMatchAllErrors(
             {
                 models: {
@@ -24,11 +23,10 @@ describe('model names', () => {
             ]
         );
     });
-
 });
 
-describe('model "type" must be valid', () => {
-    test('model without "type" property should fail validation', () => {
+describe('model "type" property', () => {
+    test('should fail validation if not defined', () => {
         expectValidationResultToMatchAllErrors(
             { models: { post: {} } },
             [
@@ -41,7 +39,7 @@ describe('model "type" must be valid', () => {
         );
     });
 
-    test('model with illegal "type" value should fail validation', () => {
+    test('should fail validation if set to illegal value', () => {
         expectValidationResultToMatchAllErrors(
             { models: { post: { type: 'illegal' } } },
             [
@@ -58,14 +56,13 @@ describe('model "type" must be valid', () => {
         { models: { post: { type: 'page', label: 'Post' } } },
         { models: { post: { type: 'data', label: 'Author' } } },
         { models: { post: { type: 'object', label: 'Button' } } }
-    ])('model with valid "type" value should pass validation', (config) => {
+    ])('should pass validation if set to valid value', (config) => {
         expectPassingValidation(config);
     });
 });
 
-describe('model "label" property is required', () => {
-
-    test('object model without "label" property should fail validation', () => {
+describe('model "label" property', () => {
+    test('should fail validation if not defined', () => {
         expectValidationResultToMatchAllErrors(
             {
                 models: {
@@ -84,7 +81,7 @@ describe('model "label" property is required', () => {
         );
     });
 
-    test('object model with "label" property should pass validation', () => {
+    test('should pass validation if defined', () => {
         expectPassingValidation({
             models: {
                 author: {
@@ -96,9 +93,8 @@ describe('model "label" property is required', () => {
     });
 });
 
-describe('model "extends" property references existing "object" model', () => {
-
-    test('model with "extends" property referencing non existing model should fail validation', () => {
+describe('model "extends" property', () => {
+    test('should fail validation when referencing non existing model', () => {
         expectValidationResultToMatchAllErrors(
             {
                 models: {
@@ -119,7 +115,7 @@ describe('model "extends" property references existing "object" model', () => {
         );
     });
 
-    test('model with "extends" property referencing non "object" model should fail validation', () => {
+    test('should fail validation when referencing an object other than "object" type', () => {
         expectValidationResultToMatchAllErrors(
             {
                 models: {
@@ -144,7 +140,7 @@ describe('model "extends" property references existing "object" model', () => {
         );
     });
 
-    test('model with "extends" property referenceing "object" model should pass validation', () => {
+    test('should pass validation when referencing a model of the "object" type', () => {
         expectPassingValidation({
             models: {
                 author: {
@@ -155,65 +151,6 @@ describe('model "extends" property references existing "object" model', () => {
                 person: {
                     type: 'object',
                     label: 'Person'
-                }
-            }
-        });
-    });
-});
-
-describe('"object" model "labelField" property references one of the model fields', () => {
-
-    test('"object" model with "labelField" property and without any fields should fail validation', () => {
-        expectValidationResultToMatchAllErrors(
-            {
-                models: {
-                    author: {
-                        type: 'object',
-                        label: 'Post',
-                        labelField: 'illegalField'
-                    }
-                }
-            },
-            [
-                {
-                    type: 'any.only',
-                    fieldPath: ['models', 'author', 'labelField'],
-                    message: 'models.author.labelField must be one of model field names, got "illegalField"'
-                }
-            ]
-        );
-    });
-
-    test('"object" model with "labelField" property referencing non existing fields should fail validation', () => {
-        expectValidationResultToMatchAllErrors(
-            {
-                models: {
-                    author: {
-                        type: 'object',
-                        label: 'Post',
-                        labelField: 'illegalField',
-                        fields: [{ type: 'string', name: 'someField' }]
-                    }
-                }
-            },
-            [
-                {
-                    type: 'any.only',
-                    fieldPath: ['models', 'author', 'labelField'],
-                    message: 'models.author.labelField must be one of model field names, got "illegalField"'
-                }
-            ]
-        );
-    })
-
-    test('"object" model with "labelField" property referencing an existing field should pass validation', () => {
-        expectPassingValidation({
-            models: {
-                author: {
-                    type: 'object',
-                    label: 'Post',
-                    labelField: 'someField',
-                    fields: [{ type: 'string', name: 'someField' }]
                 }
             }
         });

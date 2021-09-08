@@ -93,17 +93,17 @@ describe('stackbit.yaml default properties', () => {
         result = await loadConfig({ dirPath: stackbitYamlPath });
     });
 
-    test.skip('stackbit.yaml should sets "pageLayoutKey" to "layout" if not defined', () => {
+    test.skip('config loader should set "pageLayoutKey" to "layout" if not defined', () => {
         expect(result.valid).toBeTruthy();
         expect(result.config.pageLayoutKey).toEqual('layout');
     });
 
-    test.skip('stackbit.yaml should sets "objectTypeKey" to "type" if not defined', () => {
+    test.skip('config loader should set "objectTypeKey" to "type" if not defined', () => {
         expect(result.config.objectTypeKey).toEqual('type');
     });
 });
 
-describe('model extension', () => {
+describe('internal model fields', () => {
     let result;
     beforeAll(async () => {
         const stackbitYamlPath = path.join(__dirname, 'fixtures/model-extensions');
@@ -189,7 +189,7 @@ describe('model extension', () => {
     });
 });
 
-describe('field extension', () => {
+describe('default values for missing field properties', () => {
     let result;
     beforeAll(async () => {
         const stackbitYamlPath = path.join(__dirname, 'fixtures/model-extensions');

@@ -43,8 +43,6 @@ const fieldNameSchema = Joi.string()
     });
 
 const objectModelNameErrorCode = 'model.name.of.object.models';
-const documentModelNameErrorCode = 'model.name.of.document.models';
-
 const validObjectModelNames = Joi.custom((value, { error, state }) => {
     const models = _.last<YamlConfig>(state.ancestors)!.models ?? {};
     const modelNames = Object.keys(models);
@@ -53,8 +51,14 @@ const validObjectModelNames = Joi.custom((value, { error, state }) => {
         return error(objectModelNameErrorCode);
     }
     return value;
+}).prefs({
+    messages: {
+        [objectModelNameErrorCode]: '{{#label}} must reference the name of an existing model of type "object", got "{{#value}}"'
+    },
+    errors: { wrap: { label: false } }
 });
 
+const documentModelNameErrorCode = 'model.name.of.document.models';
 const validPageOrDataModelNames = Joi.custom((value, { error, state }) => {
     const models = _.last<YamlConfig>(state.ancestors)!.models ?? {};
     const modelNames = Object.keys(models);
@@ -63,6 +67,11 @@ const validPageOrDataModelNames = Joi.custom((value, { error, state }) => {
         return error(documentModelNameErrorCode);
     }
     return value;
+}).prefs({
+    messages: {
+        [documentModelNameErrorCode]: '{{#label}} must reference the name of an existing model of type "page" or "data", got "{{#value}}"',
+    },
+    errors: { wrap: { label: false } }
 });
 
 export type LogicField = string;
@@ -73,16 +82,53 @@ const logicField = Joi.string();
 //     return value;
 // });
 
-const inFields = Joi.string()
-    .valid(
-        Joi.in('fields', {
-            adjust: (fields) => (_.isArray(fields) ? fields.map((field) => field.name) : [])
-        })
-    )
-    .prefs({
-        messages: { 'any.only': '{{#label}} must be one of model field names, got "{{#value}}"' },
-        errors: { wrap: { label: false } }
-    });
+const labelFieldNotFoundError = 'labelField.not.found';
+const labelFieldNotSimple = 'labelField.not.simple';
+const labelFieldSchema = Joi.custom((value, { error, state }) => {
+    const modelOrObjectField: YamlBaseModel | FieldObjectProps = _.head(state.ancestors)!;
+    const fields = modelOrObjectField?.fields ?? [];
+    if (!_.isArray(fields)) {
+        return error(labelFieldNotFoundError);
+    }
+    const field = _.find(fields, (field) => field.name === value);
+    if (!field) {
+        return error(labelFieldNotFoundError);
+    }
+    if (['object', 'model', 'reference', 'list'].includes(field.type)) {
+        return error(labelFieldNotSimple, { fieldType: field.type });
+    }
+    return value;
+}).prefs({
+    messages: {
+        [labelFieldNotFoundError]: '{{#label}} must be one of model field names, got "{{#value}}"',
+        [labelFieldNotSimple]: '{{#label}} can not reference complex field, got "{{#value}}" field of type "{{#fieldType}}"'
+    },
+    errors: { wrap: { label: false } }
+});
+
+const variantFieldNotFoundError = 'variantField.not.found';
+const variantFieldNotEnum = 'variantField.not.enum';
+const variantFieldSchema = Joi.custom((value, { error, state }) => {
+    const modelOrObjectField: YamlBaseModel | FieldObjectProps = _.head(state.ancestors)!;
+    const fields = modelOrObjectField?.fields ?? [];
+    if (!_.isArray(fields)) {
+        return error(variantFieldNotFoundError);
+    }
+    const field = _.find(fields, (field) => field.name === value);
+    if (!field) {
+        return error(variantFieldNotFoundError);
+    }
+    if (field.type !== 'enum') {
+        return error(variantFieldNotEnum, { fieldType: field.type });
+    }
+    return value;
+}).prefs({
+    messages: {
+        [variantFieldNotFoundError]: '{{#label}} must be one of model field names, got "{{#value}}"',
+        [variantFieldNotEnum]: '{{#label}} should reference "enum" field, got "{{#value}}" field of type "{{#fieldType}}"'
+    },
+    errors: { wrap: { label: false } }
+});
 
 export interface ContentfulImport {
     type: 'contentful';
@@ -184,6 +230,7 @@ export interface FieldCommonProps {
     description?: string;
     required?: boolean;
     default?: unknown;
+    group?: string;
     const?: unknown;
     hidden?: boolean;
     readOnly?: boolean;
@@ -200,12 +247,15 @@ export type FieldSchemaEnumOptions = FieldEnumValue[] | FieldEnumOptionWithLabel
 
 export interface FieldEnumProps {
     type: 'enum';
+    controlType?: 'dropdown' | 'button-group' | 'thumbnails' | 'color-palette';
     options: FieldSchemaEnumOptions;
 }
 
 export interface FieldObjectProps {
     type: 'object';
     labelField?: string;
+    fieldGroups?: string;
+    variantField?: string;
     fields: Field[];
 }
 
@@ -263,6 +313,36 @@ export type FieldListReference = FieldList & { items?: FieldReferenceProps };
 
 export type Field = FieldPartialProps & FieldCommonProps;
 
+const fieldGroupsSchema = Joi.array()
+    .items(
+        Joi.object({
+            name: Joi.string().required(),
+            label: Joi.string().required()
+        })
+    )
+    .unique('name')
+    .prefs({
+        messages: {
+            'array.unique': '{{#label}} contains a duplicate group name "{{#value.name}}"'
+        },
+        errors: { wrap: { label: false } }
+    });
+
+const inGroups = Joi.string()
+    .valid(
+        // 4 dots "...." =>
+        //   ".." for the parent field where "group" property is defined
+        //   + "." for the fields array
+        //   + "." for the parent model
+        Joi.in('....fieldGroups', {
+            adjust: (groups) => (_.isArray(groups) ? groups.map((group) => group.name) : [])
+        })
+    )
+    .prefs({
+        messages: { 'any.only': '{{#label}} must be one of model field groups, got "{{#value}}"' },
+        errors: { wrap: { label: false } }
+    });
+
 const fieldCommonPropsSchema = Joi.object({
     type: Joi.string()
         .valid(...FIELD_TYPES)
@@ -272,6 +352,7 @@ const fieldCommonPropsSchema = Joi.object({
     description: Joi.string().allow(''),
     required: Joi.boolean(),
     default: Joi.any(),
+    group: inGroups,
     const: Joi.any(),
     hidden: Joi.boolean(),
     readOnly: Joi.boolean()
@@ -287,6 +368,7 @@ const numberFieldPartialSchema = Joi.object({
 
 const enumFieldPartialSchema = Joi.object({
     type: Joi.string().valid('enum').required(),
+    controlType: Joi.string().valid('dropdown', 'button-group', 'thumbnails', 'color-palette'),
     options: Joi.alternatives()
         .try(
             Joi.array().items(Joi.string(), Joi.number()),
@@ -306,7 +388,9 @@ const enumFieldPartialSchema = Joi.object({
 
 const objectFieldPartialSchema = Joi.object({
     type: Joi.string().valid('object').required(),
-    labelField: inFields,
+    labelField: labelFieldSchema,
+    fieldGroups: fieldGroupsSchema,
+    variantField: variantFieldSchema,
     fields: Joi.link('#fieldsSchema').required()
 });
 
@@ -347,11 +431,17 @@ const fieldSchema: Joi.ObjectSchema<Field> = fieldCommonPropsSchema.concat(parti
 
 const fieldsSchema = Joi.array().items(fieldSchema).unique('name').id('fieldsSchema');
 
+export interface FieldGroupItem {
+    name: string;
+    label: string;
+}
+
 export interface YamlBaseModel {
     label: string;
     description?: string;
     extends?: string | string[];
     labelField?: string;
+    fieldGroups?: FieldGroupItem[];
     fields?: Field[];
 }
 
@@ -369,17 +459,20 @@ const baseModelSchema = Joi.object({
     label: Joi.string().required().when(Joi.ref('/import'), { is: Joi.exist(), then: Joi.optional() }),
     description: Joi.string(),
     extends: Joi.array().items(validObjectModelNames).single(),
-    labelField: inFields,
+    labelField: labelFieldSchema,
+    fieldGroups: fieldGroupsSchema,
     fields: Joi.link('#fieldsSchema')
 });
 
 export interface YamlObjectModel extends YamlBaseModel {
     type: 'object';
+    variantField?: string;
 }
 
 const objectModelSchema = baseModelSchema.concat(
     Joi.object({
-        type: Joi.string().valid('object').required()
+        type: Joi.string().valid('object').required(),
+        variantField: variantFieldSchema
     })
 );
 
@@ -549,8 +642,6 @@ const modelsSchema = Joi.object<YamlModels>()
             [modelIsListItemsRequiredErrorCode]: '{{#label}} is required when "isList" is true',
             [modelIsListFieldsForbiddenErrorCode]: '{{#label}} is not allowed when "isList" is true',
             [modelListForbiddenErrorCode]: '{{#label}} is not allowed when "isList" is not true',
-            [objectModelNameErrorCode]: '{{#label}} must reference the name of an existing model of type "object", got "{{#value}}"',
-            [documentModelNameErrorCode]: '{{#label}} must reference the name of an existing model of type "page" or "data", got "{{#value}}"',
             [fieldNameUnique]: '{{#label}} contains a duplicate field name "{{#value.name}}"'
         },
         errors: { wrap: { label: false } }

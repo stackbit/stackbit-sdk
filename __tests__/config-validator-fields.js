@@ -33,7 +33,7 @@ function expectModelValidationResultToMatchAllErrors(model, expectedErrors, opti
     );
 }
 
-describe('model fields base rules', () => {
+describe('model fields naming rules', () => {
 
     test('model fields with non unique names should fail validation', () => {
         expectModelValidationResultToMatchAllErrors(
@@ -274,83 +274,7 @@ describe('object field', () => {
         );
     });
 
-    test.each([
-        'string', 'text', 'markdown', 'number', 'boolean'
-    ])('non object fields with "labelField" property should fail validation', (fieldType) => {
-        expectModelValidationResultToMatchAllErrors(
-            {
-                fields: [
-                    {
-                        type: fieldType,
-                        name: 'style',
-                        labelField: 'title'
-                    }
-                ]
-            },
-            [{
-                type: 'object.unknown',
-                fieldPath: ['models', 'button', 'fields', 0, 'labelField'],
-                message: 'models.button.fields[0].labelField is not allowed'
-            }]
-        );
-    });
-
-    test('"object" field with "labelField" property and without any fields should fail validation', () => {
-        expectModelValidationResultToMatchAllErrors(
-            {
-                fields: [
-                    {
-                        type: 'object',
-                        name: 'header',
-                        labelField: 'title',
-                        fields: []
-                    }
-                ]
-            },
-            [
-                { type: 'any.only', fieldPath: ['models', 'button', 'fields', 0, 'labelField'] }
-            ]
-        );
-    });
-
-    test('"object" field with "labelField" property referencing non existing fields should fail validation', () => {
-        expectModelValidationResultToMatchAllErrors(
-            {
-                fields: [
-                    {
-                        type: 'object',
-                        name: 'header',
-                        labelField: 'illegalField',
-                        fields: [{ type: 'string', name: 'title' }]
-                    }
-                ]
-            },
-            [
-                {
-                    type: 'any.only',
-                    fieldPath: ['models', 'button', 'fields', 0, 'labelField'],
-                    message: 'models.button.fields[0].labelField must be one of model field names, got "illegalField"'
-                }
-            ]
-        );
-    });
-
-    test('"object" field with "labelField" property referencing an existing field should pass validation', () => {
-        expectModelPassingValidation({
-            fields: [
-                {
-                    type: 'object',
-                    name: 'header',
-                    labelField: 'title',
-                    fields: [
-                        { type: 'string', name: 'title' }
-                    ]
-                }
-            ]
-        });
-    });
-
-    test('"object" field with nexted "object" field should pass validation', () => {
+    test('"object" field with nested "object" field should pass validation', () => {
         expectModelPassingValidation({
             fields: [
                 {

@@ -11,8 +11,10 @@ const minimalValidConfig = {
 
 module.exports = {
     expectPassingValidation,
+    expectModelPassingValidation,
     expectValidationResultToIncludeSingleError,
     expectValidationResultToMatchAllErrors,
+    expectModelValidationResultToMatchAllErrors,
     expectArrayToIncludeObjectContaining,
     inspectValidationResultErrors,
     getFieldOfModel
@@ -54,4 +56,26 @@ function inspectValidationResultErrors(result) {
 function getFieldOfModel(models, modelName, fieldName) {
     const model = _.find(models, { name: modelName });
     return _.find(model?.fields, { name: fieldName });
+}
+
+function expectModelPassingValidation(model, options) {
+    expectPassingValidation(getMinimalModel(model), options);
+}
+
+function expectModelValidationResultToMatchAllErrors(model, expectedErrors, options) {
+    expectValidationResultToMatchAllErrors(getMinimalModel(model), expectedErrors, options);
+}
+
+function getMinimalModel(model) {
+    return {
+        models: {
+            test_model: _.assign(
+                {
+                    type: 'object',
+                    label: 'Test Model'
+                },
+                model
+            )
+        }
+    };
 }
