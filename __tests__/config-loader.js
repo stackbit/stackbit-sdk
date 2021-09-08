@@ -54,7 +54,8 @@ test('load and override model files', async () => {
     const stackbitYamlPath = path.join(__dirname, 'fixtures/model-files');
     const result = await loadConfig({ dirPath: stackbitYamlPath });
     expect(result.valid).toBeTruthy();
-    expect(_.sortBy(result.config.models, 'name')).toMatchObject([
+    const models = _.sortBy(result.config.models, 'name');
+    expect(models).toMatchObject([
         {
             name: 'model_1',
             description: 'Model defined in stackbit.yaml'
@@ -82,6 +83,43 @@ test('load and override model files', async () => {
         {
             name: 'model_stackbit_2',
             description: 'Model defined in .stackbit/models overriden by stackbit.yaml'
+        }
+    ]);
+});
+
+test('load and normalize thumbnails', async () => {
+    const stackbitYamlPath = path.join(__dirname, 'fixtures/model-files');
+    const result = await loadConfig({ dirPath: stackbitYamlPath });
+    expect(result.valid).toBeTruthy();
+    const models = _.sortBy(result.config.models, 'name');
+    expect(models).toMatchObject([
+        {
+            name: 'model_1',
+            thumbnail: 'path/to/thumbnail.png'
+        },
+        {
+            name: 'model_components_1',
+            thumbnail: 'node_modules/@stackbit/components/models/path/to/thumbnail.png'
+        },
+        {
+            name: 'model_components_2',
+            thumbnail: 'path/to/thumbnail.png'
+        },
+        {
+            name: 'model_components_3',
+            thumbnail: '.stackbit/models/path/to/thumbnail.png'
+        },
+        {
+            name: 'model_components_4',
+            thumbnail: 'path/to/thumbnail.png'
+        },
+        {
+            name: 'model_stackbit_1',
+            thumbnail: '.stackbit/models/path/to/thumbnail.png'
+        },
+        {
+            name: 'model_stackbit_2',
+            thumbnail: 'path/to/thumbnail.png'
         }
     ]);
 });

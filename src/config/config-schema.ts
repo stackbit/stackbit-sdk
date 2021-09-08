@@ -254,6 +254,7 @@ export interface FieldEnumProps {
 export interface FieldObjectProps {
     type: 'object';
     labelField?: string;
+    thumbnail?: string;
     fieldGroups?: string;
     variantField?: string;
     fields: Field[];
@@ -411,6 +412,7 @@ const enumFieldPartialSchema = Joi.object({
 const objectFieldPartialSchema = Joi.object({
     type: Joi.string().valid('object').required(),
     labelField: labelFieldSchema,
+    thumbnail: Joi.string(),
     fieldGroups: fieldGroupsSchema,
     variantField: variantFieldSchema,
     fields: Joi.link('#fieldsSchema').required()
@@ -459,8 +461,12 @@ export interface FieldGroupItem {
 }
 
 export interface YamlBaseModel {
+    __metadata?: {
+        filePath?: string;
+    },
     label: string;
     description?: string;
+    thumbnail?: string;
     extends?: string | string[];
     labelField?: string;
     fieldGroups?: FieldGroupItem[];
@@ -481,6 +487,7 @@ const baseModelSchema = Joi.object({
     type: Joi.string().valid('page', 'data', 'config', 'object').required(),
     label: Joi.string().required().when(Joi.ref('/import'), { is: Joi.exist(), then: Joi.optional() }),
     description: Joi.string(),
+    thumbnail: Joi.string(),
     extends: Joi.array().items(validObjectModelNames).single(),
     labelField: labelFieldSchema,
     fieldGroups: fieldGroupsSchema,

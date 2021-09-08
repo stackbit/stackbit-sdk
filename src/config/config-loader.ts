@@ -5,7 +5,7 @@ import semver from 'semver';
 import _ from 'lodash';
 
 import { validate, ConfigValidationResult, ConfigValidationError } from './config-validator';
-import { YamlConfigModel, YamlDataModel, YamlModel, YamlObjectModel, YamlPageModel, YamlConfig, Field, FieldModel, FieldListModel } from './config-schema';
+import { YamlConfigModel, YamlDataModel, YamlModel, YamlObjectModel, YamlPageModel, YamlConfig, FieldModel, FieldObjectProps } from './config-schema';
 import { ConfigLoadError } from './config-errors';
 import {
     isListDataModel,
@@ -252,6 +252,8 @@ function normalizeConfig(config: any): any {
             assignLabelFieldIfNeeded(model);
         }
 
+        normalizeThumbnailPathForModel(model, model?.__metadata?.filePath);
+
         iterateModelFieldsRecursively(model, (field: any, fieldPath) => {
             // add field label if label is not set
             if (!_.has(field, 'label')) {
@@ -268,6 +270,7 @@ function normalizeConfig(config: any): any {
 
             if (isObjectField(field)) {
                 assignLabelFieldIfNeeded(field);
+                normalizeThumbnailPathForModel(field, model?.__metadata?.filePath);
             } else if (isCustomModelField(field, models)) {
                 // stackbit v0.2.0 compatibility
                 // convert the old custom model field type: { type: 'action' }
@@ -361,6 +364,12 @@ function addObjectTypeKeyField(model: any, objectTypeKey: string, modelName: str
     });
 }
 
+function normalizeThumbnailPathForModel(modelOrField: Model | FieldObjectProps, filePath: string | undefined) {
+    if (modelOrField.thumbnail && filePath) {
+        modelOrField.thumbnail = path.join(path.dirname(filePath), modelOrField.thumbnail);
+    }
+}
+
 /**
  * Returns model names referenced by polymorphic 'model' and 'reference' fields.
  * That is, fields that can hold objects of different types.
@@ -386,7 +395,7 @@ function getReferencedModelNames(field: any) {
     return referencedModelNames;
 }
 
-function convertModelsToArray(validationResult: ConfigValidationResult): { config: Config, errors: ConfigNormalizedValidationError[] } {
+function convertModelsToArray(validationResult: ConfigValidationResult): { config: Config; errors: ConfigNormalizedValidationError[] } {
     const config = _.cloneDeep(validationResult.value);
 
     // get array of invalid model names by iterating errors and filtering these
@@ -441,7 +450,7 @@ function convertModelsToArray(validationResult: ConfigValidationResult): { confi
     return {
         config: {
             ...config,
-            models: modelArray,
+            models: modelArray
         },
         errors: convertedErrors
     };

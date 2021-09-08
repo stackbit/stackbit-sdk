@@ -2,6 +2,7 @@ name: model_stackbit_1
 type: object
 label: Model Stackbit 1
 description: Model defined in .stackbit/models
+thumbnail: path/to/thumbnail.png
 fields:
   - type: string
     name: title

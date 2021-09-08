@@ -6,6 +6,7 @@ models:
     type: object
     label: Model 1
     description: Model defined in stackbit.yaml
+    thumbnail: path/to/thumbnail.png
     fields:
       - type: string
         name: title
@@ -13,6 +14,7 @@ models:
     type: object
     label: Model 2
     description: Model defined in .stackbit/models overriden by stackbit.yaml
+    thumbnail: path/to/thumbnail.png
     fields:
       - type: string
         name: title
@@ -20,6 +22,7 @@ models:
     type: object
     label: Model 3
     description: Model defined in @stackbit/components, overriden by .stackbit/models, overriden by stackbit.yaml
+    thumbnail: path/to/thumbnail.png
     fields:
       - type: string
         name: title
@@ -27,6 +30,7 @@ models:
     type: object
     label: Model 3
     description: Model defined in @stackbit/components, overriden by stackbit.yaml
+    thumbnail: path/to/thumbnail.png
     fields:
       - type: string
         name: title
