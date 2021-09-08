@@ -3,7 +3,7 @@ const { describe, expect, test } = require('@jest/globals');
 const {
     expectPassingValidation,
     expectValidationResultToMatchAllErrors
-} = require('./test-utils');
+} = require('../test-utils');
 
 
 describe('model name', () => {
