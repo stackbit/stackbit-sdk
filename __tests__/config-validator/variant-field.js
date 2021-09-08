@@ -70,9 +70,7 @@ describe('model "variantField" value', () => {
                     }
                 ]
             },
-            [
-                { type: 'variantField.not.found', fieldPath: ['models', 'test_model', 'fields', 0, 'variantField'] }
-            ]
+            [{ type: 'variantField.not.found', fieldPath: ['models', 'test_model', 'fields', 0, 'variantField'] }]
         );
     });
 
@@ -127,9 +125,7 @@ describe('model "variantField" value', () => {
                     type: 'object',
                     name: 'header',
                     variantField: 'enumField',
-                    fields: [
-                        { type: 'enum', name: 'enumField', options: [] }
-                    ]
+                    fields: [{ type: 'enum', name: 'enumField', options: [] }]
                 }
             ]
         });

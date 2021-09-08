@@ -69,7 +69,7 @@ const validPageOrDataModelNames = Joi.custom((value, { error, state }) => {
     return value;
 }).prefs({
     messages: {
-        [documentModelNameErrorCode]: '{{#label}} must reference the name of an existing model of type "page" or "data", got "{{#value}}"',
+        [documentModelNameErrorCode]: '{{#label}} must reference the name of an existing model of type "page" or "data", got "{{#value}}"'
     },
     errors: { wrap: { label: false } }
 });
@@ -247,7 +247,7 @@ export type FieldSchemaEnumOptions = FieldEnumValue[] | FieldEnumOptionWithLabel
 
 export interface FieldEnumProps {
     type: 'enum';
-    controlType?: 'dropdown' | 'button-group' | 'thumbnails' | 'color-palette';
+    controlType?: 'dropdown' | 'button-group' | 'thumbnails' | 'palette';
     options: FieldSchemaEnumOptions;
 }
 
@@ -366,22 +366,44 @@ const numberFieldPartialSchema = Joi.object({
     step: Joi.number()
 });
 
+const enumFieldBaseOptionSchema = Joi.object({
+    label: Joi.string().required(),
+    value: Joi.alternatives().try(Joi.string(), Joi.number()).required()
+});
+
 const enumFieldPartialSchema = Joi.object({
     type: Joi.string().valid('enum').required(),
-    controlType: Joi.string().valid('dropdown', 'button-group', 'thumbnails', 'color-palette'),
-    options: Joi.alternatives()
-        .try(
-            Joi.array().items(Joi.string(), Joi.number()),
-            Joi.array().items(
-                Joi.object({
-                    label: Joi.string().required(),
-                    value: Joi.alternatives().try(Joi.string(), Joi.number()).required()
-                })
-            )
-        )
+    controlType: Joi.string().valid('dropdown', 'button-group', 'thumbnails', 'palette'),
+    options: Joi.any()
+        .when('..controlType', {
+            switch: [
+                {
+                    is: 'thumbnails',
+                    then: Joi.array().items(
+                        enumFieldBaseOptionSchema.append({
+                            thumbnail: Joi.string().required()
+                        })
+                    )
+                },
+                {
+                    is: 'palette',
+                    then: Joi.array().items(
+                        enumFieldBaseOptionSchema.append({
+                            textColor: Joi.string(),
+                            backgroundColor: Joi.string(),
+                            borderColor: Joi.string()
+                        })
+                    )
+                }
+            ],
+            otherwise: Joi.alternatives().try(Joi.array().items(Joi.string(), Joi.number()), Joi.array().items(enumFieldBaseOptionSchema))
+        })
         .required()
         .prefs({
-            messages: { 'alternatives.types': '{{#label}} must be an array of strings or numbers, or array of objects with label and value properties' },
+            messages: {
+                'alternatives.types': '{{#label}} must be an array of strings or numbers, or an array of objects with label and value properties',
+                'alternatives.match': '{{#label}} must be an array of strings or numbers, or an array of objects with label and value properties'
+            },
             errors: { wrap: { label: false } }
         })
 });
