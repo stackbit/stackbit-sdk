@@ -12,7 +12,10 @@ import {
     FieldObjectProps,
     FieldListObject,
     FieldListModel,
-    FieldListReference, FieldReferenceProps, FieldModelProps
+    FieldListReference,
+    FieldReferenceProps,
+    FieldModelProps,
+    FieldEnum
 } from '../config/config-schema';
 
 export function getModelByName(models: Model[], modelName: string): Model | undefined {
@@ -65,6 +68,10 @@ export function isReferenceField(field: Field): field is FieldReference {
 export function isCustomModelField(field: Field, modelsByName: Record<string, Model>) {
     // custom model field types are deprecated
     return !FIELD_TYPES.includes(field.type) && _.has(modelsByName, field.type);
+}
+
+export function isEnumField(field: Field): field is FieldEnum {
+    return field.type === 'enum';
 }
 
 export function isListOfObjectsField(field: Field): field is FieldListObject {

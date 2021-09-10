@@ -236,20 +236,42 @@ export interface FieldCommonProps {
     readOnly?: boolean;
 }
 
-export type FieldEnumValue = string | number;
+export type FieldEnumOptionValue = string | number;
 
-export interface FieldEnumOptionWithLabel {
+export interface FieldEnumOptionObject {
     label: string;
-    value: FieldEnumValue;
+    value: FieldEnumOptionValue;
 }
 
-export type FieldSchemaEnumOptions = FieldEnumValue[] | FieldEnumOptionWithLabel[];
+export interface FieldEnumOptionThumbnails extends FieldEnumOptionObject {
+    thumbnail?: string;
+}
 
-export interface FieldEnumProps {
+export interface FieldEnumOptionPalette extends FieldEnumOptionObject {
+    textColor?: string;
+    backgroundColor?: string;
+    borderColor?: string;
+}
+
+export interface FieldEnumDropdownProps {
     type: 'enum';
-    controlType?: 'dropdown' | 'button-group' | 'thumbnails' | 'palette';
-    options: FieldSchemaEnumOptions;
+    controlType?: 'dropdown' | 'button-group';
+    options: FieldEnumOptionValue[] | FieldEnumOptionObject[];
 }
+
+export interface FieldEnumThumbnailsProps {
+    type: 'enum';
+    controlType: 'thumbnails';
+    options: FieldEnumOptionThumbnails[];
+}
+
+export interface FieldEnumPaletteProps {
+    type: 'enum';
+    controlType: 'palette';
+    options: FieldEnumOptionPalette[];
+}
+
+export type FieldEnumProps = FieldEnumDropdownProps | FieldEnumThumbnailsProps | FieldEnumPaletteProps;
 
 export interface FieldObjectProps {
     type: 'object';
@@ -463,7 +485,7 @@ export interface FieldGroupItem {
 export interface YamlBaseModel {
     __metadata?: {
         filePath?: string;
-    },
+    };
     label: string;
     description?: string;
     thumbnail?: string;

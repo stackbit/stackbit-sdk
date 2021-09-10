@@ -6,8 +6,8 @@ import {
     Field,
     FieldNumberProps,
     FieldEnumProps,
-    FieldEnumValue,
-    FieldEnumOptionWithLabel,
+    FieldEnumOptionValue,
+    FieldEnumOptionObject,
     FieldObjectProps,
     FieldModelProps,
     FieldReferenceProps,
@@ -159,7 +159,7 @@ export type FieldPropsByType = {
 const FieldSchemas: { [fieldType in keyof FieldPropsByType]: (field: FieldPropsByType[fieldType], fieldPath: FieldPath) => Joi.Schema } = {
     enum: (field) => {
         if (field.options) {
-            const values = (field.options as (FieldEnumValue | FieldEnumOptionWithLabel)[]).map((option) =>
+            const values = field.options.map((option: FieldEnumOptionValue | FieldEnumOptionObject) =>
                 typeof option === 'number' || typeof option === 'string' ? option : option.value
             );
             return Joi.valid(...values);

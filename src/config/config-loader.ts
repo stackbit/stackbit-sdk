@@ -5,13 +5,24 @@ import semver from 'semver';
 import _ from 'lodash';
 
 import { ConfigValidationError, ConfigValidationResult, validate } from './config-validator';
-import { FieldModel, FieldObjectProps, YamlConfig, YamlConfigModel, YamlDataModel, YamlModel, YamlObjectModel, YamlPageModel } from './config-schema';
+import {
+    FieldEnum,
+    FieldModel,
+    FieldObjectProps,
+    YamlConfig,
+    YamlConfigModel,
+    YamlDataModel,
+    YamlModel,
+    YamlObjectModel,
+    YamlPageModel
+} from './config-schema';
 import { ConfigLoadError } from './config-errors';
 import {
     assignLabelFieldIfNeeded,
     extendModelMap,
     getListItemsField,
     isCustomModelField,
+    isEnumField,
     isListDataModel,
     isListField,
     isModelField,
@@ -271,6 +282,8 @@ function normalizeConfig(config: any): any {
             if (isObjectField(field)) {
                 assignLabelFieldIfNeeded(field);
                 normalizeThumbnailPathForModel(field, model?.__metadata?.filePath);
+            } else if (isEnumField(field)) {
+                normalizeThumbnailPathForEnumField(field, model?.__metadata?.filePath);
             } else if (isCustomModelField(field, models)) {
                 // stackbit v0.2.0 compatibility
                 // convert the old custom model field type: { type: 'action' }
@@ -367,6 +380,16 @@ function addObjectTypeKeyField(model: any, objectTypeKey: string, modelName: str
 function normalizeThumbnailPathForModel(modelOrField: Model | FieldObjectProps, filePath: string | undefined) {
     if (modelOrField.thumbnail && filePath) {
         modelOrField.thumbnail = path.join(path.dirname(filePath), modelOrField.thumbnail);
+    }
+}
+
+function normalizeThumbnailPathForEnumField(enumField: FieldEnum, filePath: string | undefined) {
+    if (enumField.controlType === 'thumbnails' && filePath) {
+        _.forEach(enumField.options, (option) => {
+            if (option.thumbnail) {
+                option.thumbnail = path.join(path.dirname(filePath), option.thumbnail);
+            }
+        });
     }
 }
 

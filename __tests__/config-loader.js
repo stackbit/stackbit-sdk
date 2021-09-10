@@ -90,38 +90,122 @@ test('load and override model files', async () => {
 test('load and normalize thumbnails', async () => {
     const stackbitYamlPath = path.join(__dirname, 'fixtures/model-files');
     const result = await loadConfig({ dirPath: stackbitYamlPath });
-    expect(result.valid).toBeTruthy();
     const models = _.sortBy(result.config.models, 'name');
     expect(models).toMatchObject([
         {
             name: 'model_1',
-            thumbnail: 'path/to/thumbnail.png'
+            thumbnail: 'path/to/thumbnail.png',
+            fields: [
+                {
+                    type: 'enum',
+                    name: 'enum_field',
+                    options: [
+                        {
+                            value: 'thumbnail_1',
+                            thumbnail: 'path/to/thumbnail.png'
+                        }
+                    ]
+                }
+            ]
         },
         {
             name: 'model_components_1',
-            thumbnail: 'node_modules/@stackbit/components/models/path/to/thumbnail.png'
+            thumbnail: 'node_modules/@stackbit/components/models/path/to/thumbnail.png',
+            fields: [
+                {
+                    type: 'enum',
+                    name: 'enum_field',
+                    options: [
+                        {
+                            value: 'thumbnail_1',
+                            thumbnail: 'node_modules/@stackbit/components/models/path/to/thumbnail.png'
+                        }
+                    ]
+                }
+            ]
         },
         {
             name: 'model_components_2',
-            thumbnail: 'path/to/thumbnail.png'
+            thumbnail: 'path/to/thumbnail.png',
+            fields: [
+                {
+                    type: 'enum',
+                    name: 'enum_field',
+                    options: [
+                        {
+                            value: 'thumbnail_1',
+                            thumbnail: 'path/to/thumbnail.png'
+                        }
+                    ]
+                }
+            ]
         },
         {
             name: 'model_components_3',
-            thumbnail: '.stackbit/models/path/to/thumbnail.png'
+            thumbnail: '.stackbit/models/path/to/thumbnail.png',
+            fields: [
+                {
+                    type: 'enum',
+                    name: 'enum_field',
+                    options: [
+                        {
+                            value: 'thumbnail_1',
+                            thumbnail: '.stackbit/models/path/to/thumbnail.png'
+                        }
+                    ]
+                }
+            ]
         },
         {
             name: 'model_components_4',
-            thumbnail: 'path/to/thumbnail.png'
+            thumbnail: 'path/to/thumbnail.png',
+            fields: [
+                {
+                    type: 'enum',
+                    name: 'enum_field',
+                    options: [
+                        {
+                            value: 'thumbnail_1',
+                            thumbnail: 'path/to/thumbnail.png'
+                        }
+                    ]
+                }
+            ]
         },
         {
             name: 'model_stackbit_1',
-            thumbnail: '.stackbit/models/path/to/thumbnail.png'
+            thumbnail: '.stackbit/models/path/to/thumbnail.png',
+            fields: [
+                {
+                    type: 'enum',
+                    name: 'enum_field',
+                    options: [
+                        {
+                            value: 'thumbnail_1',
+                            thumbnail: '.stackbit/models/path/to/thumbnail.png'
+                        }
+                    ]
+                }
+            ]
         },
         {
             name: 'model_stackbit_2',
-            thumbnail: 'path/to/thumbnail.png'
+            thumbnail: 'path/to/thumbnail.png',
+            fields: [
+                {
+                    type: 'enum',
+                    name: 'enum_field',
+                    options: [
+                        {
+                            value: 'thumbnail_1',
+                            thumbnail: 'path/to/thumbnail.png'
+                        }
+                    ]
+                }
+            ]
         }
     ]);
+    expect(result.valid).toBeTruthy();
 });
 
 describe('stackbit.yaml default properties', () => {
@@ -148,7 +232,7 @@ describe('internal model fields', () => {
         result = await loadConfig({ dirPath: stackbitYamlPath });
     });
 
-    test.skip('page model with a "layout" property should add "layout" (pageLayoutKey) field', () => {
+    test('page model with "layout" property should be extended with "layout" (pageLayoutKey) field if not defined', () => {
         expect(_.find(result.config.models, ['name', 'page_1'])).toMatchObject({
             name: 'page_1',
             layout: 'layout_1',
@@ -202,7 +286,7 @@ describe('internal model fields', () => {
         });
     });
 
-    test.skip('referenced data objects should add "type" (objectTypeKey) field if not defined', () => {
+    test('models referenced from "reference" fields should be extended with "type" (objectTypeKey) field if not defined', () => {
         expect(_.find(result.config.models, ['name', 'object_2'])).toMatchObject({
             name: 'object_2',
             fields: expect.arrayContaining([
@@ -313,7 +397,7 @@ describe('default values for missing field properties', () => {
                     }
                 })
             ])
-        })
+        });
     });
 });
 
@@ -324,7 +408,7 @@ describe('stackbit.yaml v0.2.0', () => {
         result = await loadConfig({ dirPath: stackbitYamlPath });
     });
 
-    test.skip('page model with a "template" property should convert it to "layout" property', () => {
+    test('page model with a "template" property should convert it to "layout" property', () => {
         expect(_.find(result.config.models, ['name', 'page_1'])).toMatchObject({
             name: 'page_1',
             layout: 'layout_1',

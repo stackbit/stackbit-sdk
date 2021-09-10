@@ -4,5 +4,10 @@ label: Model Stackbit 4
 description: Model defined in @stackbit/components, overriden by .stackbit/models
 thumbnail: path/to/thumbnail.png
 fields:
-  - type: string
-    name: title
+  - type: enum
+    name: enum_field
+    controlType: thumbnails
+    options:
+      - value: thumbnail_1
+        label: Thumbnail 1
+        thumbnail: path/to/thumbnail.png

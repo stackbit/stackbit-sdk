@@ -8,29 +8,49 @@ models:
     description: Model defined in stackbit.yaml
     thumbnail: path/to/thumbnail.png
     fields:
-      - type: string
-        name: title
+      - type: enum
+        name: enum_field
+        controlType: thumbnails
+        options:
+          - value: thumbnail_1
+            label: Thumbnail 1
+            thumbnail: path/to/thumbnail.png
   model_stackbit_2:
     type: object
     label: Model 2
     description: Model defined in .stackbit/models overriden by stackbit.yaml
     thumbnail: path/to/thumbnail.png
     fields:
-      - type: string
-        name: title
+      - type: enum
+        name: enum_field
+        controlType: thumbnails
+        options:
+          - value: thumbnail_1
+            label: Thumbnail 1
+            thumbnail: path/to/thumbnail.png
   model_components_2:
     type: object
     label: Model 3
     description: Model defined in @stackbit/components, overriden by .stackbit/models, overriden by stackbit.yaml
     thumbnail: path/to/thumbnail.png
     fields:
-      - type: string
-        name: title
+      - type: enum
+        name: enum_field
+        controlType: thumbnails
+        options:
+          - value: thumbnail_1
+            label: Thumbnail 1
+            thumbnail: path/to/thumbnail.png
   model_components_4:
     type: object
     label: Model 3
     description: Model defined in @stackbit/components, overriden by stackbit.yaml
     thumbnail: path/to/thumbnail.png
     fields:
-      - type: string
-        name: title
+      - type: enum
+        name: enum_field
+        controlType: thumbnails
+        options:
+          - value: thumbnail_1
+            label: Thumbnail 1
+            thumbnail: path/to/thumbnail.png
