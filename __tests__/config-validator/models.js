@@ -107,7 +107,7 @@ describe('model "extends" property', () => {
             },
             [
                 {
-                    type: 'model.name.of.object.models',
+                    type: 'model.not.object.model',
                     fieldPath: ['models', 'author', 'extends'],
                     message: 'models.author.extends must reference the name of an existing model of type "object", got "person"'
                 }
@@ -132,7 +132,7 @@ describe('model "extends" property', () => {
             },
             [
                 {
-                    type: 'model.name.of.object.models',
+                    type: 'model.not.object.model',
                     fieldPath: ['models', 'author', 'extends'],
                     message: 'models.author.extends must reference the name of an existing model of type "object", got "post"'
                 }

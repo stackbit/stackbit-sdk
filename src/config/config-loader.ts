@@ -90,6 +90,7 @@ export async function loadConfig({ dirPath }: ConfigLoaderOptions): Promise<Conf
 
     const config = normalizeConfig(configLoadResult.config);
     const validationResult = validate(config);
+    convertModelCategoriesToModels(validationResult);
     const convertedResult = convertModelsToArray(validationResult);
     const errors = [...configLoadResult.errors, ...convertedResult.errors];
     return {
@@ -416,6 +417,51 @@ function getReferencedModelNames(field: any) {
         referencedModelNames = _.union(referencedModelNames, modelNames);
     }
     return referencedModelNames;
+}
+
+function convertModelCategoriesToModels(validationResult: ConfigValidationResult) {
+    const models = validationResult.value?.models ?? {};
+
+    const categoryMap = _.reduce(models, (categoryMap, model, modelName) => {
+        if (!model.categories) {
+            return categoryMap;
+        }
+        let key = model?.type === 'object' ? 'objectModels' : 'documentModels';
+        _.forEach(model.categories, (categoryName) => {
+            append(categoryMap, [categoryName, key], modelName);
+        });
+        delete model.categories;
+        return categoryMap;
+    }, {} as Record<string, { objectModels?: string[], documentModels?: string[] }>);
+
+    _.forEach(categoryMap, (category, categoryName) => {
+        _.forEach(category, (modelCategory, key) => {
+            _.set(category, key, _.uniq(modelCategory));
+        });
+    });
+
+    _.forEach(models, (model) => {
+        iterateModelFieldsRecursively(model, (field: any) => {
+            if (isListField(field)) {
+                field = getListItemsField(field);
+            }
+            if (field.categories) {
+                let key: string | null = null;
+                if (isModelField(field)) {
+                    key = 'objectModels';
+                } else if (isReferenceField(field)) {
+                    key = 'documentModels';
+                }
+                if (key) {
+                    field.models = _.reduce(field.categories, (modelNames, categoryName) => {
+                        const objectModelNames = _.get(categoryMap, [categoryName, key], []);
+                        return _.uniq(modelNames.concat(objectModelNames));
+                    }, field.models || []);
+                }
+                delete field.categories;
+            }
+        });
+    })
 }
 
 function convertModelsToArray(validationResult: ConfigValidationResult): { config: Config; errors: ConfigNormalizedValidationError[] } {

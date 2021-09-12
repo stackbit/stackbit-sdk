@@ -478,6 +478,18 @@ describe('model and reference fields', () => {
         });
     });
 
+    test.each(['model', 'reference'])('"model" and "reference" fields with "categories" instead of "models" should pass validation', (fieldType) => {
+        expectModelPassingValidation({
+            fields: [
+                {
+                    type: fieldType,
+                    name: 'style',
+                    categories: []
+                }
+            ]
+        });
+    });
+
     test('"model" field referencing non existing "models" should fail validation', () => {
         expectModelValidationResultToMatchAllErrors(
             {
@@ -491,7 +503,7 @@ describe('model and reference fields', () => {
             },
             [
                 {
-                    type: 'model.name.of.object.models',
+                    type: 'model.not.object.model',
                     fieldPath: ['models', 'test_model', 'fields', 0, 'models', 0],
                     message: 'models.test_model.fields[0].models[0] must reference the name of an existing model of type "object", got "no_such_model"'
                 }
@@ -512,7 +524,7 @@ describe('model and reference fields', () => {
             },
             [
                 {
-                    type: 'model.name.of.document.models',
+                    type: 'model.not.document.model',
                     fieldPath: ['models', 'test_model', 'fields', 0, 'models', 0],
                     message: 'models.test_model.fields[0].models[0] must reference the name of an existing model of type "page" or "data", got "no_such_model"'
                 }
@@ -543,7 +555,7 @@ describe('model and reference fields', () => {
             },
             [
                 {
-                    type: 'model.name.of.object.models',
+                    type: 'model.not.object.model',
                     fieldPath: ['models', 'test_model', 'fields', 0, 'models', 0],
                     message: 'models.test_model.fields[0].models[0] must reference the name of an existing model of type "object", got "post"'
                 }
@@ -574,7 +586,7 @@ describe('model and reference fields', () => {
             },
             [
                 {
-                    type: 'model.name.of.document.models',
+                    type: 'model.not.document.model',
                     fieldPath: ['models', 'test_model', 'fields', 0, 'models', 0],
                     message: 'models.test_model.fields[0].models[0] must reference the name of an existing model of type "page" or "data", got "style"'
                 }

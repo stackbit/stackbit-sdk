@@ -1,5 +1,6 @@
 import Joi from 'joi';
 import _ from 'lodash';
+import { append } from '@stackbit/utils';
 import { StricterUnion } from '../utils';
 
 // SSGs Stackbit Stuio supports
@@ -42,9 +43,10 @@ const fieldNameSchema = Joi.string()
         errors: { wrap: { label: false } }
     });
 
-const objectModelNameErrorCode = 'model.name.of.object.models';
+const objectModelNameErrorCode = 'model.not.object.model';
 const validObjectModelNames = Joi.custom((value, { error, state }) => {
-    const models = _.last<YamlConfig>(state.ancestors)!.models ?? {};
+    const config: YamlConfig = _.last(state.ancestors)!;
+    const models = config.models ?? {};
     const modelNames = Object.keys(models);
     const objectModelNames = modelNames.filter((modelName) => models[modelName]!.type === 'object');
     if (!objectModelNames.includes(value)) {
@@ -58,9 +60,10 @@ const validObjectModelNames = Joi.custom((value, { error, state }) => {
     errors: { wrap: { label: false } }
 });
 
-const documentModelNameErrorCode = 'model.name.of.document.models';
+const documentModelNameErrorCode = 'model.not.document.model';
 const validPageOrDataModelNames = Joi.custom((value, { error, state }) => {
-    const models = _.last<YamlConfig>(state.ancestors)!.models ?? {};
+    const config: YamlConfig = _.last(state.ancestors)!;
+    const models = config.models ?? {};
     const modelNames = Object.keys(models);
     const documentModels = modelNames.filter((modelName) => ['page', 'data'].includes(models[modelName]!.type));
     if (!documentModels.includes(value)) {
@@ -73,6 +76,69 @@ const validPageOrDataModelNames = Joi.custom((value, { error, state }) => {
     },
     errors: { wrap: { label: false } }
 });
+
+const categoryNotFoundErrorCode = 'category.not.found';
+const categoryNotObjectModelErrorCode = 'category.not.object.model';
+const validModelFieldCategories = Joi.string()
+    .custom((category, { error, state }) => {
+        const config: YamlConfig = _.last(state.ancestors)!;
+        const categoryModels = getModelNamesForCategory(category, config);
+        if (!_.isEmpty(categoryModels.documentModels)) {
+            return error(categoryNotObjectModelErrorCode, { nonObjectModels: categoryModels.documentModels.join(', ') });
+        }
+        if (_.isEmpty(categoryModels.objectModels)) {
+            return error(categoryNotFoundErrorCode);
+        }
+        return category;
+    })
+    .prefs({
+        messages: {
+            [categoryNotObjectModelErrorCode]:
+                '{{#label}} of a "model" field must reference a category with only models of type "object", the "{{#value}}" category includes models of type "page" or "data" ({{#nonObjectModels}})',
+            [categoryNotFoundErrorCode]: '{{#label}} of a "model" field must reference the name of an existing category, got "{{#value}}"'
+        },
+        errors: { wrap: { label: false } }
+    });
+
+const categoryNotDocumentModelErrorCode = 'category.not.document.model';
+const validReferenceFieldCategories = Joi.string()
+    .custom((category, { error, state }) => {
+        const config: YamlConfig = _.last(state.ancestors)!;
+        const categoryModels = getModelNamesForCategory(category, config);
+        if (!_.isEmpty(categoryModels.objectModels)) {
+            return error(categoryNotDocumentModelErrorCode, { nonDocumentModels: categoryModels.objectModels.join(', ') });
+        }
+        if (_.isEmpty(categoryModels.documentModels)) {
+            return error(categoryNotFoundErrorCode);
+        }
+        return category;
+    })
+    .prefs({
+        messages: {
+            [categoryNotDocumentModelErrorCode]:
+                '{{#label}} of a "reference" field must reference a category with only models of type "page" or "data", the "{{#value}}" category includes models of type "object" ({{#nonDocumentModels}})',
+            [categoryNotFoundErrorCode]: '{{#label}} of a "reference" field must reference the name of an existing category, got "{{#value}}"'
+        },
+        errors: { wrap: { label: false } }
+    });
+
+function getModelNamesForCategory(category: string, config: YamlConfig) {
+    const models = config.models ?? {};
+    return _.reduce(
+        models,
+        (result: { objectModels: string[]; documentModels: string[] }, model, modelName) => {
+            if (model?.categories && _.includes(model.categories, category)) {
+                if (model?.type === 'object') {
+                    result.objectModels.push(modelName);
+                } else {
+                    result.documentModels.push(modelName);
+                }
+            }
+            return result;
+        },
+        { objectModels: [], documentModels: [] }
+    );
+}
 
 export type LogicField = string;
 
@@ -277,8 +343,8 @@ export interface FieldObjectProps {
     type: 'object';
     labelField?: string;
     thumbnail?: string;
-    fieldGroups?: string;
     variantField?: string;
+    fieldGroups?: string;
     fields: Field[];
 }
 
@@ -298,11 +364,13 @@ export interface FieldNumberProps {
 export interface FieldModelProps {
     type: 'model';
     models: string[];
+    categories?: string[];
 }
 
 export interface FieldReferenceProps {
     type: 'reference';
     models: string[];
+    categories?: string[];
 }
 
 export interface FieldSimpleNoProps {
@@ -435,19 +503,21 @@ const objectFieldPartialSchema = Joi.object({
     type: Joi.string().valid('object').required(),
     labelField: labelFieldSchema,
     thumbnail: Joi.string(),
-    fieldGroups: fieldGroupsSchema,
     variantField: variantFieldSchema,
+    fieldGroups: fieldGroupsSchema,
     fields: Joi.link('#fieldsSchema').required()
 });
 
 const modelFieldPartialSchema = Joi.object({
     type: Joi.string().valid('model').required(),
-    models: Joi.array().items(validObjectModelNames).required()
+    models: Joi.array().items(validObjectModelNames).when('categories', { not: Joi.exist(), then: Joi.required() }),
+    categories: Joi.array().items(validModelFieldCategories)
 });
 
 const referenceFieldPartialSchema = Joi.object({
     type: Joi.string().valid('reference').required(),
-    models: Joi.array().items(validPageOrDataModelNames).required()
+    models: Joi.array().items(validPageOrDataModelNames).when('categories', { not: Joi.exist(), then: Joi.required() }),
+    categories: Joi.array().items(validReferenceFieldCategories)
 });
 
 const partialFieldSchema = Joi.object().when('.type', {
@@ -491,8 +561,9 @@ export interface YamlBaseModel {
     thumbnail?: string;
     extends?: string | string[];
     labelField?: string;
-    fieldGroups?: FieldGroupItem[];
     variantField?: string;
+    categories?: string[];
+    fieldGroups?: FieldGroupItem[];
     fields?: Field[];
 }
 
@@ -512,8 +583,9 @@ const baseModelSchema = Joi.object({
     thumbnail: Joi.string(),
     extends: Joi.array().items(validObjectModelNames).single(),
     labelField: labelFieldSchema,
-    fieldGroups: fieldGroupsSchema,
     variantField: variantFieldSchema,
+    categories: Joi.array().items(Joi.string()),
+    fieldGroups: fieldGroupsSchema,
     fields: Joi.link('#fieldsSchema')
 });
 
@@ -656,11 +728,43 @@ const modelIsListItemsRequiredErrorCode = 'model.isList.items.required';
 const modelIsListFieldsForbiddenErrorCode = 'model.isList.fields.forbidden';
 const modelListForbiddenErrorCode = 'model.items.forbidden';
 const fieldNameUnique = 'field.name.unique';
+const categoryModelsIncompatibleError = 'category.models.incompatible';
 
 export type YamlModels = Record<string, YamlModel>;
 
 const modelsSchema = Joi.object<YamlModels>()
     .pattern(modelNamePattern, modelSchema)
+    .custom((models: YamlModels, { error, state }) => {
+        const categoryMap: Record<string, Record<'objectModels' | 'documentModels', string[]>> = {};
+
+        _.forEach(models, (model, modelName) => {
+            let key = model?.type === 'object' ? 'objectModels' : 'documentModels';
+            _.forEach(model.categories, (categoryName) => {
+                append(categoryMap, [categoryName, key], modelName);
+            });
+        });
+
+        const errors = _.reduce(
+            categoryMap,
+            (errors: string[], category, categoryName) => {
+                if (category.objectModels && category.documentModels) {
+                    const objectModels = category.objectModels.join(', ');
+                    const documentModels = category.documentModels.join(', ');
+                    errors.push(
+                        `category "${categoryName}" include models of type "object" (${objectModels}) and objects of type "page" or "data" (${documentModels})`
+                    );
+                }
+                return errors;
+            },
+            []
+        );
+
+        if (!_.isEmpty(errors)) {
+            return error(categoryModelsIncompatibleError, { incompatibleCategories: errors.join(', ') });
+        }
+
+        return models;
+    })
     .error(((errors: Joi.ErrorReport[]): Joi.ErrorReport[] => {
         return _.map(errors, (error) => {
             if (error.code === 'object.unknown' && error.path.length === 2 && error.path[0] === 'models') {
@@ -687,6 +791,8 @@ const modelsSchema = Joi.object<YamlModels>()
     }) as any) // the type definition of Joi.ValidationErrorFunction is wrong, so we override
     .prefs({
         messages: {
+            [categoryModelsIncompatibleError]:
+                'Model categories must include models of the same type. The following categories have incompatible models: {{#incompatibleCategories}}',
             [modelNamePatternMatchErrorCode]:
                 'Invalid model name "{{#key}}" at "{{#label}}". A model name must contain only alphanumeric characters and underscores, must start with a letter, and end with alphanumeric character.',
             [modelFileExclusiveErrorCode]: '{{#label}} cannot be used with "file"',
