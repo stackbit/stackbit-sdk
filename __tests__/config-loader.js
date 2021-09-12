@@ -77,6 +77,10 @@ test('load and override model files', async () => {
             description: 'Model defined in @stackbit/components, overriden by stackbit.yaml'
         },
         {
+            name: 'model_components_5',
+            description: 'Model defined in @stackbit/components'
+        },
+        {
             name: 'model_stackbit_1',
             description: 'Model defined in .stackbit/models'
         },
@@ -142,7 +146,7 @@ test('load and normalize thumbnails', async () => {
         },
         {
             name: 'model_components_3',
-            thumbnail: '.stackbit/models/path/to/thumbnail.png',
+            thumbnail: 'abs/path/thumbnail.png',
             fields: [
                 {
                     type: 'enum',
@@ -150,7 +154,7 @@ test('load and normalize thumbnails', async () => {
                     options: [
                         {
                             value: 'thumbnail_1',
-                            thumbnail: '.stackbit/models/path/to/thumbnail.png'
+                            thumbnail: 'abs/path/thumbnail.png'
                         }
                     ]
                 }
@@ -167,6 +171,22 @@ test('load and normalize thumbnails', async () => {
                         {
                             value: 'thumbnail_1',
                             thumbnail: 'path/to/thumbnail.png'
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            name: 'model_components_5',
+            thumbnail: 'node_modules/@stackbit/components/abs/path/thumbnail.png',
+            fields: [
+                {
+                    type: 'enum',
+                    name: 'enum_field',
+                    options: [
+                        {
+                            value: 'thumbnail_1',
+                            thumbnail: 'node_modules/@stackbit/components/abs/path/thumbnail.png'
                         }
                     ]
                 }

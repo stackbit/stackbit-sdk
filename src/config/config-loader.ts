@@ -264,7 +264,7 @@ function normalizeConfig(config: any): any {
             assignLabelFieldIfNeeded(model);
         }
 
-        normalizeThumbnailPathForModel(model, model?.__metadata?.filePath);
+        resolveThumbnailPathForModel(model, model?.__metadata?.filePath);
 
         iterateModelFieldsRecursively(model, (field: any, fieldPath) => {
             // add field label if label is not set
@@ -282,9 +282,9 @@ function normalizeConfig(config: any): any {
 
             if (isObjectField(field)) {
                 assignLabelFieldIfNeeded(field);
-                normalizeThumbnailPathForModel(field, model?.__metadata?.filePath);
+                resolveThumbnailPathForModel(field, model?.__metadata?.filePath);
             } else if (isEnumField(field)) {
-                normalizeThumbnailPathForEnumField(field, model?.__metadata?.filePath);
+                resolveThumbnailPathForEnumField(field, model?.__metadata?.filePath);
             } else if (isCustomModelField(field, models)) {
                 // stackbit v0.2.0 compatibility
                 // convert the old custom model field type: { type: 'action' }
@@ -378,20 +378,34 @@ function addObjectTypeKeyField(model: any, objectTypeKey: string, modelName: str
     });
 }
 
-function normalizeThumbnailPathForModel(modelOrField: Model | FieldObjectProps, filePath: string | undefined) {
-    if (modelOrField.thumbnail && filePath) {
-        modelOrField.thumbnail = path.join(path.dirname(filePath), modelOrField.thumbnail);
+function resolveThumbnailPathForModel(modelOrField: Model | FieldObjectProps, modelFilePath: string | undefined) {
+    if (modelOrField.thumbnail && modelFilePath) {
+        const modelDirPath = path.dirname(modelFilePath);
+        modelOrField.thumbnail = resolveThumbnailPath(modelOrField.thumbnail, modelDirPath);
     }
 }
 
-function normalizeThumbnailPathForEnumField(enumField: FieldEnum, filePath: string | undefined) {
-    if (enumField.controlType === 'thumbnails' && filePath) {
+function resolveThumbnailPathForEnumField(enumField: FieldEnum, modelFilePath: string | undefined) {
+    if (enumField.controlType === 'thumbnails' && modelFilePath) {
+        const modelDirPath = path.dirname(modelFilePath);
         _.forEach(enumField.options, (option) => {
             if (option.thumbnail) {
-                option.thumbnail = path.join(path.dirname(filePath), option.thumbnail);
+                option.thumbnail = resolveThumbnailPath(option.thumbnail, modelDirPath);
             }
         });
     }
+}
+
+function resolveThumbnailPath(thumbnail: string, modelDirPath: string) {
+    if (thumbnail.startsWith('/')) {
+        if (modelDirPath.endsWith('@stackbit/components/models')) {
+            modelDirPath = modelDirPath.replace(/\/models$/, '');
+        } else {
+            modelDirPath = '';
+        }
+        thumbnail = thumbnail.replace(/^\//, '');
+    }
+    return path.join(modelDirPath, thumbnail);
 }
 
 /**
