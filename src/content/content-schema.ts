@@ -1,7 +1,7 @@
 import Joi from 'joi';
 import _ from 'lodash';
 
-import { Model } from '../config/config-loader';
+import { Config, Model } from '../config/config-loader';
 import {
     Field,
     FieldNumberProps,
@@ -13,7 +13,7 @@ import {
     FieldReferenceProps,
     FieldListProps,
     FieldListItems
-} from '..';
+} from '../config/config-schema';
 import { isDataModel, isPageModel } from '../utils';
 
 type FieldPath = (string | number)[];
@@ -26,9 +26,9 @@ const metadataSchema = Joi.object({
     error: Joi.string()
 });
 
-export function joiSchemasForModels(models: Model[]) {
+export function joiSchemasForModels(config: Config) {
     const modelSchemas = _.reduce(
-        models,
+        config.models,
         (modelSchemas: ModelSchemaMap, model: Model) => {
             let joiSchema: Joi.ObjectSchema;
             if (model.__metadata?.invalid) {
@@ -43,7 +43,7 @@ export function joiSchemasForModels(models: Model[]) {
                         'any.unknown': `${objectLabel} cannot be validated, the model "${model.name}" is invalid. Fix the model to validate the content.`
                     });
             } else {
-                joiSchema = joiSchemaForModel(model);
+                joiSchema = joiSchemaForModel(model, config);
             }
             modelSchemas[model.name] = joiSchema.id(`${model.name}_model_schema`);
             return modelSchemas;
@@ -75,23 +75,23 @@ export function joiSchemasForModels(models: Model[]) {
     );
 }
 
-export function joiSchemaForModel(model: Model) {
+export function joiSchemaForModel(model: Model, config: Config) {
     if (isDataModel(model) && model.isList) {
         return Joi.object({
-            items: Joi.array().items(joiSchemaForField(model.items, [model.name, 'items']))
+            items: Joi.array().items(joiSchemaForField(model.items, config, [model.name, 'items']))
         });
     } else {
-        return joiSchemaForModelFields(model.fields, [model.name]);
+        return joiSchemaForModelFields(model.fields, config, [model.name]);
     }
 }
 
-function joiSchemaForModelFields(fields: Field[] | undefined, fieldPath: FieldPath) {
+function joiSchemaForModelFields(fields: Field[] | undefined, config: Config, fieldPath: FieldPath) {
     return Joi.object(
         _.reduce(
             fields,
             (schema: Record<string, Joi.Schema>, field) => {
                 const childFieldPath = fieldPath.concat(`[name='${field.name}']`);
-                schema[field.name] = joiSchemaForField(field, childFieldPath);
+                schema[field.name] = joiSchemaForField(field, config, childFieldPath);
                 return schema;
             },
             {}
@@ -99,7 +99,7 @@ function joiSchemaForModelFields(fields: Field[] | undefined, fieldPath: FieldPa
     );
 }
 
-function joiSchemaForField(field: Field | FieldListItems, fieldPath: FieldPath) {
+function joiSchemaForField(field: Field | FieldListItems, config: Config, fieldPath: FieldPath) {
     let fieldSchema;
     switch (field.type) {
         case 'string':
@@ -121,22 +121,22 @@ function joiSchemaForField(field: Field | FieldListItems, fieldPath: FieldPath) 
             fieldSchema = Joi.date();
             break;
         case 'enum':
-            fieldSchema = FieldSchemas.enum(field, fieldPath);
+            fieldSchema = FieldSchemas.enum(field, config, fieldPath);
             break;
         case 'number':
-            fieldSchema = FieldSchemas.number(field, fieldPath);
+            fieldSchema = FieldSchemas.number(field, config, fieldPath);
             break;
         case 'object':
-            fieldSchema = FieldSchemas.object(field, fieldPath);
+            fieldSchema = FieldSchemas.object(field, config, fieldPath);
             break;
         case 'model':
-            fieldSchema = FieldSchemas.model(field, fieldPath);
+            fieldSchema = FieldSchemas.model(field, config, fieldPath);
             break;
         case 'reference':
             fieldSchema = Joi.string();
             break;
         case 'list':
-            fieldSchema = FieldSchemas.list(field, fieldPath);
+            fieldSchema = FieldSchemas.list(field, config, fieldPath);
             break;
     }
     if ('const' in field) {
@@ -156,7 +156,7 @@ export type FieldPropsByType = {
     list: FieldListProps;
 };
 
-const FieldSchemas: { [fieldType in keyof FieldPropsByType]: (field: FieldPropsByType[fieldType], fieldPath: FieldPath) => Joi.Schema } = {
+const FieldSchemas: { [fieldType in keyof FieldPropsByType]: (field: FieldPropsByType[fieldType], config: Config, fieldPath: FieldPath) => Joi.Schema } = {
     enum: (field) => {
         if (field.options) {
             const values = field.options.map((option: FieldEnumOptionValue | FieldEnumOptionObject) =>
@@ -179,14 +179,15 @@ const FieldSchemas: { [fieldType in keyof FieldPropsByType]: (field: FieldPropsB
         }
         return result;
     },
-    object: (field, fieldPath: FieldPath) => {
+    object: (field, config, fieldPath: FieldPath) => {
         const childFieldPath = fieldPath.concat('fields');
-        return joiSchemaForModelFields(field.fields, childFieldPath);
+        return joiSchemaForModelFields(field.fields, config, childFieldPath);
     },
-    model: (field) => {
+    model: (field, config) => {
         if (field.models.length === 0) {
             return Joi.any().forbidden();
         }
+        const objectTypeKey = config.objectTypeKey || 'type';
         const typeSchema = Joi.string().valid(...field.models);
         if (field.models.length === 1 && field.models[0]) {
             const modelName = field.models[0];
@@ -195,15 +196,14 @@ const FieldSchemas: { [fieldType in keyof FieldPropsByType]: (field: FieldPropsB
                 .concat(
                     Joi.object({
                         __metadata: metadataSchema,
-                        // TODO: change to objectTypeKey
-                        type: typeSchema
+                        [objectTypeKey]: typeSchema
                     })
                 );
         } else {
             // if there is more than one model in models, then 'type' field is
             // required to identify the object
             return Joi.alternatives()
-                .conditional('.type', {
+                .conditional(`.${objectTypeKey}`, {
                     switch: _.map(field.models, (modelName) => {
                         return {
                             is: modelName,
@@ -212,8 +212,7 @@ const FieldSchemas: { [fieldType in keyof FieldPropsByType]: (field: FieldPropsB
                                 .concat(
                                     Joi.object({
                                         __metadata: metadataSchema,
-                                        // TODO: change to objectTypeKey
-                                        type: Joi.string()
+                                        [objectTypeKey]: Joi.string()
                                     })
                                 )
                         };
@@ -221,7 +220,7 @@ const FieldSchemas: { [fieldType in keyof FieldPropsByType]: (field: FieldPropsB
                 })
                 .prefs({
                     messages: {
-                        'alternatives.any': `"{{#label}}.type" is required and must be one of [${field.models.join(', ')}].`
+                        'alternatives.any': `{{#label}}.${objectTypeKey} is required and must be one of [${field.models.join(', ')}].`
                     },
                     errors: { wrap: { label: false } }
                 });
@@ -229,10 +228,10 @@ const FieldSchemas: { [fieldType in keyof FieldPropsByType]: (field: FieldPropsB
     },
     // TODO: validate reference by looking if referenced filePath actually exists
     reference: () => Joi.string(),
-    list: (field, fieldPath: FieldPath) => {
+    list: (field, config, fieldPath: FieldPath) => {
         if (field.items) {
             const childFieldPath = fieldPath.concat('items');
-            const itemsSchema = joiSchemaForField(field.items, childFieldPath);
+            const itemsSchema = joiSchemaForField(field.items, config, childFieldPath);
             return Joi.array().items(itemsSchema);
         }
         return Joi.array().items(Joi.string());

@@ -5,7 +5,12 @@ import { ContentItem } from './content-loader';
 import { Config } from '../config/config-loader';
 import { joiSchemasForModels } from './content-schema';
 import { ContentValidationError } from './content-errors';
-import { getModelByName, isConfigModel, isPageModel } from '../utils';
+import {
+    getModelByName,
+    isConfigModel,
+    isDataModel,
+    isPageModel
+} from '../utils';
 
 interface ContentValidationOptions {
     contentItems: ContentItem[];
@@ -21,7 +26,7 @@ interface ContentValidationResult {
 export function validate({ contentItems, config }: ContentValidationOptions): ContentValidationResult {
     const errors: ContentValidationError[] = [];
 
-    const joiModelSchemas = joiSchemasForModels(config.models);
+    const joiModelSchemas = joiSchemasForModels(config);
 
     const value = _.map(
         contentItems,
@@ -54,6 +59,11 @@ export function validate({ contentItems, config }: ContentValidationOptions): Co
                     const pageLayoutKey = config.pageLayoutKey || 'layout';
                     if (!_.find(model.fields, { name: pageLayoutKey })) {
                         modelSchema = modelSchema.keys({ [pageLayoutKey]: Joi.string().valid(model.layout) });
+                    }
+                } else if (isDataModel(model)) {
+                    const objectTypeKey = config.objectTypeKey || 'layout';
+                    if (!_.find(model.fields, { name: objectTypeKey })) {
+                        modelSchema = modelSchema.keys({ [objectTypeKey]: Joi.string().valid(model.name) });
                     }
                 }
                 modelSchema = modelSchema.keys({
