@@ -1,8 +1,7 @@
 import _ from 'lodash';
 import { copyIfNotSet } from '@stackbit/utils';
 
-import { Model } from '../config/config-loader';
-import { YamlModel, YamlModels } from '../config/config-schema';
+import { Model, YamlModel, ModelMap } from '../config/config-types';
 
 export function extendModels(models: Model[]): Model[] {
     const memorized = _.memoize(extendModel, (model: YamlModel, modelName: string) => modelName);
@@ -13,7 +12,7 @@ export function extendModels(models: Model[]): Model[] {
     });
 }
 
-export function extendModelMap(models: YamlModels): YamlModels {
+export function extendModelMap(models: ModelMap): ModelMap {
     const memorized = _.memoize(extendModel, (model: YamlModel, modelName: string) => modelName);
     return _.mapValues(models, (model, modelName) => {
         return memorized(model, modelName, models);
@@ -43,15 +42,18 @@ function extendModel(model: YamlModel, modelName: string, modelsByName: Record<s
 
     _.forEach(_extends, (superModelName) => {
         let superModel = _.get(modelsByName, superModelName);
-        assert(superModel, `model '${modelName}' extends non defined model '${superModelName}'`);
-        assert(superModel.type === 'object', `only object model types can be extended`);
+        assert(superModel, `model '${modelName}' extends non existing model '${superModelName}'`);
+        assert(
+            superModel.type === 'object',
+            `model '${modelName}' extends models of type '${superModel.type}', only model of the 'object' type can be extended`
+        );
         superModel = extendModel(superModel, superModelName, modelsByName, _extendPath.concat(modelName));
         copyIfNotSet(superModel, 'hideContent', model, 'hideContent');
         copyIfNotSet(superModel, 'singleInstance', model, 'singleInstance');
         copyIfNotSet(superModel, 'labelField', model, 'labelField');
         let idx = 0;
         _.forEach(superModel.fields, (superField) => {
-            let field = _.find(fields, { name: superField.name });
+            const field = _.find(fields, { name: superField.name });
             if (field) {
                 _.defaultsDeep(field, _.cloneDeep(superField));
             } else {

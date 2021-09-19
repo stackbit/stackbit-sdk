@@ -4,8 +4,6 @@ import path from 'path';
 import micromatch from 'micromatch';
 import { findPromise, forEachPromise, parseFile, readDirRecursively } from '@stackbit/utils';
 
-import { Config, ConfigModel, Model } from '../config/config-loader';
-import { Field, FieldListItems, FieldModelProps } from '../config/config-schema';
 import { FileForModelNotFoundError, FileMatchedMultipleModelsError, FileNotMatchedModelError, FileReadError, FolderReadError } from './content-errors';
 import {
     isConfigModel,
@@ -21,6 +19,7 @@ import {
 } from '../utils';
 import { validate } from './content-validator';
 import { DATA_FILE_EXTENSIONS, EXCLUDED_DATA_FILES, EXCLUDED_MARKDOWN_FILES, EXCLUDED_COMMON_FILES, MARKDOWN_FILE_EXTENSIONS } from '../consts';
+import { Config, ConfigModel, Field, FieldListItems, FieldModelProps, Model } from '../config/config-types';
 
 interface BaseMetadata {
     filePath: string;

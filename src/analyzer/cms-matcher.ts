@@ -4,7 +4,7 @@ import { findPromise, forEachPromise, reducePromise } from '@stackbit/utils';
 
 import { FileBrowser, getFileBrowserFromOptions, GetFileBrowserOptions } from './file-browser';
 import { findDirsWithPackageDependency } from './analyzer-utils';
-import { Config } from '../config/config-loader';
+import { Config } from '../config/config-types';
 
 export type CMSMatcherOptions = GetFileBrowserOptions;
 

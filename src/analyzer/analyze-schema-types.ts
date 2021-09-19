@@ -4,47 +4,70 @@
  * schema from content files
  */
 
-import { StricterUnion } from '../utils';
 import {
     FieldCommonProps,
-    FieldEnumProps,
-    FieldModelProps,
-    FieldNumberProps,
     FieldType,
+    FieldSimpleProps,
+    FieldEnumProps,
+    FieldNumberProps,
+    FieldObjectProps,
+    FieldModelProps,
     FieldReferenceProps,
-    FieldSimpleNoProps
-} from '../config/config-schema';
+    FieldListProps,
+    FieldListItems
+} from '../config/config-types';
 
-export type FieldTypeWithUnknown = FieldType | 'unknown';
-export type FieldListItemsTypeWithUnknown = Exclude<FieldTypeWithUnknown, 'list'>;
+export type FieldWithUnknown =
+    | FieldUnknown
+    | FieldSimpleWithUnknown
+    | FieldEnumWithUnknown
+    | FieldNumberWithUnknown
+    | FieldObjectWithUnknown
+    | FieldModelWithUnknown
+    | FieldReferenceWithUnknown
+    | FieldListWithUnknown;
+
+export type FieldUnknown = FieldCommonPropsWithUnknown & FieldUnknownProps;
+export type FieldSimpleWithUnknown = FieldCommonPropsWithUnknown & FieldSimpleProps;
+export type FieldEnumWithUnknown = FieldCommonPropsWithUnknown & FieldEnumProps;
+export type FieldNumberWithUnknown = FieldCommonPropsWithUnknown & FieldNumberProps;
+export type FieldObjectWithUnknown = FieldCommonPropsWithUnknown & FieldObjectPropsWithUnknown;
+export type FieldModelWithUnknown = FieldCommonPropsWithUnknown & FieldModelProps;
+export type FieldReferenceWithUnknown = FieldCommonPropsWithUnknown & FieldReferenceProps;
+export type FieldListWithUnknown = FieldCommonPropsWithUnknown & FieldListPropsWithUnknown;
+
+export type FieldCommonPropsWithUnknown = Omit<FieldCommonProps, 'type'> & {
+    type: FieldTypeWithUnknown;
+};
+
+export type FieldTypeWithUnknown = 'unknown' | FieldType;
 
 export interface FieldUnknownProps {
     type: 'unknown';
 }
 
-export interface FieldListPropsWithUnknown {
-    type: 'list';
-    items?: FieldListItemsWithUnknown;
-}
-
-export interface FieldObjectPropsWithUnknown {
-    type: 'object';
-    labelField?: string;
+export type FieldObjectPropsWithUnknown = Omit<FieldObjectProps, 'fields'> & {
     fields: FieldWithUnknown[];
+};
+
+export type FieldListPropsWithUnknown = Omit<FieldListProps, 'items'> & {
+    items?: FieldListItemsWithUnknown;
+};
+
+export type FieldListItemsWithUnknown = Exclude<FieldListItems, FieldObjectProps> | FieldUnknownProps | FieldObjectPropsWithUnknown;
+
+export function isObjectWithUnknownField(field: FieldWithUnknown): field is FieldObjectWithUnknown {
+    return field.type === 'object';
 }
 
-export type NonStrictFieldPartialPropsWithUnknown =
-    | FieldUnknownProps
-    | FieldEnumProps
-    | FieldObjectPropsWithUnknown
-    | FieldListPropsWithUnknown
-    | FieldNumberProps
-    | FieldModelProps
-    | FieldReferenceProps
-    | FieldSimpleNoProps;
+export function isListWithUnknownField(field: FieldWithUnknown): field is FieldListWithUnknown {
+    return field.type === 'list';
+}
 
-export type FieldPartialPropsWithUnknown = StricterUnion<NonStrictFieldPartialPropsWithUnknown>;
-export type FieldListItemsWithUnknown = StricterUnion<Exclude<NonStrictFieldPartialPropsWithUnknown, FieldListPropsWithUnknown>>;
-export type FieldObjectWithUnknown = FieldObjectPropsWithUnknown & FieldCommonProps;
-export type FieldListWithUnknown = FieldListPropsWithUnknown & FieldCommonProps;
-export type FieldWithUnknown = FieldPartialPropsWithUnknown & FieldCommonProps;
+export function isObjectListItemsWithUnknown(items: FieldListItemsWithUnknown): items is FieldObjectPropsWithUnknown {
+    return items.type === 'object';
+}
+
+export function isModelListItemsWithUnknown(items: FieldListItemsWithUnknown): items is FieldModelProps {
+    return items.type === 'model';
+}

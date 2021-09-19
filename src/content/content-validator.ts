@@ -2,15 +2,10 @@ import Joi from 'joi';
 import _ from 'lodash';
 
 import { ContentItem } from './content-loader';
-import { Config } from '../config/config-loader';
 import { joiSchemasForModels } from './content-schema';
 import { ContentValidationError } from './content-errors';
-import {
-    getModelByName,
-    isConfigModel,
-    isDataModel,
-    isPageModel
-} from '../utils';
+import { getModelByName, isConfigModel, isDataModel, isPageModel } from '../utils';
+import { Config } from '../config/config-types';
 
 interface ContentValidationOptions {
     contentItems: ContentItem[];

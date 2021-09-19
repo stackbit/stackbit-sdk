@@ -1,22 +1,26 @@
 import _ from 'lodash';
 
-import { Model, ConfigModel, DataModel, PageModel, ObjectModel } from '../config/config-loader';
+import { FIELD_TYPES } from '../config/config-consts';
 import {
-    FIELD_TYPES,
+    Model,
+    ObjectModel,
+    DataModel,
+    PageModel,
+    ConfigModel,
     Field,
-    FieldModel,
-    FieldObject,
-    FieldReference,
+    FieldEnum,
     FieldList,
     FieldListItems,
-    FieldObjectProps,
-    FieldListObject,
     FieldListModel,
+    FieldListObject,
     FieldListReference,
-    FieldReferenceProps,
+    FieldModel,
     FieldModelProps,
-    FieldEnum
-} from '../config/config-schema';
+    FieldObject,
+    FieldObjectProps,
+    FieldReference,
+    FieldReferenceProps
+} from '../config/config-types';
 
 export function getModelByName(models: Model[], modelName: string): Model | undefined {
     return models.find((model) => model.name === modelName);

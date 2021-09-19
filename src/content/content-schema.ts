@@ -1,20 +1,21 @@
 import Joi from 'joi';
 import _ from 'lodash';
 
-import { Config, Model } from '../config/config-loader';
-import {
-    Field,
-    FieldNumberProps,
-    FieldEnumProps,
-    FieldEnumOptionValue,
-    FieldEnumOptionObject,
-    FieldObjectProps,
-    FieldModelProps,
-    FieldReferenceProps,
-    FieldListProps,
-    FieldListItems
-} from '../config/config-schema';
 import { isDataModel, isPageModel } from '../utils';
+import {
+    Config,
+    Field,
+    FieldEnumOptionObject,
+    FieldEnumOptionValue,
+    FieldEnumProps,
+    FieldListItems,
+    FieldListProps,
+    FieldModelProps,
+    FieldNumberProps,
+    FieldObjectProps,
+    FieldReferenceProps,
+    Model
+} from '../config/config-types';
 
 type FieldPath = (string | number)[];
 

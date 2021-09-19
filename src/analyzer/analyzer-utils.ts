@@ -96,7 +96,7 @@ export function getGatsbySourceFilesystemOptions(data: string): GatsbySourceFile
             }
             pathValue = pathValue.replace(/^\${__dirname}\//, '');
             const ignoreProperty = findObjectProperty(optionsProperty.value, 'ignore');
-            let ignoreValue = ignoreProperty ? getNodeValue(ignoreProperty.value) : null;
+            const ignoreValue = ignoreProperty ? getNodeValue(ignoreProperty.value) : null;
             result.push({
                 name: nameValue,
                 path: pathValue,
@@ -258,6 +258,7 @@ export function getGatsbySourceFilesystemOptionsUsingRegExp(data: string) {
     //     path: `${__dirname}/src/pages`
     //   }
     // }
+    // eslint-disable-next-line
     const gatsbySourceFilesystemRegExp = /resolve\s*:\s*(['"`])gatsby-source-filesystem\1\s*,\s*options\s*:\s*{\s*(\w+)\s*:\s*(['"`])([^'"`]+)\3\s*,\s*(\w+)\s*:\s*(['"`])([^'"`]+)\6/g;
     let match: RegExpExecArray | null;
     const fileSystemOptions = [];

@@ -4,7 +4,7 @@ import semver from 'semver';
 
 import { FileBrowser, getFileBrowserFromOptions, GetFileBrowserOptions } from './file-browser';
 import { extractNodeEnvironmentVariablesFromFile, findDirsWithPackageDependency, getGatsbySourceFilesystemOptions } from './analyzer-utils';
-import { Config } from '../config/config-loader';
+import { Config } from '../config/config-types';
 
 export type SSGMatcherOptions = GetFileBrowserOptions;
 

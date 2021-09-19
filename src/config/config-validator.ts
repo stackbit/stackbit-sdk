@@ -1,6 +1,5 @@
 import _ from 'lodash';
-import { stackbitConfigSchema, YamlModel } from './config-schema';
-import { Model } from './config-loader';
+import { stackbitConfigSchema } from './config-schema';
 
 export interface ConfigValidationError {
     name: 'ConfigValidationError';

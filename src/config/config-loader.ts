@@ -5,17 +5,6 @@ import semver from 'semver';
 import _ from 'lodash';
 
 import { ConfigValidationError, ConfigValidationResult, validate } from './config-validator';
-import {
-    FieldEnum,
-    FieldModel,
-    FieldObjectProps,
-    YamlConfig,
-    YamlConfigModel,
-    YamlDataModel,
-    YamlModel,
-    YamlObjectModel,
-    YamlPageModel
-} from './config-schema';
 import { ConfigLoadError } from './config-errors';
 import {
     assignLabelFieldIfNeeded,
@@ -30,27 +19,10 @@ import {
     isObjectListItems,
     isPageModel,
     isReferenceField,
-    iterateModelFieldsRecursively,
-    StricterUnion
+    iterateModelFieldsRecursively
 } from '../utils';
 import { append, parseFile, readDirRecursively, reducePromise, rename } from '@stackbit/utils';
-
-export type BaseModel = {
-    name: string;
-    __metadata?: {
-        filePath?: string;
-        invalid?: boolean;
-    };
-};
-export type ObjectModel = YamlObjectModel & BaseModel;
-export type DataModel = YamlDataModel & BaseModel;
-export type ConfigModel = YamlConfigModel & BaseModel;
-export type PageModel = YamlPageModel & BaseModel;
-export type Model = StricterUnion<ObjectModel | DataModel | ConfigModel | PageModel>;
-
-export interface Config extends Omit<YamlConfig, 'models'> {
-    models: Model[];
-}
+import { Config, FieldEnum, FieldModel, FieldObjectProps, Model, PageModel, YamlModel } from './config-types';
 
 export interface ConfigNormalizedValidationError extends ConfigValidationError {
     normFieldPath: (string | number)[];
@@ -88,7 +60,7 @@ export async function loadConfig({ dirPath }: ConfigLoaderOptions): Promise<Conf
         };
     }
 
-    const config = normalizeConfig(configLoadResult.config);
+    const config = resolveConfig(configLoadResult.config);
     const validationResult = validate(config);
     convertModelCategoriesToModels(validationResult);
     const convertedResult = convertModelsToArray(validationResult);
@@ -101,7 +73,7 @@ export async function loadConfig({ dirPath }: ConfigLoaderOptions): Promise<Conf
 }
 
 async function loadConfigFromDir(dirPath: string): Promise<{ config?: any; errors: ConfigLoadError[] }> {
-    let { config, error } = await loadConfigFromStackbitYaml(dirPath);
+    const { config, error } = await loadConfigFromStackbitYaml(dirPath);
     if (error) {
         return { errors: [error] };
     }
@@ -188,6 +160,7 @@ async function readModelFilesFromDir(modelsDir: string) {
     });
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function loadConfigFromDotStackbit(dirPath: string) {
     const stackbitDotPath = path.join(dirPath, '.stackbit');
     const stackbitDotExists = await fse.pathExists(stackbitDotPath);
@@ -221,7 +194,7 @@ async function loadConfigFromDotStackbit(dirPath: string) {
     return _.isEmpty(config) ? null : config;
 }
 
-function normalizeConfig(config: any): any {
+function resolveConfig(config: any): any {
     const pageLayoutKey = _.get(config, 'pageLayoutKey', 'layout');
     const objectTypeKey = _.get(config, 'objectTypeKey', 'type');
     const stackbitYamlVersion = String(_.get(config, 'stackbitVersion', ''));
@@ -230,12 +203,7 @@ function normalizeConfig(config: any): any {
     let models = config?.models || {};
     let referencedModelNames: string[] = [];
 
-    try {
-        models = extendModelMap(models);
-    } catch (error) {
-        // TODO: gracefully extend and return error rather throwing
-        throw error;
-    }
+    models = extendModelMap(models);
 
     _.forEach(models, (model) => {
         if (!model) {
@@ -266,7 +234,7 @@ function normalizeConfig(config: any): any {
 
         resolveThumbnailPathForModel(model, model?.__metadata?.filePath);
 
-        iterateModelFieldsRecursively(model, (field: any, fieldPath) => {
+        iterateModelFieldsRecursively(model, (field: any) => {
             // add field label if label is not set
             if (!_.has(field, 'label')) {
                 field.label = _.startCase(field.name);
@@ -436,19 +404,24 @@ function getReferencedModelNames(field: any) {
 function convertModelCategoriesToModels(validationResult: ConfigValidationResult) {
     const models = validationResult.value?.models ?? {};
 
-    const categoryMap = _.reduce(models, (categoryMap, model, modelName) => {
-        if (!model.categories) {
+    const categoryMap = _.reduce(
+        models,
+        (categoryMap, model, modelName) => {
+            if (!model.categories) {
+                return categoryMap;
+            }
+            const key = model?.type === 'object' ? 'objectModels' : 'documentModels';
+            _.forEach(model.categories, (categoryName) => {
+                append(categoryMap, [categoryName, key], modelName);
+            });
+            delete model.categories;
             return categoryMap;
-        }
-        let key = model?.type === 'object' ? 'objectModels' : 'documentModels';
-        _.forEach(model.categories, (categoryName) => {
-            append(categoryMap, [categoryName, key], modelName);
-        });
-        delete model.categories;
-        return categoryMap;
-    }, {} as Record<string, { objectModels?: string[], documentModels?: string[] }>);
+        },
+        {} as Record<string, { objectModels?: string[]; documentModels?: string[] }>
+    );
 
-    _.forEach(categoryMap, (category, categoryName) => {
+    // update categories to have unique model names
+    _.forEach(categoryMap, (category) => {
         _.forEach(category, (modelCategory, key) => {
             _.set(category, key, _.uniq(modelCategory));
         });
@@ -467,15 +440,19 @@ function convertModelCategoriesToModels(validationResult: ConfigValidationResult
                     key = 'documentModels';
                 }
                 if (key) {
-                    field.models = _.reduce(field.categories, (modelNames, categoryName) => {
-                        const objectModelNames = _.get(categoryMap, [categoryName, key], []);
-                        return _.uniq(modelNames.concat(objectModelNames));
-                    }, field.models || []);
+                    field.models = _.reduce(
+                        field.categories,
+                        (modelNames, categoryName) => {
+                            const objectModelNames = _.get(categoryMap, [categoryName, key], []);
+                            return _.uniq(modelNames.concat(objectModelNames));
+                        },
+                        field.models || []
+                    );
                 }
                 delete field.categories;
             }
         });
-    })
+    });
 }
 
 function convertModelsToArray(validationResult: ConfigValidationResult): { config: Config; errors: ConfigNormalizedValidationError[] } {
@@ -485,7 +462,7 @@ function convertModelsToArray(validationResult: ConfigValidationResult): { confi
     // convert 'models' to array of objects and set their 'name' property to the
     // model name
     const modelMap = config.models ?? {};
-    let modelArray: Model[] = _.map(
+    const modelArray: Model[] = _.map(
         modelMap,
         (yamlModel: YamlModel, modelName: string): Model => {
             return {

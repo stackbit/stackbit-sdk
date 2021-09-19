@@ -7,14 +7,17 @@ import { append, reducePromise } from '@stackbit/utils';
 import { FileBrowser, FileResult, getFileBrowserFromOptions, GetFileBrowserOptions } from './file-browser';
 import { SSGMatchResult } from './ssg-matcher';
 import { DATA_FILE_EXTENSIONS, EXCLUDED_DATA_FILES, EXCLUDED_MARKDOWN_FILES, EXCLUDED_COMMON_FILES, MARKDOWN_FILE_EXTENSIONS } from '../consts';
-import { DataModel, Model, ObjectModel, PageModel } from '../config/config-loader';
-import { Field, FieldType, FieldListItems, FieldModelProps } from '../config/config-schema';
+import { Model, ObjectModel, DataModel, PageModel, Field, FieldType, FieldListItems, FieldModelProps } from '../config/config-types';
 import {
     FieldListItemsWithUnknown,
     FieldListPropsWithUnknown,
-    FieldPartialPropsWithUnknown,
+    FieldObjectPropsWithUnknown,
     FieldTypeWithUnknown,
-    FieldWithUnknown
+    FieldWithUnknown,
+    isListWithUnknownField,
+    isModelListItemsWithUnknown,
+    isObjectListItemsWithUnknown,
+    isObjectWithUnknownField
 } from './analyze-schema-types';
 
 type FieldPath = (string | number)[];
@@ -23,7 +26,6 @@ type PartialObjectModel = Omit<ObjectModel, 'label' | 'fields'> & { fields: Fiel
 type PartialPageModel = Omit<PageModel, 'label' | 'fields'> & { fields: FieldWithUnknown[]; filePaths: string[] };
 type PartialPageModelWithFilePaths = Omit<PageModel, 'label'> & { filePaths: string[] };
 type PartialDataModel = Omit<DataModel, 'label' | 'fields' | 'items'> & { fields?: FieldWithUnknown[]; items?: FieldListItemsWithUnknown; filePaths: string[] };
-type PartialModel = PartialPageModel | PartialDataModel;
 
 const SAME_FOLDER_PAGE_DSC_COEFFICIENT = 0.6;
 const ROOT_FOLDER_PAGE_DSC_COEFFICIENT = 0.7;
@@ -142,7 +144,14 @@ async function listContentFiles({ fileBrowser, contentDir, ssgMatchResult, exclu
     if (contentDir !== undefined || contentDirs.length === 0) {
         contentDirFromRoot = getDir(ssgDir, contentDir ?? '');
         // TODO: in some projects, pages can be defined as JSON files as well
-        filePaths = await readDirRecursivelyWithFilter({ fileBrowser, contentDir, ssgMatchResult, excludedFiles, allowedExtensions, excludedFilesInSSGDir });
+        filePaths = await readDirRecursivelyWithFilter({
+            fileBrowser,
+            contentDir,
+            ssgMatchResult,
+            excludedFiles,
+            allowedExtensions,
+            excludedFilesInSSGDir
+        });
     } else {
         contentDirFromRoot = ssgDir;
         filePaths = await reducePromise(
@@ -231,6 +240,7 @@ interface GeneratePageModelsOptions {
     pageTypeKey?: string;
     objectModels: PartialObjectModel[];
 }
+
 async function generatePageModelsForFiles({
     filePaths,
     dirPathFromRoot,
@@ -238,7 +248,7 @@ async function generatePageModelsForFiles({
     pageTypeKey,
     objectModels
 }: GeneratePageModelsOptions): Promise<{ pageModels: PartialPageModelWithFilePaths[]; objectModels: PartialObjectModel[] }> {
-    let pageModels: PartialPageModel[] = [];
+    const pageModels: PartialPageModel[] = [];
     let modelNameCounter = 1;
 
     for (const filePath of filePaths) {
@@ -282,7 +292,7 @@ async function generatePageModelsForFiles({
     const lcaFolder = findLowestCommonAncestorFolder(_.flatten(_.map(pageModels, 'filePaths')));
     const lcaFolderModels: PartialPageModel[] = [];
     const modelsByFolder: Record<string, PartialPageModel[]> = {};
-    for (let pageModel of pageModels) {
+    for (const pageModel of pageModels) {
         const filePath = pageModel.filePaths[0]!;
         const dir = path.parse(filePath).dir;
         if (dir === lcaFolder) {
@@ -295,7 +305,7 @@ async function generatePageModelsForFiles({
     let mergedPageModels: PartialPageModel[] = [];
 
     // merge page models from same sub-folders (excluding LCA folder) with lowest similarity coefficient
-    for (let folderPath in modelsByFolder) {
+    for (const folderPath in modelsByFolder) {
         const pageModelsInFolder = modelsByFolder[folderPath]!;
         const mergeResult = mergeSimilarPageModels(pageModelsInFolder, objectModels, SAME_FOLDER_PAGE_DSC_COEFFICIENT);
         mergedPageModels = mergedPageModels.concat(mergeResult.pageModels);
@@ -311,7 +321,7 @@ async function generatePageModelsForFiles({
     const mergeResult = mergeSimilarPageModels(mergedPageModels, objectModels, DIFF_FOLDER_PAGE_DSC_COEFFICIENT);
 
     // remove 'unknown' field type
-    let pageModelsWithFilePaths = _.reduce(
+    const pageModelsWithFilePaths = _.reduce(
         mergeResult.pageModels,
         (mergedPageModels: PartialPageModelWithFilePaths[], pageModel) => {
             const fields = removeUnknownTypesFromFields(pageModel.fields);
@@ -346,7 +356,7 @@ async function generateDataModelsForFiles({
     let modelNameCounter = 1;
 
     for (const filePath of filePaths) {
-        let data = await fileBrowser.getFileData(path.join(dirPathFromRoot, filePath));
+        const data = await fileBrowser.getFileData(path.join(dirPathFromRoot, filePath));
         const modelName = `data_${modelNameCounter++}`;
         if (_.isPlainObject(data)) {
             const result = generateObjectFields(data, [modelName], objectModels);
@@ -656,12 +666,13 @@ function consolidateListItems(
         const type = itemTypes[0]!;
         // handle fields with extra properties
         switch (type) {
-            case 'unknown':
+            case 'unknown': {
                 return {
                     items: { type: 'unknown' },
                     objectModels
                 };
-            case 'number':
+            }
+            case 'number': {
                 const subtypes = _.compact(_.uniq(_.map(listItemModels, 'subtype')));
                 const subtype = subtypes.length === 1 ? subtypes[0] : 'float';
                 return {
@@ -671,8 +682,9 @@ function consolidateListItems(
                     },
                     objectModels
                 };
-            case 'object':
-                const fieldsList = _.map(listItemModels, (itemModels) => itemModels.fields!);
+            }
+            case 'object': {
+                const fieldsList = _.map(listItemModels as FieldObjectPropsWithUnknown[], (itemModels) => itemModels.fields!);
                 const result = consolidateObjectFieldsListWithOverlap(fieldsList, fieldPath, LIST_OBJECT_DSC_COEFFICIENT, objectModels);
                 if (result.fieldsList.length === 1) {
                     return {
@@ -704,7 +716,8 @@ function consolidateListItems(
                         objectModels: result.objectModels.concat(models)
                     };
                 }
-            case 'model':
+            }
+            case 'model': {
                 const modelNames = _.compact(_.uniq(_.flatten(_.map(listItemModels, 'models'))));
                 return {
                     items: {
@@ -713,6 +726,7 @@ function consolidateListItems(
                     },
                     objectModels
                 };
+            }
             case 'enum':
             case 'reference':
                 // these cases cannot happen because we don't generate these fields,
@@ -725,9 +739,9 @@ function consolidateListItems(
         }
     }
     if (_.every(itemTypes, (itemsType) => ['object', 'model'].includes(itemsType))) {
-        const modelListItems = _.filter(listItemModels, { type: 'model' });
+        const modelListItems = _.filter(listItemModels, isModelListItemsWithUnknown);
         const modelNames = _.compact(_.uniq(_.flatten(_.map(modelListItems, 'models'))));
-        const objectListItems = _.filter(listItemModels, { type: 'object' });
+        const objectListItems = _.filter(listItemModels, isObjectListItemsWithUnknown);
         const fieldsList = _.map(objectListItems, (listItems) => listItems.fields!);
         const result = consolidateObjectFieldsListWithOverlap(fieldsList, fieldPath, LIST_OBJECT_DSC_COEFFICIENT, objectModels);
         const models = result.fieldsList.map(
@@ -768,7 +782,6 @@ function consolidateObjectFieldsListWithOverlap(
 ): { fieldsList: FieldWithUnknown[][]; objectModels: PartialObjectModel[] } {
     // to reduce fragmentation sort fields arrays by length to merge the larger objects with smaller objects first
     let unmergedFieldsList = _.orderBy(fieldsList.slice(), ['length'], ['desc']);
-    let idx = 0;
     const mergedFieldsList = [];
 
     while (unmergedFieldsList.length > 0) {
@@ -777,7 +790,6 @@ function consolidateObjectFieldsListWithOverlap(
         unmergedFieldsList = result.unmergedFieldsList;
         mergedFieldsList.push(result.mergedFields);
         objectModels = result.objectModels;
-        idx++;
     }
 
     return {
@@ -820,7 +832,13 @@ function mergeSimilarFields(
             unmergedFieldsList.push(otherFields);
         }
     }
-    return { mergedFields, unmergedFieldsList, mergedIndexes, unmergedIndexes, objectModels };
+    return {
+        mergedFields,
+        unmergedFieldsList,
+        mergedIndexes,
+        unmergedIndexes,
+        objectModels
+    };
 }
 
 /**
@@ -873,7 +891,7 @@ function mergeObjectFieldsList(
     const consolidatedFields: FieldWithUnknown[] = [];
     for (const fieldName of fieldNames) {
         const fields = fieldsByName[fieldName]!;
-        const result = consolidateFields(fields, fieldPath.concat(fieldName), objectModels);
+        const result = consolidateFields(fields, fieldName, fieldPath.concat(fieldName), objectModels);
         // if one of the fields cannot be consolidated, then the object cannot be consolidated as well
         if (!result) {
             return null;
@@ -898,9 +916,10 @@ function mergeObjectFieldsList(
 
 function consolidateFields(
     fields: FieldWithUnknown[],
+    fieldName: string,
     fieldPath: FieldPath,
     objectModels: PartialObjectModel[]
-): { field: FieldPartialPropsWithUnknown; objectModels: PartialObjectModel[] } | null {
+): { field: FieldWithUnknown; objectModels: PartialObjectModel[] } | null {
     if (fields.length === 1) {
         const field = fields[0]!;
         return {
@@ -918,56 +937,67 @@ function consolidateFields(
         const type = fieldTypes[0]!;
         // handle fields with extra properties
         switch (type) {
-            case 'unknown':
+            case 'unknown': {
                 return {
-                    field: { type: 'unknown' },
+                    field: {
+                        type: 'unknown',
+                        name: fieldName
+                    },
                     objectModels
                 };
-            case 'number':
+            }
+            case 'number': {
                 const subtypes = _.compact(_.uniq(_.map(fields, 'subtype')));
                 const subtype = subtypes.length === 1 ? subtypes[0] : 'float';
                 return {
                     field: {
                         type: 'number',
+                        name: fieldName,
                         ...(subtype && { subtype })
                     },
                     objectModels
                 };
-            case 'object':
-                const fieldsList = _.map(fields, (field) => field.fields!);
-                const mergeResult = mergeObjectFieldsList(fieldsList, fieldPath, objectModels);
+            }
+            case 'object': {
+                const objectWithUnknownFields = _.filter(fields, isObjectWithUnknownField);
+                const fieldsWithUnknownList = _.compact(_.map(objectWithUnknownFields, (field) => field.fields));
+                const mergeResult = mergeObjectFieldsList(fieldsWithUnknownList, fieldPath, objectModels);
                 if (!mergeResult) {
                     return null;
                 }
                 return {
                     field: {
                         type: 'object',
+                        name: fieldName,
                         fields: mergeResult.fields
                     },
                     objectModels: mergeResult.objectModels
                 };
-            case 'list':
-                const listItemsArr = _.map(fields, (field) => field.items!);
-                const itemsResult = consolidateListItems(listItemsArr, fieldPath, objectModels);
+            }
+            case 'list': {
+                const listWithUnknownFields = _.filter(fields, isListWithUnknownField);
+                const listItemsWithUnknownArr = _.compact(_.map(listWithUnknownFields, (field) => field.items));
+                const itemsResult = consolidateListItems(listItemsWithUnknownArr, fieldPath, objectModels);
                 if (!itemsResult) {
                     return null;
                 }
                 return {
                     field: {
                         type: 'list',
+                        name: fieldName,
                         items: itemsResult.items
                     },
                     objectModels: itemsResult.objectModels
                 };
+            }
             case 'enum':
-            case 'model':
-            // we don't produce 'model' fields as direct child of 'object' fields, only as list items
+            case 'model': // we don't produce 'model' fields as direct child of 'object' fields, only as list items
             case 'reference':
                 // these cases cannot happen because we don't generate these fields,
                 return null;
             default:
                 return {
-                    field: { type },
+                    field: { type, name: fieldName },
                     objectModels
                 };
         }
@@ -975,7 +1005,7 @@ function consolidateFields(
     const fieldType = coerceSimpleFieldTypes(fieldTypes);
     return fieldType
         ? {
-              field: { type: fieldType },
+              field: { type: fieldType, name: fieldName },
               objectModels
           }
         : null;
@@ -1156,25 +1186,16 @@ function analyzeDataFileMatchingProperties(partialDataModels: PartialDataModel[]
             const otherNames = _.map(dataModels, 'name');
             const modelName = getUniqueName(_.snakeCase(pathObject.name), otherNames);
             const modelLabel = _.startCase(modelName);
-            let items: undefined | null | FieldListItems;
-            let fields: undefined | Field[];
-            if (dataModelWithFilePaths.isList && dataModelWithFilePaths.items) {
-                items = removeUnknownTypesFromListItem(dataModelWithFilePaths.items);
-                if (!items) {
-                    continue;
-                }
-            } else {
-                fields = removeUnknownTypesFromFields(dataModelWithFilePaths.fields!);
-                if (_.isEmpty(fields)) {
-                    continue;
-                }
+            const itemsOrFields = removeUnknownTypesFromDataModel(dataModelWithFilePaths);
+            if (!itemsOrFields) {
+                continue;
             }
             dataModels.push({
                 type: 'data',
                 name: modelName,
                 label: modelLabel,
                 file: dataModelWithFilePaths.filePaths[0]!,
-                ...(items ? { isList: true, items } : { fields })
+                ...itemsOrFields
             });
         } else {
             const folder = findLowestCommonAncestorFolder(dataModelWithFilePaths.filePaths);
@@ -1187,29 +1208,35 @@ function analyzeDataFileMatchingProperties(partialDataModels: PartialDataModel[]
             const otherNames = _.map(dataModels, 'name');
             modelName = getUniqueName(modelName, otherNames);
             const modelLabel = _.startCase(modelName);
-            let items: undefined | null | FieldListItems;
-            let fields: undefined | Field[];
-            if (dataModelWithFilePaths.isList && dataModelWithFilePaths.items) {
-                items = removeUnknownTypesFromListItem(dataModelWithFilePaths.items);
-                if (!items) {
-                    continue;
-                }
-            } else {
-                fields = removeUnknownTypesFromFields(dataModelWithFilePaths.fields!);
-                if (_.isEmpty(fields)) {
-                    continue;
-                }
+            const itemsOrFields = removeUnknownTypesFromDataModel(dataModelWithFilePaths);
+            if (!itemsOrFields) {
+                continue;
             }
             dataModels.push({
                 type: 'data',
                 name: modelName,
                 label: modelLabel,
                 folder: folder,
-                ...(items ? { isList: true, items } : { fields })
+                ...itemsOrFields
             });
         }
     }
     return dataModels;
+}
+
+function removeUnknownTypesFromDataModel(partialDataModel: PartialDataModel): { isList: true; items: FieldListItems } | { fields: Field[] } | null {
+    if (partialDataModel.isList && partialDataModel.items) {
+        const items = removeUnknownTypesFromListItem(partialDataModel.items);
+        if (items) {
+            return { isList: true, items };
+        }
+    } else {
+        const fields = removeUnknownTypesFromFields(partialDataModel.fields!);
+        if (!_.isEmpty(fields)) {
+            return { fields };
+        }
+    }
+    return null;
 }
 
 function removeUnknownTypesFromFields(fields: FieldWithUnknown[]): Field[] {
@@ -1217,22 +1244,26 @@ function removeUnknownTypesFromFields(fields: FieldWithUnknown[]): Field[] {
         fields,
         (accum: Field[], field: FieldWithUnknown) => {
             switch (field.type) {
-                case 'unknown':
+                case 'unknown': {
                     return accum;
-                case 'object':
+                }
+                case 'object': {
                     const fields = removeUnknownTypesFromFields(field.fields!);
                     if (_.isEmpty(fields)) {
                         return accum;
                     }
                     return accum.concat(Object.assign(field, { fields }));
-                case 'list':
+                }
+                case 'list': {
                     const items = removeUnknownTypesFromListItem(field.items!);
                     if (!items) {
                         return accum;
                     }
                     return accum.concat(Object.assign(field, { items }));
-                default:
+                }
+                default: {
                     return accum.concat(field);
+                }
             }
         },
         []
@@ -1254,7 +1285,7 @@ function removeUnknownTypesFromListItem(items: FieldListItemsWithUnknown): Field
 
 function getLowestCommonAncestorFolderFromModels<T extends PageModel | DataModel>(models: T[]): string {
     let commonDir: null | string[] = null;
-    for (let model of models) {
+    for (const model of models) {
         let dir;
         if (model.file) {
             dir = path.parse(model.file).dir;
@@ -1267,7 +1298,7 @@ function getLowestCommonAncestorFolderFromModels<T extends PageModel | DataModel
         if (commonDir === null) {
             commonDir = dir;
         } else {
-            let common: string[] = [];
+            const common: string[] = [];
             let j = 0;
             while (j < commonDir.length && j < dir.length && commonDir[j] === dir[j]) {
                 common.push(commonDir[j]!);
@@ -1320,7 +1351,7 @@ function findLowestCommonAncestorFolder(filePaths: string[]): string {
         }
         const commonDirParts = _.split(commonDir, path.sep);
         const dirParts = _.split(dir, path.sep);
-        let common = [];
+        const common = [];
         let j = 0;
         while (j < commonDirParts.length && j < dirParts.length && commonDirParts[j] === dirParts[j]) {
             common.push(commonDirParts[j]);

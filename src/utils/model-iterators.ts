@@ -1,8 +1,7 @@
 import _ from 'lodash';
 
-import { Model } from '../config/config-loader';
-import { Field, FieldListItems, FieldModelProps } from '../config/config-schema';
 import { getListItemsField, isListDataModel, isListField, isObjectListItems, isModelField, isObjectField, isModelListItems } from './model-utils';
+import { Field, FieldListItems, FieldModelProps, Model } from '../config/config-types';
 
 /**
  * This function invokes the `iteratee` function for every field of the `model`.
@@ -113,7 +112,7 @@ export function iterateObjectFieldsWithModelRecursively(
         let modelField: FieldModelProps | null = null;
 
         if (!model && !field && !fieldListItem) {
-            error = `could not match model/field ${modelKeyPath.join('.')} to content at ${valueKeyPath.join('.')}`;
+            error = `could not match model/field ${modelKeyPath.join('.')} for content at ${valueKeyPath.join('.')}`;
         }
 
         if (field && isModelField(field)) {
@@ -145,8 +144,10 @@ export function iterateObjectFieldsWithModelRecursively(
         iteratee({ value, model, field, fieldListItem, error, valueKeyPath, modelKeyPath, objectStack });
 
         if (_.isPlainObject(value)) {
-            const modelOrField = model || field || fieldListItem;
-            const fields = modelOrField?.fields || [];
+            // if fields will not be resolved or the object will have a key that
+            // doesn't exist among fields, the nested calls to _iterateDeep will
+            // include an error.
+            const fields = getFieldsOfModelOrField(model, field, fieldListItem);
             const fieldsByName = _.keyBy(fields, 'name');
             modelKeyPath = _.concat(modelKeyPath, 'fields');
             _.forEach(value, (val, key) => {
@@ -265,8 +266,10 @@ export function mapObjectFieldsWithModelRecursively(
         }
 
         if (_.isPlainObject(value)) {
-            const modelOrField = model || field || fieldListItem;
-            const fields = modelOrField?.fields || [];
+            // if fields will not be resolved or the object will have a key that
+            // doesn't exist among fields, the nested calls to _iterateDeep will
+            // include an error.
+            const fields = getFieldsOfModelOrField(model, field, fieldListItem);
             const fieldsByName = _.keyBy(fields, 'name');
             modelKeyPath = _.concat(modelKeyPath, 'fields');
             value = _.mapValues(value, (val, key) => {
@@ -358,4 +361,15 @@ export function getModelOfObject({
         modelName,
         model: modelsByName[modelName]!
     };
+}
+
+function getFieldsOfModelOrField(model: Model | null, field: Field | null, fieldListItems: FieldListItems | null): Field[] {
+    if (model && model.fields) {
+        return model.fields;
+    } else if (field && isObjectField(field)) {
+        return field.fields;
+    } else if (fieldListItems && isObjectListItems(fieldListItems)) {
+        return fieldListItems.fields;
+    }
+    return [];
 }

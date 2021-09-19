@@ -1,18 +1,8 @@
 export * from './config/config-schema';
+export * from './config/config-types';
+export * from './config/config-consts';
 export * from './content/content-errors';
-export {
-    loadConfig,
-    ObjectModel,
-    DataModel,
-    ConfigModel,
-    PageModel,
-    Model,
-    ConfigLoaderOptions,
-    ConfigLoaderResult,
-    Config,
-    ConfigError,
-    ConfigNormalizedValidationError
-} from './config/config-loader';
+export { loadConfig, ConfigLoaderOptions, ConfigLoaderResult, ConfigError, ConfigNormalizedValidationError } from './config/config-loader';
 export * from './config/config-errors';
 export { writeConfig, WriteConfigOptions, convertToYamlConfig } from './config/config-writer';
 export { loadContent, ContentItem, ContentLoaderOptions, ContentLoaderResult } from './content/content-loader';

@@ -1,8 +1,8 @@
 import micromatch from 'micromatch';
 import _ from 'lodash';
 
-import { Model } from '../config/config-loader';
 import { FileMatchedMultipleModelsError, FileNotMatchedModelError } from '../content/content-errors';
+import { Model } from '../config/config-types';
 
 interface BaseModelQuery {
     filePath: string;
@@ -22,7 +22,8 @@ type ModelQuery = BaseModelQuery | TypedModelQuery;
  * @param {Object} query A query object to match a model against.
  * @param {string} query.filePath The path of the content file relative to the `pagesDir` or `dataDir` folders defined in stackbit.yaml.
  * @param {string} [query.type] The type of the data file. For example, can be page's layout that maps to page's model.
- * @param {Array|string} [query.modelTypeKeyPath] Used to compare the value of `query.type` with the value of a model at `modelTypeKeyPath`. Required if `query.type` is provided.
+ * @param {Array|string} [query.modelTypeKeyPath] Used to compare the value of `query.type` with the value of a model at `modelTypeKeyPath`.
+ *   Required if `query.type` is provided.
  * @param {Array.<Object>} models Array of stackbit.yaml `models`.
  * @return {Object} stackbit.yaml model matching the `query`.
  */
@@ -53,7 +54,8 @@ export function getModelByQuery(query: ModelQuery, models: Model[]): { model: Mo
  * @param {Object} query A query object to match models against.
  * @param {string} query.filePath The path of the content file relative to the `pagesDir` or `dataDir` folders defined in stackbit.yaml.
  * @param {string} [query.type] The type of the data file. For example, can be page's layout that maps to page's model.
- * @param {Array|string} [query.modelTypeKeyPath] Used to compare the value of `query.type` with the value of a model at `modelTypeKeyPath`. Required if `query.type` is provided.
+ * @param {Array|string} [query.modelTypeKeyPath] Used to compare the value of `query.type` with the value of a model at `modelTypeKeyPath`.
+ *   Required if `query.type` is provided.
  * @param {Array.<Object>} models Array of stackbit.yaml `models`.
  * @return {Array.<Model>} Array of stackbit.yaml models matching the `query`.
  */

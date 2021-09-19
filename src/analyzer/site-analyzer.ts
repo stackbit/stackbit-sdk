@@ -3,9 +3,8 @@ import _ from 'lodash';
 import { getFileBrowserFromOptions, GetFileBrowserOptions } from './file-browser';
 import { matchSSG, SSGMatchResult } from './ssg-matcher';
 import { CMSMatchResult, matchCMS } from './cms-matcher';
-import { Config } from '../config/config-loader';
 import { generateSchema, SchemaGeneratorResult } from './schema-generator';
-import { AssetsModel } from '../config/config-schema';
+import { Assets, Config } from '../config/config-types';
 
 export type SiteAnalyzerOptions = GetFileBrowserOptions;
 
@@ -51,7 +50,7 @@ export async function analyzeSite(options: SiteAnalyzerOptions): Promise<SiteAna
     };
 }
 
-function generateAssets(ssgMatchResult: SSGMatchResult | null): AssetsModel | undefined {
+function generateAssets(ssgMatchResult: SSGMatchResult | null): Assets | undefined {
     if (ssgMatchResult?.assetsReferenceType === 'static' && ssgMatchResult?.staticDir) {
         return {
             referenceType: 'static',
