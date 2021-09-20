@@ -62,7 +62,7 @@ export async function loadConfig({ dirPath }: ConfigLoaderOptions): Promise<Conf
 
     const config = resolveConfig(configLoadResult.config);
     const validationResult = validate(config);
-    convertModelCategoriesToModels(validationResult);
+    convertModelGroupsToModelList(validationResult);
     const convertedResult = convertModelsToArray(validationResult);
     const errors = [...configLoadResult.errors, ...convertedResult.errors];
     return {
@@ -401,29 +401,29 @@ function getReferencedModelNames(field: any) {
     return referencedModelNames;
 }
 
-function convertModelCategoriesToModels(validationResult: ConfigValidationResult) {
+function convertModelGroupsToModelList(validationResult: ConfigValidationResult) {
     const models = validationResult.value?.models ?? {};
 
-    const categoryMap = _.reduce(
+    const groupMap = _.reduce(
         models,
-        (categoryMap, model, modelName) => {
-            if (!model.categories) {
-                return categoryMap;
+        (groupMap, model, modelName) => {
+            if (!model.groups) {
+                return groupMap;
             }
             const key = model?.type === 'object' ? 'objectModels' : 'documentModels';
-            _.forEach(model.categories, (categoryName) => {
-                append(categoryMap, [categoryName, key], modelName);
+            _.forEach(model.groups, (groupName) => {
+                append(groupMap, [groupName, key], modelName);
             });
-            delete model.categories;
-            return categoryMap;
+            delete model.groups;
+            return groupMap;
         },
         {} as Record<string, { objectModels?: string[]; documentModels?: string[] }>
     );
 
-    // update categories to have unique model names
-    _.forEach(categoryMap, (category) => {
-        _.forEach(category, (modelCategory, key) => {
-            _.set(category, key, _.uniq(modelCategory));
+    // update groups to have unique model names
+    _.forEach(groupMap, (group) => {
+        _.forEach(group, (modelGroup, key) => {
+            _.set(group, key, _.uniq(modelGroup));
         });
     });
 
@@ -432,7 +432,7 @@ function convertModelCategoriesToModels(validationResult: ConfigValidationResult
             if (isListField(field)) {
                 field = getListItemsField(field);
             }
-            if (field.categories) {
+            if (field.groups) {
                 let key: string | null = null;
                 if (isModelField(field)) {
                     key = 'objectModels';
@@ -441,15 +441,15 @@ function convertModelCategoriesToModels(validationResult: ConfigValidationResult
                 }
                 if (key) {
                     field.models = _.reduce(
-                        field.categories,
-                        (modelNames, categoryName) => {
-                            const objectModelNames = _.get(categoryMap, [categoryName, key], []);
+                        field.groups,
+                        (modelNames, groupName) => {
+                            const objectModelNames = _.get(groupMap, [groupName, key], []);
                             return _.uniq(modelNames.concat(objectModelNames));
                         },
                         field.models || []
                     );
                 }
-                delete field.categories;
+                delete field.groups;
             }
         });
     });

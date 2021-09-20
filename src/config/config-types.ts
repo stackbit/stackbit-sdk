@@ -109,7 +109,7 @@ export interface YamlBaseModel {
     extends?: string | string[];
     labelField?: string;
     variantField?: string;
-    categories?: string[];
+    groups?: string[];
     fieldGroups?: FieldGroupItem[];
     fields?: Field[];
 }
@@ -273,13 +273,13 @@ export interface FieldObjectProps {
 export interface FieldModelProps {
     type: 'model';
     models: string[];
-    categories?: string[];
+    groups?: string[];
 }
 
 export interface FieldReferenceProps {
     type: 'reference';
     models: string[];
-    categories?: string[];
+    groups?: string[];
 }
 
 export interface FieldListProps {

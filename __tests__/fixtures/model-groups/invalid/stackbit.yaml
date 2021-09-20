@@ -8,60 +8,60 @@ models:
     fields:
       - type: model
         name: model_field
-        categories:
-          - category_1
-          - category_2
-          - category_3
+        groups:
+          - group_1
+          - group_2
+          - group_3
       - type: reference
         name: reference_field
-        categories:
-          - category_1
-          - category_2
-          - category_3
+        groups:
+          - group_1
+          - group_2
+          - group_3
       - type: list
         name: model_list_field
         items:
           type: model
-          categories:
-            - category_1
-            - category_2
-            - category_3
+          groups:
+            - group_1
+            - group_2
+            - group_3
       - type: list
         name: reference_list_field
         items:
           type: reference
-          categories:
-            - category_1
-            - category_2
-            - category_3
+          groups:
+            - group_1
+            - group_2
+            - group_3
   object_2:
     type: object
     label: Object 2
-    categories:
-      - category_1
+    groups:
+      - group_1
   object_3:
     type: object
     label: Object 2
-    categories:
-      - category_2
+    groups:
+      - group_2
   page_1:
     type: page
     label: Page 1
-    categories:
-      - category_2
+    groups:
+      - group_2
   page_2:
     type: page
     label: Page 2
-    categories:
-      - category_3
+    groups:
+      - group_3
   data_1:
     type: data
     label: Data 1
-    categories:
-      - category_2
+    groups:
+      - group_2
   data_2:
     type: data
     label: Data 2
-    categories:
-      - category_3
+    groups:
+      - group_3
 

@@ -478,13 +478,13 @@ describe('model and reference fields', () => {
         });
     });
 
-    test.each(['model', 'reference'])('"model" and "reference" fields with "categories" instead of "models" should pass validation', (fieldType) => {
+    test.each(['model', 'reference'])('"model" and "reference" fields with "groups" instead of "models" should pass validation', (fieldType) => {
         expectModelPassingValidation({
             fields: [
                 {
                     type: fieldType,
                     name: 'style',
-                    categories: []
+                    groups: []
                 }
             ]
         });
