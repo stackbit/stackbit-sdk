@@ -40,8 +40,19 @@ export interface ConfigLoaderResult {
     errors: ConfigError[];
 }
 
+export interface NormalizedValidationResult {
+    config: Config;
+    valid: boolean;
+    errors: ConfigNormalizedValidationError[];
+}
+
+export interface TempConfigLoaderResult {
+    config?: any;
+    errors: ConfigLoadError[];
+}
+
 export async function loadConfig({ dirPath }: ConfigLoaderOptions): Promise<ConfigLoaderResult> {
-    let configLoadResult;
+    let configLoadResult: TempConfigLoaderResult;
     try {
         configLoadResult = await loadConfigFromDir(dirPath);
     } catch (error) {
@@ -60,19 +71,21 @@ export async function loadConfig({ dirPath }: ConfigLoaderOptions): Promise<Conf
         };
     }
 
-    const config = resolveConfig(configLoadResult.config);
-    const validationResult = validate(config);
-    convertModelGroupsToModelList(validationResult);
-    const convertedResult = convertModelsToArray(validationResult);
-    const errors = [...configLoadResult.errors, ...convertedResult.errors];
+    const normalizedResult = sanitizeAndValidateConfig(configLoadResult.config);
     return {
-        valid: validationResult.valid,
-        config: convertedResult.config,
-        errors: errors
+        valid: normalizedResult.valid,
+        config: normalizedResult.config,
+        errors: [...configLoadResult.errors, ...normalizedResult.errors]
     };
 }
 
-async function loadConfigFromDir(dirPath: string): Promise<{ config?: any; errors: ConfigLoadError[] }> {
+export function sanitizeAndValidateConfig(config: any): NormalizedValidationResult {
+    config = sanitizeConfig(config);
+    const validationResult = validate(config);
+    return normalizeValidationResult(validationResult);
+}
+
+async function loadConfigFromDir(dirPath: string): Promise<TempConfigLoaderResult> {
     const { config, error } = await loadConfigFromStackbitYaml(dirPath);
     if (error) {
         return { errors: [error] };
@@ -194,7 +207,7 @@ async function loadConfigFromDotStackbit(dirPath: string) {
     return _.isEmpty(config) ? null : config;
 }
 
-function resolveConfig(config: any): any {
+function sanitizeConfig(config: any): any {
     const pageLayoutKey = _.get(config, 'pageLayoutKey', 'layout');
     const objectTypeKey = _.get(config, 'objectTypeKey', 'type');
     const stackbitYamlVersion = String(_.get(config, 'stackbitVersion', ''));
@@ -401,6 +414,12 @@ function getReferencedModelNames(field: any) {
     return referencedModelNames;
 }
 
+function normalizeValidationResult(validationResult: ConfigValidationResult): NormalizedValidationResult {
+    convertModelGroupsToModelList(validationResult);
+    extendModelTypes(validationResult);
+    return convertModelsToArray(validationResult);
+}
+
 function convertModelGroupsToModelList(validationResult: ConfigValidationResult) {
     const models = validationResult.value?.models ?? {};
 
@@ -455,8 +474,29 @@ function convertModelGroupsToModelList(validationResult: ConfigValidationResult)
     });
 }
 
-function convertModelsToArray(validationResult: ConfigValidationResult): { config: Config; errors: ConfigNormalizedValidationError[] } {
-    const config = _.cloneDeep(validationResult.value);
+function extendModelTypes(validationResult: ConfigValidationResult) {
+    const config = validationResult.value;
+    const contentModels = config?.contentModels ?? {};
+    const models = config?.models ?? {};
+
+    config.models = _.mapValues(models, (model, modelName) => {
+        const contentModel = contentModels[modelName];
+        if (!contentModel) {
+            return model;
+        }
+        return {
+            type: contentModel.isPage ? 'page' : 'data',
+            ...(contentModel.newFilePath ? { filePath: contentModel.newFilePath } : {}),
+            ..._.omit(contentModel, ['isPage', 'newFilePath']),
+            ..._.omit(model, 'type')
+        };
+    });
+
+    delete config.contentModels;
+}
+
+function convertModelsToArray(validationResult: ConfigValidationResult): NormalizedValidationResult {
+    const config = validationResult.value;
 
     // in stackbit.yaml 'models' are defined as object where keys are the model names,
     // convert 'models' to array of objects and set their 'name' property to the
@@ -490,6 +530,7 @@ function convertModelsToArray(validationResult: ConfigValidationResult): { confi
     });
 
     return {
+        valid: validationResult.valid,
         config: {
             ...config,
             models: modelArray

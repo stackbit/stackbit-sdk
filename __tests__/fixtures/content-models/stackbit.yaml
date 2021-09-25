@@ -1,0 +1,26 @@
+stackbitVersion: 0.3.0
+dataDir: "content/data"
+objectTypeKey: "type"
+pagesDir: "content/pages"
+pageLayoutKey: "layout"
+contentModels:
+  model_1:
+    isPage: true
+    urlPath: '/blog/{slug}'
+    newFilePath: 'blog/{slug}.md'
+    folder: 'blog'
+    match: '**/*.md'
+    exclude: 'index.md'
+  model_2:
+    newFilePath: 'authors/{slug}.json'
+    folder: 'authors'
+models:
+  model_1:
+    type: page
+    label: Model 1
+  model_2:
+    type: data
+    label: Model 2
+  model_3:
+    type: object
+    label: Model 3

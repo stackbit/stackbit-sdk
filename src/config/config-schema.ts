@@ -17,8 +17,19 @@ import {
     ModelMap,
     YamlPageModel,
     FieldGroupItem,
-    YamlObjectModel
+    YamlObjectModel,
+    ContentModelMap,
+    ContentModel
 } from './config-types';
+
+function getConfigFromValidationState(state: Joi.State): YamlConfig {
+    return _.last(state.ancestors)!;
+}
+
+function getModelsFromValidationState(state: Joi.State): ModelMap {
+    const config = getConfigFromValidationState(state);
+    return config.models ?? {};
+}
 
 const fieldNamePattern = /^[a-zA-Z0-9]([a-zA-Z0-9_-]*[a-zA-Z0-9])?$/;
 const fieldNameError =
@@ -34,8 +45,7 @@ const fieldNameSchema = Joi.string()
 
 const objectModelNameErrorCode = 'model.not.object.model';
 const validObjectModelNames = Joi.custom((value, { error, state }) => {
-    const config: YamlConfig = _.last(state.ancestors)!;
-    const models = config.models ?? {};
+    const models = getModelsFromValidationState(state);
     const modelNames = Object.keys(models);
     const objectModelNames = modelNames.filter((modelName) => models[modelName]!.type === 'object');
     if (!objectModelNames.includes(value)) {
@@ -50,9 +60,8 @@ const validObjectModelNames = Joi.custom((value, { error, state }) => {
 });
 
 const documentModelNameErrorCode = 'model.not.document.model';
-const validPageOrDataModelNames = Joi.custom((value, { error, state }) => {
-    const config: YamlConfig = _.last(state.ancestors)!;
-    const models = config.models ?? {};
+const validReferenceModelNames = Joi.custom((value, { error, state }) => {
+    const models = getModelsFromValidationState(state);
     const modelNames = Object.keys(models);
     const documentModels = modelNames.filter((modelName) => ['page', 'data'].includes(models[modelName]!.type));
     if (!documentModels.includes(value)) {
@@ -70,7 +79,7 @@ const groupNotFoundErrorCode = 'group.not.found';
 const groupNotObjectModelErrorCode = 'group.not.object.model';
 const validModelFieldGroups = Joi.string()
     .custom((group, { error, state }) => {
-        const config: YamlConfig = _.last(state.ancestors)!;
+        const config = getConfigFromValidationState(state);
         const groupModels = getModelNamesForGroup(group, config);
         if (!_.isEmpty(groupModels.documentModels)) {
             return error(groupNotObjectModelErrorCode, { nonObjectModels: groupModels.documentModels.join(', ') });
@@ -93,7 +102,7 @@ const validModelFieldGroups = Joi.string()
 const groupNotDocumentModelErrorCode = 'group.not.document.model';
 const validReferenceFieldGroups = Joi.string()
     .custom((group, { error, state }) => {
-        const config: YamlConfig = _.last(state.ancestors)!;
+        const config = getConfigFromValidationState(state);
         const groupModels = getModelNamesForGroup(group, config);
         if (!_.isEmpty(groupModels.objectModels)) {
             return error(groupNotDocumentModelErrorCode, { nonDocumentModels: groupModels.objectModels.join(', ') });
@@ -349,7 +358,7 @@ const modelFieldPartialSchema = Joi.object({
 
 const referenceFieldPartialSchema = Joi.object({
     type: Joi.string().valid('reference').required(),
-    models: Joi.array().items(validPageOrDataModelNames).when('groups', {
+    models: Joi.array().items(validReferenceModelNames).when('groups', {
         not: Joi.exist(),
         then: Joi.required()
     }),
@@ -385,6 +394,49 @@ const partialFieldWithListSchema = partialFieldSchema.when('.type', {
 const fieldSchema: Joi.ObjectSchema<Field> = fieldCommonPropsSchema.concat(partialFieldWithListSchema);
 
 const fieldsSchema = Joi.array().items(fieldSchema).unique('name').id('fieldsSchema');
+
+const contentModelKeyNotFound = 'contentModel.model.not.found';
+const contentModelTypeNotPage = 'contentModel.type.not.page';
+const contentModelTypeNotData = 'contentModel.type.not.data';
+const contentModelSchema = Joi.object<ContentModel>({
+    isPage: Joi.boolean(),
+    newFilePath: Joi.string(),
+    file: Joi.string(),
+    folder: Joi.string(),
+    match: Joi.array().items(Joi.string()).single(),
+    exclude: Joi.array().items(Joi.string()).single()
+})
+    .without('file', ['folder', 'match', 'exclude'])
+    .when('.isPage', {
+        is: true,
+        then: Joi.object({
+            urlPath: Joi.string(),
+            hideContent: Joi.boolean()
+        })
+    })
+    .custom((contentModel, { error, state }) => {
+        const models = getModelsFromValidationState(state);
+        const modelName = _.last(state.path)!;
+        const model = models[modelName];
+        if (!model) {
+            return error(contentModelKeyNotFound, { modelName });
+        } else if (contentModel.isPage && model.type !== 'page') {
+            return error(contentModelTypeNotPage, { modelName });
+        } else if (!contentModel.isPage && model.type !== 'data') {
+            return error(contentModelTypeNotData, { modelName });
+        }
+        return contentModel;
+    })
+    .prefs({
+        messages: {
+            [contentModelKeyNotFound]: 'The key "{{#modelName}}" of contentModels must reference the name of an existing model',
+            [contentModelTypeNotPage]: 'The contentModels.{{#modelName}}.isPage is true, but the referenced model is not of type "page"',
+            [contentModelTypeNotData]: 'The contentModels.{{#modelName}} references a model which is not of type "data"'
+        },
+        errors: { wrap: { label: false } }
+    });
+
+const contentModelsSchema = Joi.object<ContentModelMap>().pattern(Joi.string(), contentModelSchema);
 
 const baseModelSchema = Joi.object<YamlBaseModel>({
     __metadata: Joi.object({
@@ -564,7 +616,7 @@ const modelsSchema = Joi.object<ModelMap>()
         errors: { wrap: { label: false } }
     });
 
-const schema = Joi.object<YamlConfig>({
+export const stackbitConfigSchema = Joi.object<YamlConfig>({
     stackbitVersion: Joi.string().required(),
     ssgName: Joi.string().valid(...SSG_NAMES),
     ssgVersion: Joi.string(),
@@ -583,6 +635,7 @@ const schema = Joi.object<YamlConfig>({
     objectTypeKey: Joi.string(),
     excludePages: Joi.array().items(Joi.string()).single(),
     logicFields: Joi.array().items(logicField),
+    contentModels: contentModelsSchema,
     modelsSource: modelsSourceSchema,
     models: modelsSchema
 })
@@ -600,5 +653,3 @@ const schema = Joi.object<YamlConfig>({
         })
     })
     .shared(fieldsSchema);
-
-export const stackbitConfigSchema = schema;

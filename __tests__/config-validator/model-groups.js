@@ -186,7 +186,8 @@ describe('model "groups" property', () => {
                     type: 'group.not.object.model',
                     fieldPath: ['models', 'object_1', 'fields', 0, 'groups', 1],
                     message: expect.stringContaining(
-                        'models.object_1.fields[0].groups[1] of a "model" field must reference a group with only models of type "object", the "group_2" group includes models of type "page" or "data" (data_1, data_2)'
+                        'models.object_1.fields[0].groups[1] of a "model" field must reference a group with ' +
+                        'only models of type "object", the "group_2" group includes models of type "page" or "data" (data_1, data_2)'
                     )
                 }
             ]
@@ -221,7 +222,8 @@ describe('model "groups" property', () => {
                     type: 'group.not.object.model',
                     fieldPath: ['models', 'object_1', 'fields', 0, 'items', 'groups', 1],
                     message: expect.stringContaining(
-                        'models.object_1.fields[0].items.groups[1] of a "model" field must reference a group with only models of type "object", the "group_2" group includes models of type "page" or "data" (data_1, data_2)'
+                        'models.object_1.fields[0].items.groups[1] of a "model" field must reference a group with ' +
+                        'only models of type "object", the "group_2" group includes models of type "page" or "data" (data_1, data_2)'
                     )
                 }
             ]
@@ -254,7 +256,8 @@ describe('model "groups" property', () => {
                     type: 'group.not.document.model',
                     fieldPath: ['models', 'object_1', 'fields', 0, 'groups', 0],
                     message: expect.stringContaining(
-                        'models.object_1.fields[0].groups[0] of a "reference" field must reference a group with only models of type "page" or "data", the "group_1" group includes models of type "object" (object_2, object_3)'
+                        'models.object_1.fields[0].groups[0] of a "reference" field must reference a group with ' +
+                        'only models of type "page" or "data", the "group_1" group includes models of type "object" (object_2, object_3)'
                     )
                 }
             ]
@@ -290,7 +293,8 @@ describe('model "groups" property', () => {
                     type: 'group.not.document.model',
                     fieldPath: ['models', 'object_1', 'fields', 0, 'items', 'groups', 0],
                     message: expect.stringContaining(
-                        'models.object_1.fields[0].items.groups[0] of a "reference" field must reference a group with only models of type "page" or "data", the "group_1" group includes models of type "object" (object_2, object_3)'
+                        'models.object_1.fields[0].items.groups[0] of a "reference" field must reference a group with ' +
+                        'only models of type "page" or "data", the "group_1" group includes models of type "object" (object_2, object_3)'
                     )
                 }
             ]
@@ -380,7 +384,7 @@ describe('model "groups" property', () => {
         });
     });
 
-    test('should convert to correct models list', async () => {
+    test('should be converted to a models list when config is loaded', async () => {
         const azimuthStackbitYamlPath = path.join(__dirname, '../fixtures/model-groups/valid');
         const result = await loadConfig({ dirPath: azimuthStackbitYamlPath });
         const object1Model = _.find(result.config.models, { name: 'object_1' });
