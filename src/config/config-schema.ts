@@ -414,29 +414,37 @@ const contentModelSchema = Joi.object<ContentModel>({
             hideContent: Joi.boolean()
         })
     })
-    .custom((contentModel, { error, state }) => {
-        const models = getModelsFromValidationState(state);
+    .custom((contentModel, { error, state, prefs }) => {
+        const models = _.get(prefs, 'context.models');
         const modelName = _.last(state.path)!;
         const model = models[modelName];
         if (!model) {
             return error(contentModelKeyNotFound, { modelName });
-        } else if (contentModel.isPage && model.type !== 'page') {
-            return error(contentModelTypeNotPage, { modelName });
-        } else if (!contentModel.isPage && model.type !== 'data') {
-            return error(contentModelTypeNotData, { modelName });
+        } else if (contentModel.isPage && model.type && !['page', 'object'].includes(model.type)) {
+            return error(contentModelTypeNotPage, { modelName, modelType: model.type });
+        } else if (!contentModel.isPage && model.type && !['data', 'object'].includes(model.type)) {
+            return error(contentModelTypeNotData, { modelName, modelType: model.type });
         }
         return contentModel;
     })
     .prefs({
         messages: {
             [contentModelKeyNotFound]: 'The key "{{#modelName}}" of contentModels must reference the name of an existing model',
-            [contentModelTypeNotPage]: 'The contentModels.{{#modelName}}.isPage is true, but the referenced model is not of type "page"',
-            [contentModelTypeNotData]: 'The contentModels.{{#modelName}} references a model which is not of type "data"'
+            [contentModelTypeNotPage]:
+                'The contentModels.{{#modelName}}.isPage is set to true, but the "{{#modelName}}" model\'s type is "{{#modelType}}". ' +
+                'The contentModels should reference models of "object" type only. ' +
+                'Set the "{{#modelName}}" model\'s type property to "object" or delete it use the default "object"',
+            [contentModelTypeNotData]:
+                'The contentModels.{{#modelName}} references a model of type "{{#modelType}}". ' +
+                'The contentModels should reference models of "object" type only. ' +
+                'Set the "{{#modelName}}" model\'s type property to "object" or delete it use the default "object"'
         },
         errors: { wrap: { label: false } }
     });
 
-const contentModelsSchema = Joi.object<ContentModelMap>().pattern(Joi.string(), contentModelSchema);
+export const contentModelsSchema = Joi.object({
+    contentModels: Joi.object<ContentModelMap>().pattern(Joi.string(), contentModelSchema)
+});
 
 const baseModelSchema = Joi.object<YamlBaseModel>({
     __metadata: Joi.object({
@@ -467,6 +475,7 @@ const dataModelSchema: Joi.ObjectSchema<YamlDataModel> = baseModelSchema
     .concat(
         Joi.object({
             type: Joi.string().valid('data').required(),
+            filePath: Joi.string(),
             file: Joi.string(),
             folder: Joi.string(),
             match: Joi.array().items(Joi.string()).single(),
@@ -635,7 +644,6 @@ export const stackbitConfigSchema = Joi.object<YamlConfig>({
     objectTypeKey: Joi.string(),
     excludePages: Joi.array().items(Joi.string()).single(),
     logicFields: Joi.array().items(logicField),
-    contentModels: contentModelsSchema,
     modelsSource: modelsSourceSchema,
     models: modelsSchema
 })

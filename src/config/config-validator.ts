@@ -1,5 +1,7 @@
 import _ from 'lodash';
-import { stackbitConfigSchema } from './config-schema';
+import Joi from 'joi';
+
+import { stackbitConfigSchema, contentModelsSchema } from './config-schema';
 
 export interface ConfigValidationError {
     name: 'ConfigValidationError';
@@ -16,12 +18,44 @@ export interface ConfigValidationResult {
     errors: ConfigValidationError[];
 }
 
-export function validate(config: any): ConfigValidationResult {
+export function validateConfig(config: any): ConfigValidationResult {
     const validationOptions = { abortEarly: false };
     const validationResult = stackbitConfigSchema.validate(config, validationOptions);
     const value = validationResult.value;
+    const errors = mapJoiErrorsToConfigValidationErrors(validationResult);
+    const valid = _.isEmpty(errors);
+    markInvalidModels(value, errors, 'models');
+    return {
+        value,
+        valid,
+        errors
+    };
+}
+
+export function validateContentModels(contentModels: any, models: any): ConfigValidationResult {
+    const validationResult = contentModelsSchema.validate(
+        { contentModels: contentModels },
+        {
+            abortEarly: false,
+            context: {
+                models: models
+            }
+        }
+    );
+    const value = validationResult.value;
+    const errors = mapJoiErrorsToConfigValidationErrors(validationResult);
+    const valid = _.isEmpty(errors);
+    markInvalidModels(value, errors, 'contentModels');
+    return {
+        value,
+        valid,
+        errors
+    };
+}
+
+function mapJoiErrorsToConfigValidationErrors(validationResult: Joi.ValidationResult): ConfigValidationError[] {
     const joiErrors = validationResult.error?.details || [];
-    const errors = joiErrors.map(
+    return joiErrors.map(
         (validationError): ConfigValidationError => {
             return {
                 name: 'ConfigValidationError',
@@ -32,18 +66,11 @@ export function validate(config: any): ConfigValidationResult {
             };
         }
     );
-    markInvalidModels(value, errors);
-    const valid = _.isEmpty(errors);
-    return {
-        value,
-        valid,
-        errors
-    };
 }
 
-function markInvalidModels(config: any, errors: ConfigValidationError[]) {
-    const invalidModelNames = getInvalidModelNames(errors);
-    const models = config.models ?? {};
+function markInvalidModels(config: any, errors: ConfigValidationError[], configKey: string) {
+    const invalidModelNames = getInvalidModelNames(errors, configKey);
+    const models = config[configKey] ?? {};
     _.forEach(models, (model: any, modelName: string): any => {
         if (invalidModelNames.includes(modelName)) {
             _.set(model, '__metadata.invalid', true);
@@ -51,13 +78,13 @@ function markInvalidModels(config: any, errors: ConfigValidationError[]) {
     });
 }
 
-function getInvalidModelNames(errors: ConfigValidationError[]) {
+function getInvalidModelNames(errors: ConfigValidationError[], configKey: string) {
     // get array of invalid model names by iterating errors and filtering these
     // having fieldPath starting with ['models', modelName]
     return _.reduce(
         errors,
         (modelNames: string[], error: ConfigValidationError) => {
-            if (error.fieldPath[0] === 'models' && typeof error.fieldPath[1] == 'string') {
+            if (error.fieldPath[0] === configKey && typeof error.fieldPath[1] == 'string') {
                 const modelName = error.fieldPath[1];
                 modelNames.push(modelName);
             }

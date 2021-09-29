@@ -1,10 +1,6 @@
 const { describe, expect, test } = require('@jest/globals');
 
-const {
-    expectPassingValidation,
-    expectValidationResultToMatchAllErrors,
-    expectConfigToBeSanitizedPassValidationAndMatchObject
-} = require('../test-utils');
+const { expectPassingValidation, expectValidationResultToMatchAllErrors, expectConfigPassingValidationAndMatchObject } = require('../test-utils');
 
 describe('model name', () => {
     test('should fail validation if set to illegal value', () => {
@@ -229,25 +225,30 @@ describe('"data" model with "file" property', () => {
     });
 
     test('"data" model with "match" and "exclude" as strings should be converted to arrays of strings', async () => {
-        expectConfigToBeSanitizedPassValidationAndMatchObject({
-            models: {
-                author: {
-                    type: 'data',
-                    label: 'Author',
-                    folder: 'data/authors',
-                    match: '**/*.json',
-                    exclude: '**/*.md'
+        expectConfigPassingValidationAndMatchObject(
+            {
+                models: {
+                    author: {
+                        type: 'data',
+                        label: 'Author',
+                        folder: 'data/authors',
+                        match: '**/*.json',
+                        exclude: '**/*.md'
+                    }
                 }
+            },
+            {
+                models: [
+                    {
+                        name: 'author',
+                        type: 'data',
+                        folder: 'data/authors',
+                        match: ['**/*.json'],
+                        exclude: ['**/*.md']
+                    }
+                ]
             }
-        }, {
-            models: [{
-                name: 'author',
-                type: 'data',
-                folder: 'data/authors',
-                match: ['**/*.json'],
-                exclude: ['**/*.md']
-            }]
-        });
+        );
     });
 });
 
@@ -514,25 +515,30 @@ describe('"page" model "file" and "singleInstance" properties are mutual exclusi
     });
 
     test('"page" model with "match" and "exclude" as strings should be converted to arrays of strings', async () => {
-        expectConfigToBeSanitizedPassValidationAndMatchObject({
-            models: {
-                post: {
-                    type: 'page',
-                    label: 'Post',
-                    folder: 'posts',
-                    match: '**/*.md',
-                    exclude: '**/*.json'
+        expectConfigPassingValidationAndMatchObject(
+            {
+                models: {
+                    post: {
+                        type: 'page',
+                        label: 'Post',
+                        folder: 'posts',
+                        match: '**/*.md',
+                        exclude: '**/*.json'
+                    }
                 }
+            },
+            {
+                models: [
+                    {
+                        name: 'post',
+                        type: 'page',
+                        label: 'Post',
+                        folder: 'posts',
+                        match: ['**/*.md'],
+                        exclude: ['**/*.json']
+                    }
+                ]
             }
-        }, {
-            models: [{
-                name: 'post',
-                type: 'page',
-                label: 'Post',
-                folder: 'posts',
-                match: ['**/*.md'],
-                exclude: ['**/*.json']
-            }]
-        });
+        );
     });
 });

@@ -134,6 +134,7 @@ export interface YamlObjectModel extends YamlBaseModel {
 
 export interface BaseDataModel extends YamlBaseModel {
     type: 'data';
+    filePath?: string;
 }
 
 export interface BasePageModel extends YamlBaseModel {
