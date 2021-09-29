@@ -28,6 +28,7 @@ interface BaseConfig {
     objectTypeKey?: string;
     excludePages?: string | string[];
     logicFields?: LogicField[];
+    contentModels?: ContentModelMap;
     modelsSource?: ModelsSource;
 }
 
@@ -72,6 +73,19 @@ export interface RelativeAssets {
 }
 
 export type LogicField = string;
+
+export type ContentModelMap = Record<string, ContentModel>;
+
+export interface ContentModel {
+    isPage?: boolean;
+    urlPath?: string;
+    hideContent?: boolean;
+    newFilePath?: string;
+    file?: string;
+    folder?: string;
+    match?: string;
+    exclude?: string;
+}
 
 export interface ModelsSource {
     type: 'files';
@@ -120,6 +134,7 @@ export interface YamlObjectModel extends YamlBaseModel {
 
 export interface BaseDataModel extends YamlBaseModel {
     type: 'data';
+    filePath?: string;
 }
 
 export interface BasePageModel extends YamlBaseModel {

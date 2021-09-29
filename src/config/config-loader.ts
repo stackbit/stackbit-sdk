@@ -4,7 +4,7 @@ import yaml from 'js-yaml';
 import semver from 'semver';
 import _ from 'lodash';
 
-import { ConfigValidationError, ConfigValidationResult, validate } from './config-validator';
+import { ConfigValidationError, ConfigValidationResult, validateConfig, validateContentModels } from './config-validator';
 import { ConfigLoadError } from './config-errors';
 import {
     assignLabelFieldIfNeeded,
@@ -40,8 +40,19 @@ export interface ConfigLoaderResult {
     errors: ConfigError[];
 }
 
+export interface NormalizedValidationResult {
+    config: Config;
+    valid: boolean;
+    errors: ConfigNormalizedValidationError[];
+}
+
+export interface TempConfigLoaderResult {
+    config?: any;
+    errors: ConfigLoadError[];
+}
+
 export async function loadConfig({ dirPath }: ConfigLoaderOptions): Promise<ConfigLoaderResult> {
-    let configLoadResult;
+    let configLoadResult: TempConfigLoaderResult;
     try {
         configLoadResult = await loadConfigFromDir(dirPath);
     } catch (error) {
@@ -60,19 +71,41 @@ export async function loadConfig({ dirPath }: ConfigLoaderOptions): Promise<Conf
         };
     }
 
-    const config = resolveConfig(configLoadResult.config);
-    const validationResult = validate(config);
-    convertModelGroupsToModelList(validationResult);
-    const convertedResult = convertModelsToArray(validationResult);
-    const errors = [...configLoadResult.errors, ...convertedResult.errors];
+    const normalizedResult = validateAndNormalizeConfig(configLoadResult.config);
     return {
-        valid: validationResult.valid,
-        config: convertedResult.config,
-        errors: errors
+        valid: normalizedResult.valid,
+        config: normalizedResult.config,
+        errors: [...configLoadResult.errors, ...normalizedResult.errors]
     };
 }
 
-async function loadConfigFromDir(dirPath: string): Promise<{ config?: any; errors: ConfigLoadError[] }> {
+export function validateAndNormalizeConfig(config: any): NormalizedValidationResult {
+    // validate the "contentModels" and extend config models with "contentModels"
+    // this must be done before main config validation to make it independent of "contentModels".
+    const contentModelsValidationResult = validateAndExtendContentModels(config);
+    config = contentModelsValidationResult.value;
+
+    // extend config models having the "extends" property
+    // this must be done before main config validation as some properties like
+    // the labelField will not work when validating models without extending them first
+    config.models = extendModelMap(config?.models || {});
+
+    // extend config - backward compatibility updates, adding extra fields like "markdown_content", "type" and "layout",
+    // and setting other default values.
+    config = extendConfig(config);
+
+    // validate config
+    const configValidationResult = validateConfig(config);
+
+    const errors = [...contentModelsValidationResult.errors, ...configValidationResult.errors];
+    return normalizeValidationResult({
+        valid: _.isEmpty(errors),
+        value: configValidationResult.value,
+        errors: errors
+    });
+}
+
+async function loadConfigFromDir(dirPath: string): Promise<TempConfigLoaderResult> {
     const { config, error } = await loadConfigFromStackbitYaml(dirPath);
     if (error) {
         return { errors: [error] };
@@ -194,16 +227,14 @@ async function loadConfigFromDotStackbit(dirPath: string) {
     return _.isEmpty(config) ? null : config;
 }
 
-function resolveConfig(config: any): any {
+function extendConfig(config: any): any {
     const pageLayoutKey = _.get(config, 'pageLayoutKey', 'layout');
     const objectTypeKey = _.get(config, 'objectTypeKey', 'type');
     const stackbitYamlVersion = String(_.get(config, 'stackbitVersion', ''));
     const ver = semver.coerce(stackbitYamlVersion);
     const isStackbitYamlV2 = ver ? semver.satisfies(ver, '<0.3.0') : false;
-    let models = config?.models || {};
+    const models = config?.models || {};
     let referencedModelNames: string[] = [];
-
-    models = extendModelMap(models);
 
     _.forEach(models, (model) => {
         if (!model) {
@@ -401,6 +432,62 @@ function getReferencedModelNames(field: any) {
     return referencedModelNames;
 }
 
+function validateAndExtendContentModels(config: any) {
+    const contentModels = config.contentModels ?? {};
+    const models = config.models ?? {};
+
+    if (!contentModels) {
+        return config;
+    }
+
+    const validationResult = validateContentModels(contentModels, models);
+
+    const extendedModels = _.mapValues(models, (model, modelName) => {
+        const contentModel = validationResult.value.contentModels[modelName];
+        if (!contentModel) {
+            return {
+                // if a model does not define a type, use the default "object" type
+                type: model.type || 'object',
+                ..._.omit(model, 'type')
+            };
+        }
+        if (_.get(contentModel, '__metadata.invalid')) {
+            return model;
+        }
+        if (contentModel.isPage && (!model.type || ['object', 'page'].includes(model.type))) {
+            return {
+                type: 'page',
+                ...(contentModel.newFilePath ? { filePath: contentModel.newFilePath } : {}),
+                ..._.omit(contentModel, ['isPage', 'newFilePath']),
+                ..._.omit(model, 'type')
+            };
+        } else if (!contentModel.isPage && (!model.type || ['object', 'data'].includes(model.type))) {
+            return {
+                type: 'data',
+                ...(contentModel.newFilePath ? { filePath: contentModel.newFilePath } : {}),
+                ..._.omit(contentModel, ['newFilePath']),
+                ..._.omit(model, 'type')
+            };
+        } else {
+            return model;
+        }
+    });
+
+    return {
+        valid: validationResult.valid,
+        value: {
+            ..._.omit(config, ['contentModels', 'models']),
+            models: extendedModels
+        },
+        errors: validationResult.errors
+    };
+}
+
+function normalizeValidationResult(validationResult: ConfigValidationResult): NormalizedValidationResult {
+    convertModelGroupsToModelList(validationResult);
+    return convertModelsToArray(validationResult);
+}
+
 function convertModelGroupsToModelList(validationResult: ConfigValidationResult) {
     const models = validationResult.value?.models ?? {};
 
@@ -455,8 +542,8 @@ function convertModelGroupsToModelList(validationResult: ConfigValidationResult)
     });
 }
 
-function convertModelsToArray(validationResult: ConfigValidationResult): { config: Config; errors: ConfigNormalizedValidationError[] } {
-    const config = _.cloneDeep(validationResult.value);
+function convertModelsToArray(validationResult: ConfigValidationResult): NormalizedValidationResult {
+    const config = validationResult.value;
 
     // in stackbit.yaml 'models' are defined as object where keys are the model names,
     // convert 'models' to array of objects and set their 'name' property to the
@@ -490,6 +577,7 @@ function convertModelsToArray(validationResult: ConfigValidationResult): { confi
     });
 
     return {
+        valid: validationResult.valid,
         config: {
             ...config,
             models: modelArray

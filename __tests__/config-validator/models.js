@@ -1,10 +1,6 @@
 const { describe, expect, test } = require('@jest/globals');
 
-const {
-    expectPassingValidation,
-    expectValidationResultToMatchAllErrors
-} = require('../test-utils');
-
+const { expectPassingValidation, expectValidationResultToMatchAllErrors, expectConfigPassingValidationAndMatchObject } = require('../test-utils');
 
 describe('model name', () => {
     test('should fail validation if set to illegal value', () => {
@@ -27,29 +23,23 @@ describe('model name', () => {
 
 describe('model "type" property', () => {
     test('should fail validation if not defined', () => {
-        expectValidationResultToMatchAllErrors(
-            { models: { post: {} } },
-            [
-                {
-                    type: 'any.required',
-                    fieldPath: ['models', 'post', 'type'],
-                    message: 'models.post.type is required'
-                }
-            ]
-        );
+        expectValidationResultToMatchAllErrors({ models: { post: {} } }, [
+            {
+                type: 'any.required',
+                fieldPath: ['models', 'post', 'type'],
+                message: 'models.post.type is required'
+            }
+        ]);
     });
 
     test('should fail validation if set to illegal value', () => {
-        expectValidationResultToMatchAllErrors(
-            { models: { post: { type: 'illegal' } } },
-            [
-                {
-                    type: 'any.only',
-                    fieldPath: ['models', 'post', 'type'],
-                    message: 'models.post.type must be one of [page, data, config, object]'
-                }
-            ]
-        );
+        expectValidationResultToMatchAllErrors({ models: { post: { type: 'illegal' } } }, [
+            {
+                type: 'any.only',
+                fieldPath: ['models', 'post', 'type'],
+                message: 'models.post.type must be one of [page, data, config, object]'
+            }
+        ]);
     });
 
     test.each([
@@ -158,7 +148,6 @@ describe('model "extends" property', () => {
 });
 
 describe('"data" model with "file" property', () => {
-
     test('"data" model with "file", "folder", "match" and "exclude" properties should fail validation', () => {
         expectValidationResultToMatchAllErrors(
             {
@@ -234,10 +223,36 @@ describe('"data" model with "file" property', () => {
             }
         });
     });
+
+    test('"data" model with "match" and "exclude" as strings should be converted to arrays of strings', async () => {
+        expectConfigPassingValidationAndMatchObject(
+            {
+                models: {
+                    author: {
+                        type: 'data',
+                        label: 'Author',
+                        folder: 'data/authors',
+                        match: '**/*.json',
+                        exclude: '**/*.md'
+                    }
+                }
+            },
+            {
+                models: [
+                    {
+                        name: 'author',
+                        type: 'data',
+                        folder: 'data/authors',
+                        match: ['**/*.json'],
+                        exclude: ['**/*.md']
+                    }
+                ]
+            }
+        );
+    });
 });
 
 describe('"data" model with "isList: true"', () => {
-
     test('"data" model with "isList: true" without "items" property should fail validation', () => {
         expectValidationResultToMatchAllErrors(
             {
@@ -378,7 +393,6 @@ describe('"data" model with "isList: true"', () => {
 });
 
 describe('"page" model "file" and "singleInstance" properties are mutual exclusive with "folder", "match" and "exclude" properties', () => {
-
     test('"page" model with "file" and without "singleInstance: true" should fail validation', () => {
         expectValidationResultToMatchAllErrors(
             {
@@ -435,27 +449,32 @@ describe('"page" model "file" and "singleInstance" properties are mutual exclusi
     });
 
     test('"page" model with "file" and with "singleInstance: true" and a fields with a forbidden field should fail validation', () => {
-        expectValidationResultToMatchAllErrors({
-            models: {
-                post: {
-                    type: 'page',
-                    label: 'Post',
-                    singleInstance: true,
-                    file: 'data/author.json',
-                    fields: [{
-                        type: 'string',
-                        name: 'title',
-                        labelField: 'title'
-                    }]
-                }
-            }
-        }, [
+        expectValidationResultToMatchAllErrors(
             {
-                type: 'object.unknown',
-                fieldPath: ['models', 'post', 'fields', 0, 'labelField'],
-                message: 'models.post.fields[0].labelField is not allowed'
-            }
-        ]);
+                models: {
+                    post: {
+                        type: 'page',
+                        label: 'Post',
+                        singleInstance: true,
+                        file: 'data/author.json',
+                        fields: [
+                            {
+                                type: 'string',
+                                name: 'title',
+                                labelField: 'title'
+                            }
+                        ]
+                    }
+                }
+            },
+            [
+                {
+                    type: 'object.unknown',
+                    fieldPath: ['models', 'post', 'fields', 0, 'labelField'],
+                    message: 'models.post.fields[0].labelField is not allowed'
+                }
+            ]
+        );
     });
 
     test('"page" model with "file", "folder", "match" and "exclude" properties should fail validation', () => {
@@ -493,5 +512,33 @@ describe('"page" model "file" and "singleInstance" properties are mutual exclusi
                 }
             }
         });
+    });
+
+    test('"page" model with "match" and "exclude" as strings should be converted to arrays of strings', async () => {
+        expectConfigPassingValidationAndMatchObject(
+            {
+                models: {
+                    post: {
+                        type: 'page',
+                        label: 'Post',
+                        folder: 'posts',
+                        match: '**/*.md',
+                        exclude: '**/*.json'
+                    }
+                }
+            },
+            {
+                models: [
+                    {
+                        name: 'post',
+                        type: 'page',
+                        label: 'Post',
+                        folder: 'posts',
+                        match: ['**/*.md'],
+                        exclude: ['**/*.json']
+                    }
+                ]
+            }
+        );
     });
 });

@@ -1,5 +1,5 @@
 const path = require('path');
-const { test, expect } = require('@jest/globals');
+const { describe, test, expect, beforeAll } = require('@jest/globals');
 const _ = require('lodash');
 
 const { getFieldOfModel } = require('./test-utils');
