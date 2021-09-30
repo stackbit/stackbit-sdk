@@ -432,15 +432,23 @@ function getReferencedModelNames(field: any) {
     return referencedModelNames;
 }
 
-function validateAndExtendContentModels(config: any) {
+function validateAndExtendContentModels(config: any): ConfigValidationResult {
     const contentModels = config.contentModels ?? {};
     const models = config.models ?? {};
 
-    if (!contentModels) {
-        return config;
+    if (_.isEmpty(contentModels)) {
+        return {
+            valid: true,
+            value: config,
+            errors: []
+        };
     }
 
     const validationResult = validateContentModels(contentModels, models);
+
+    if (_.isEmpty(models)) {
+        return validationResult;
+    }
 
     const extendedModels = _.mapValues(models, (model, modelName) => {
         const contentModel = validationResult.value.contentModels[modelName];
@@ -476,7 +484,7 @@ function validateAndExtendContentModels(config: any) {
     return {
         valid: validationResult.valid,
         value: {
-            ..._.omit(config, ['contentModels', 'models']),
+            ...config,
             models: extendedModels
         },
         errors: validationResult.errors

@@ -416,6 +416,9 @@ const contentModelSchema = Joi.object<ContentModel>({
     })
     .custom((contentModel, { error, state, prefs }) => {
         const models = _.get(prefs, 'context.models');
+        if (!models) {
+            return contentModel;
+        }
         const modelName = _.last(state.path)!;
         const model = models[modelName];
         if (!model) {
@@ -644,6 +647,7 @@ export const stackbitConfigSchema = Joi.object<YamlConfig>({
     objectTypeKey: Joi.string(),
     excludePages: Joi.array().items(Joi.string()).single(),
     logicFields: Joi.array().items(logicField),
+    contentModels: Joi.any(),
     modelsSource: modelsSourceSchema,
     models: modelsSchema
 })
