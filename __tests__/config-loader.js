@@ -107,6 +107,10 @@ test('load and normalize thumbnails', async () => {
                         {
                             value: 'thumbnail_1',
                             thumbnail: 'path/to/thumbnail.png'
+                        },
+                        {
+                            value: 'thumbnail_2',
+                            thumbnail: 'path/to/thumbnail2.png'
                         }
                     ]
                 }
