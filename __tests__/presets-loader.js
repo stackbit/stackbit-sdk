@@ -19,6 +19,7 @@ describe('presets loader - model-files', () => {
             '.stackbit/presets/model1_another.json:presets[1]',
             '.stackbit/presets/model_stackbit_1.json:presets[0]',
             'node_modules/@stackbit/components/presets/model1.json:presets[0]',
+            'node_modules/@stackbit/components/presets/model1.json:presets[1]',
         ]);
         expect(result.config.presets).toMatchObject(expect.objectContaining({
             '.stackbit/presets/model1.json:presets[0]': {
@@ -39,6 +40,7 @@ describe('presets loader - model-files', () => {
                 '.stackbit/presets/model1_another.json:presets[0]',
                 '.stackbit/presets/model1_another.json:presets[1]',
                 'node_modules/@stackbit/components/presets/model1.json:presets[0]',
+                'node_modules/@stackbit/components/presets/model1.json:presets[1]',
             ]
         }));
     });
@@ -51,17 +53,17 @@ describe('presets loader - model-files', () => {
         }));
         expect(result.config.presets).toMatchObject(expect.objectContaining({
             '.stackbit/presets/model1.json:presets[1]': expect.objectContaining({
-                thumbnail: '/images/preset-thumbnail2.png'
-            })
-        }));
-        expect(result.config.presets).toMatchObject(expect.objectContaining({
-            '.stackbit/presets/model1.json:presets[1]': expect.objectContaining({
-                thumbnail: '/images/preset-thumbnail2.png'
+                thumbnail: 'images/preset-thumbnail2.png'
             })
         }));
         expect(result.config.presets).toMatchObject(expect.objectContaining({
             'node_modules/@stackbit/components/presets/model1.json:presets[0]': expect.objectContaining({
                 thumbnail: 'node_modules/@stackbit/components/presets/path/to/ext-preset-thumbnail1.png'
+            })
+        }));
+        expect(result.config.presets).toMatchObject(expect.objectContaining({
+            'node_modules/@stackbit/components/presets/model1.json:presets[1]': expect.objectContaining({
+                thumbnail: 'node_modules/@stackbit/components/path/to/ext-preset-thumbnail2.png'
             })
         }));
     });
