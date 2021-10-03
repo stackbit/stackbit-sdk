@@ -1,0 +1,12 @@
+{
+    "model": "model_stackbit_1",
+    "presets": [
+        {
+            "label": "preset",
+            "thumbnail": "path/to/preset.png",
+            "data": {
+                "enum_field": "thumbnail_1"
+            }
+        }
+    ]
+}

@@ -15,6 +15,9 @@ models:
           - value: thumbnail_1
             label: Thumbnail 1
             thumbnail: path/to/thumbnail.png
+          - value: thumbnail_2
+            label: Thumbnail 2
+            thumbnail: path/to/thumbnail2.png
   model_stackbit_2:
     type: object
     label: Model 2

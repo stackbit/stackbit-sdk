@@ -3,6 +3,7 @@ import { CMS_NAMES, FIELD_TYPES, SSG_NAMES } from './config-consts';
 
 export interface Config extends BaseConfig {
     models: Model[];
+    presets?: any;
 }
 
 export interface YamlConfig extends BaseConfig {
@@ -126,6 +127,7 @@ export interface YamlBaseModel {
     groups?: string[];
     fieldGroups?: FieldGroupItem[];
     fields?: Field[];
+    presets?: any;
 }
 
 export interface YamlObjectModel extends YamlBaseModel {

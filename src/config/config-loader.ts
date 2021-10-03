@@ -23,12 +23,12 @@ import {
 } from '../utils';
 import { append, parseFile, readDirRecursively, reducePromise, rename } from '@stackbit/utils';
 import { Config, FieldEnum, FieldModel, FieldObjectProps, Model, PageModel, YamlModel } from './config-types';
-
+import { loadPresets, ConfigPresetsError } from './presets-loader';
 export interface ConfigNormalizedValidationError extends ConfigValidationError {
     normFieldPath: (string | number)[];
 }
 
-export type ConfigError = ConfigLoadError | ConfigNormalizedValidationError;
+export type ConfigError = ConfigLoadError | ConfigNormalizedValidationError | ConfigPresetsError;
 
 export interface ConfigLoaderOptions {
     dirPath: string;
@@ -72,10 +72,13 @@ export async function loadConfig({ dirPath }: ConfigLoaderOptions): Promise<Conf
     }
 
     const normalizedResult = validateAndNormalizeConfig(configLoadResult.config);
+    
+    const presetsResult = await loadPresets(dirPath, normalizedResult.config);
+
     return {
         valid: normalizedResult.valid,
-        config: normalizedResult.config,
-        errors: [...configLoadResult.errors, ...normalizedResult.errors]
+        config: presetsResult.config,
+        errors: [...configLoadResult.errors, ...normalizedResult.errors, ...presetsResult.errors]
     };
 }
 

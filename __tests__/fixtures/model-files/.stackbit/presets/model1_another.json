@@ -1,0 +1,19 @@
+{
+    "model": "model_1",
+    "presets": [
+        {
+            "label": "my preset 1 - different thumbnail",
+            "thumbnail": "path/to/preset-thumbnail3.png",
+            "data": {
+                "enum_field": "thumbnail_1"
+            }
+        },
+        {
+            "label": "my preset 2 - another thumbnail",
+            "thumbnail": "path/to/preset-thumbnail4.png",
+            "data": {
+                "enum_field": "thumbnail_2"
+            }
+        }
+    ]
+}
