@@ -106,6 +106,7 @@ export type ConfigModel = YamlConfigModel & BaseModel;
 
 export type BaseModel = {
     name: string;
+    presets?: string[];
 };
 
 export type ModelMap = Record<string, YamlModel>;
@@ -127,7 +128,6 @@ export interface YamlBaseModel {
     groups?: string[];
     fieldGroups?: FieldGroupItem[];
     fields?: Field[];
-    presets?: any;
 }
 
 export interface YamlObjectModel extends YamlBaseModel {
