@@ -4,8 +4,8 @@ import yaml from 'js-yaml';
 import semver from 'semver';
 import _ from 'lodash';
 
-import { ConfigValidationError, ConfigValidationResult, validateConfig, validateContentModels } from './config-validator';
-import { ConfigLoadError } from './config-errors';
+import { ConfigValidationResult, validateConfig, validateContentModels } from './config-validator';
+import { ConfigError, ConfigLoadError, ConfigValidationError } from './config-errors';
 import {
     assignLabelFieldIfNeeded,
     extendModelMap,
@@ -24,11 +24,6 @@ import {
 import { append, parseFile, readDirRecursively, reducePromise, rename } from '@stackbit/utils';
 import { Config, FieldEnum, FieldModel, FieldObjectProps, Model, PageModel, YamlModel } from './config-types';
 import { loadPresets, ConfigPresetsError } from './presets-loader';
-export interface ConfigNormalizedValidationError extends ConfigValidationError {
-    normFieldPath: (string | number)[];
-}
-
-export type ConfigError = ConfigLoadError | ConfigNormalizedValidationError | ConfigPresetsError;
 
 export interface ConfigLoaderOptions {
     dirPath: string;
@@ -41,9 +36,9 @@ export interface ConfigLoaderResult {
 }
 
 export interface NormalizedValidationResult {
-    config: Config;
     valid: boolean;
-    errors: ConfigNormalizedValidationError[];
+    config: Config;
+    errors: ConfigValidationError[];
 }
 
 export interface TempConfigLoaderResult {
@@ -72,7 +67,7 @@ export async function loadConfig({ dirPath }: ConfigLoaderOptions): Promise<Conf
     }
 
     const normalizedResult = validateAndNormalizeConfig(configLoadResult.config);
-    
+
     const presetsResult = await loadPresets(dirPath, normalizedResult.config);
 
     return {
@@ -576,15 +571,9 @@ function convertModelsToArray(validationResult: ConfigValidationResult): Normali
             const modelIndex = _.findIndex(modelArray, { name: modelName });
             const normFieldPath = error.fieldPath.slice();
             normFieldPath[1] = modelIndex;
-            return {
-                ...error,
-                normFieldPath
-            };
+            error.normFieldPath = normFieldPath;
         }
-        return {
-            ...error,
-            normFieldPath: error.fieldPath
-        };
+        return error;
     });
 
     return {

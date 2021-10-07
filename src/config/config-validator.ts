@@ -2,15 +2,7 @@ import _ from 'lodash';
 import Joi from 'joi';
 
 import { stackbitConfigSchema, contentModelsSchema } from './config-schema';
-
-export interface ConfigValidationError {
-    name: 'ConfigValidationError';
-    type: string;
-    message: string;
-    fieldPath: (string | number)[];
-    normFieldPath?: (string | number)[];
-    value?: any;
-}
+import { ConfigValidationError } from './config-errors';
 
 export interface ConfigValidationResult {
     value: any;
@@ -57,13 +49,12 @@ function mapJoiErrorsToConfigValidationErrors(validationResult: Joi.ValidationRe
     const joiErrors = validationResult.error?.details || [];
     return joiErrors.map(
         (validationError): ConfigValidationError => {
-            return {
-                name: 'ConfigValidationError',
+            return new ConfigValidationError({
                 type: validationError.type,
                 message: validationError.message,
                 fieldPath: validationError.path,
                 value: validationError.context?.value
-            };
+            });
         }
     );
 }

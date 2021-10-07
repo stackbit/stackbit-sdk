@@ -5,7 +5,7 @@ export * from './content/content-errors';
 export * from './config/config-errors';
 export * from './analyzer/file-browser';
 export * from './utils';
-export { loadConfig, ConfigLoaderOptions, ConfigLoaderResult, ConfigError, ConfigNormalizedValidationError } from './config/config-loader';
+export { loadConfig, ConfigLoaderOptions, ConfigLoaderResult } from './config/config-loader';
 export { writeConfig, WriteConfigOptions, convertToYamlConfig } from './config/config-writer';
 export { loadContent, ContentItem, ContentLoaderOptions, ContentLoaderResult } from './content/content-loader';
 export { matchSSG, SSGMatcherOptions, SSGMatchResult } from './analyzer/ssg-matcher';
