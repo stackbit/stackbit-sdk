@@ -27,6 +27,7 @@ interface BaseConfig {
     dataDir?: string | null;
     pageLayoutKey?: string | null;
     objectTypeKey?: string;
+    styleObjectModelName?: string | null;
     excludePages?: string | string[];
     logicFields?: LogicField[];
     contentModels?: ContentModelMap;
