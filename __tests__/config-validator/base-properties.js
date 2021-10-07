@@ -68,7 +68,7 @@ describe('styleObjectModelName', () => {
             {
                 type: 'styleObjectModelName.model.missing',
                 fieldPath: ['styleObjectModelName'],
-                message: expect.stringContaining('styleObjectModelName must reference an existing model')
+                message: expect.stringMatching('styleObjectModelName must reference an existing model')
             }
         );
     });
@@ -84,7 +84,7 @@ describe('styleObjectModelName', () => {
             {
                 type: 'styleObjectModelName.model.type',
                 fieldPath: ['styleObjectModelName'],
-                message: expect.stringContaining('Model defined in styleObjectModelName ("model_1") must be of type "object"')
+                message: expect.stringMatching('Model defined in styleObjectModelName must be of type data - model_1')
             }
         );
     });

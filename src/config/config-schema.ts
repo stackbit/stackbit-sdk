@@ -212,7 +212,7 @@ const styleObjectModelNameSchema = Joi.string()
     .prefs({
         messages: {
             [styleObjectModelReferenceError]: '{{#label}} must reference an existing model',
-            [styleObjectModelNotObject]: 'Model defined in {{#label}} ("{{#value}}") must be of type "object"'
+            [styleObjectModelNotObject]: 'Model defined in {{#label}} must be of type data - {{#value}}'
         },
         errors: { wrap: { label: false } }
     });
