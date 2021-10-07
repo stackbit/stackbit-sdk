@@ -47,20 +47,38 @@ test('uploadDir is mutual exclusive with assets', () => {
     );
 });
 
-test('styleObjectModelName must reference an existing model', () => {
-    expectValidationResultToIncludeSingleError(
-        {
-            styleObjectModelName: 'invalid',
-            models: {
-                model_1: { type: 'page', label: 'model_1' }
+describe('styleObjectModelName', () => {
+    test('styleObjectModelName must reference an existing model', () => {
+        expectValidationResultToIncludeSingleError(
+            {
+                styleObjectModelName: 'invalid',
+                models: {
+                    model_1: { type: 'page', label: 'model_1' },
+                }
+            },
+            {
+                type: 'styleObjectModelName.model.missing',
+                fieldPath: ['styleObjectModelName'],
+                message: expect.stringContaining('styleObjectModelName must reference an existing model')
             }
-        },
-        {
-            type: 'styleObjectModelName.model.missing',
-            fieldPath: ['styleObjectModelName'],
-            message: expect.stringContaining('"styleObjectModelName" must reference an existing model')
-        }
-    );
+        );
+    });
+
+    test('styleObjectModelName must reference a model of type "object"', () => {
+        expectValidationResultToIncludeSingleError(
+            {
+                styleObjectModelName: 'model_1',
+                models: {
+                    model_1: { type: 'page', label: 'model_1' }
+                }
+            },
+            {
+                type: 'styleObjectModelName.model.type',
+                fieldPath: ['styleObjectModelName'],
+                message: expect.stringContaining('Model defined in styleObjectModelName ("model_1") must be of type "object"')
+            }
+        );
+    });
 });
 
 describe('static assets', () => {

@@ -195,20 +195,25 @@ const variantFieldSchema = Joi.custom((value, { error, state }) => {
 });
 
 const styleObjectModelReferenceError = 'styleObjectModelName.model.missing';
+const styleObjectModelNotObject = 'styleObjectModelName.model.type';
 const styleObjectModelNameSchema = Joi.string()
     .allow('', null)
     .custom((value, { error, state }) => {
         const models = getModelsFromValidationState(state);
         const modelNames = Object.keys(models);
         const objectModelNames = modelNames.filter((modelName) => models[modelName]!.type === 'object');
-        if (!objectModelNames.includes(value)) {
+        if (!modelNames.includes(value)) {
             return error(styleObjectModelReferenceError);
+        }
+        if (models[value]!.type !== 'object') {
+            return error(styleObjectModelNotObject);
         }
         return value;
     })
     .prefs({
         messages: {
-            [styleObjectModelReferenceError]: '"{{#label}}" must reference an existing model'
+            [styleObjectModelReferenceError]: '{{#label}} must reference an existing model',
+            [styleObjectModelNotObject]: 'Model defined in {{#label}} ("{{#value}}") must be of type "object"'
         },
         errors: { wrap: { label: false } }
     });
