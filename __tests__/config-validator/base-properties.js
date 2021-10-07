@@ -48,6 +48,15 @@ test('uploadDir is mutual exclusive with assets', () => {
 });
 
 describe('styleObjectModelName', () => {
+    test('should pass validation when styleObjectModelName is set and refers to a valid model', () => {
+        expectPassingValidation({
+            styleObjectModelName: 'model_1',
+            models: {
+                model_1: { type: 'data', label: 'model_1' },
+            }
+        });
+    });
+
     test('styleObjectModelName must reference an existing model', () => {
         expectValidationResultToIncludeSingleError(
             {

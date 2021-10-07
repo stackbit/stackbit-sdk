@@ -201,11 +201,10 @@ const styleObjectModelNameSchema = Joi.string()
     .custom((value, { error, state }) => {
         const models = getModelsFromValidationState(state);
         const modelNames = Object.keys(models);
-        const objectModelNames = modelNames.filter((modelName) => models[modelName]!.type === 'object');
         if (!modelNames.includes(value)) {
             return error(styleObjectModelReferenceError);
         }
-        if (models[value]!.type !== 'object') {
+        if (models[value]!.type !== 'data') {
             return error(styleObjectModelNotObject);
         }
         return value;
