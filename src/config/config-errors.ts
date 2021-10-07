@@ -36,4 +36,12 @@ export class ConfigValidationError extends Error {
     }
 }
 
-export type ConfigError = ConfigLoadError | ConfigValidationError;
+export class ConfigPresetsError extends Error {
+    name: 'ConfigPresetsError';
+    constructor(message: string) {
+        super(message);
+        this.name = 'ConfigPresetsError';
+    }
+}
+
+export type ConfigError = ConfigLoadError | ConfigValidationError | ConfigPresetsError;

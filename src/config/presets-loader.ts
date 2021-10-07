@@ -1,12 +1,10 @@
 import _ from 'lodash';
 import path from 'path';
 import fse from 'fs-extra';
-
-import { Config } from './config-types';
 import { parseFile, append } from '@stackbit/utils';
 
-export class ConfigPresetsError extends Error {
-}
+import { Config } from './config-types';
+import { ConfigPresetsError } from './config-errors';
 
 export interface PresetsLoaderResult {
     config: Config;
@@ -22,9 +20,8 @@ export async function loadPresets(dirPath: string, config: Config): Promise<Pres
         if (!(await fse.pathExists(presetsDir))) {
             continue;
         }
-        presetFiles.push(...(await fse.readdir(presetsDir))
-            .filter(fileName => path.parse(fileName).ext === '.json')
-            .map(fileName => path.join(presetsRelDir, fileName))
+        presetFiles.push(
+            ...(await fse.readdir(presetsDir)).filter((fileName) => path.parse(fileName).ext === '.json').map((fileName) => path.join(presetsRelDir, fileName))
         );
     }
 
@@ -56,19 +53,19 @@ export async function loadPresets(dirPath: string, config: Config): Promise<Pres
     config.presets = presets;
 
     return {
-        config, 
+        config,
         errors: []
     };
 }
 
 function resolveThumbnailPath(thumbnail: string, dir: string) {
-    if (thumbnail.startsWith('/')) { 
-        if (dir.endsWith('@stackbit/components/presets')) { 
-            dir = dir.replace(/\/presets$/, ''); 
-        } else { 
-            dir = ''; 
-        } 
-        thumbnail = thumbnail.replace(/^\//, ''); 
-    } 
-    return path.join(dir, thumbnail); 
+    if (thumbnail.startsWith('/')) {
+        if (dir.endsWith('@stackbit/components/presets')) {
+            dir = dir.replace(/\/presets$/, '');
+        } else {
+            dir = '';
+        }
+        thumbnail = thumbnail.replace(/^\//, '');
+    }
+    return path.join(dir, thumbnail);
 }
