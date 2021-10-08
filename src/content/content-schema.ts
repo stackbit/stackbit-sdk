@@ -136,6 +136,12 @@ function joiSchemaForField(field: Field | FieldListItems, config: Config, fieldP
         case 'reference':
             fieldSchema = Joi.string();
             break;
+        case 'style':
+            // TODO: validate the 'style' object:
+            //  - check that its keys match match field names of the parent object
+            //  - check that style properties and their values match the style field's schema
+            fieldSchema = Joi.object();
+            break;
         case 'list':
             fieldSchema = FieldSchemas.list(field, config, fieldPath);
             break;

@@ -201,7 +201,7 @@ export interface FieldGroupItem {
  *** Field Types ***
  *******************/
 
-export type Field = FieldSimple | FieldEnum | FieldNumber | FieldObject | FieldModel | FieldReference | FieldList;
+export type Field = FieldSimple | FieldEnum | FieldNumber | FieldObject | FieldModel | FieldReference | FieldStyle | FieldList;
 
 export type FieldSimple = FieldCommonProps & FieldSimpleProps;
 export type FieldEnum = FieldCommonProps & FieldEnumProps;
@@ -209,6 +209,7 @@ export type FieldNumber = FieldCommonProps & FieldNumberProps;
 export type FieldObject = FieldCommonProps & FieldObjectProps;
 export type FieldModel = FieldCommonProps & FieldModelProps;
 export type FieldReference = FieldCommonProps & FieldReferenceProps;
+export type FieldStyle = FieldCommonProps & FieldStyleProps;
 export type FieldList = FieldCommonProps & FieldListProps;
 
 export type FieldListObject = FieldList & { items?: FieldObjectProps };
@@ -298,6 +299,11 @@ export interface FieldReferenceProps {
     type: 'reference';
     models: string[];
     groups?: string[];
+}
+
+export interface FieldStyleProps {
+    type: 'style';
+    styles: any;
 }
 
 export interface FieldListProps {

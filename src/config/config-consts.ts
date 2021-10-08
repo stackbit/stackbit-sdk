@@ -20,5 +20,6 @@ export const FIELD_TYPES = [
     'object',
     'model',
     'reference',
+    'style',
     'list'
 ] as const;

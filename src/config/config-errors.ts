@@ -33,6 +33,8 @@ export class ConfigValidationError extends Error {
         this.fieldPath = fieldPath;
         this.normFieldPath = normFieldPath || fieldPath;
         this.value = value;
+        // redefine "message" as enumerable, this helps seeing the provided and the expected message in failed Jest's toMatchObject calls
+        Object.defineProperty(this, 'message', { value: message, writable: true, enumerable: true, configurable: true });
     }
 }
 

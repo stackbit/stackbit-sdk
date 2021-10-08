@@ -2,6 +2,7 @@ import Joi from 'joi';
 import _ from 'lodash';
 import { append } from '@stackbit/utils';
 import { CMS_NAMES, FIELD_TYPES, SSG_NAMES } from './config-consts';
+import { styleFieldPartialSchema } from './config-schema/style-field-schema';
 import {
     Assets,
     ContentfulImport,
@@ -388,7 +389,12 @@ const referenceFieldPartialSchema = Joi.object({
     groups: Joi.array().items(validReferenceFieldGroups)
 });
 
-const partialFieldSchema = Joi.object().when('.type', {
+const listItemsSchema = Joi.object({
+    // 'style' and 'list' are not allowed inside lists
+    type: Joi.string()
+        .valid(..._.without(FIELD_TYPES, 'list', 'style'))
+        .required()
+}).when('.type', {
     switch: [
         { is: 'number', then: numberFieldPartialSchema },
         { is: 'enum', then: enumFieldPartialSchema },
@@ -398,23 +404,22 @@ const partialFieldSchema = Joi.object().when('.type', {
     ]
 });
 
-const listItemsSchema = Joi.object({
-    type: Joi.string()
-        .valid(..._.without(FIELD_TYPES, 'list'))
-        .required()
-}).concat(partialFieldSchema);
-
 const listFieldPartialSchema = Joi.object({
     type: Joi.string().valid('list').required(),
     items: listItemsSchema
 });
 
-const partialFieldWithListSchema = partialFieldSchema.when('.type', {
-    is: 'list',
-    then: listFieldPartialSchema
+const fieldSchema: Joi.ObjectSchema<Field> = fieldCommonPropsSchema.when('.type', {
+    switch: [
+        { is: 'number', then: numberFieldPartialSchema },
+        { is: 'enum', then: enumFieldPartialSchema },
+        { is: 'object', then: objectFieldPartialSchema },
+        { is: 'model', then: modelFieldPartialSchema },
+        { is: 'reference', then: referenceFieldPartialSchema },
+        { is: 'style', then: styleFieldPartialSchema },
+        { is: 'list', then: listFieldPartialSchema }
+    ]
 });
-
-const fieldSchema: Joi.ObjectSchema<Field> = fieldCommonPropsSchema.concat(partialFieldWithListSchema);
 
 const fieldsSchema = Joi.array().items(fieldSchema).unique('name').id('fieldsSchema');
 
