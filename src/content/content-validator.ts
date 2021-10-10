@@ -18,7 +18,7 @@ interface ContentValidationResult {
     errors: ContentValidationError[];
 }
 
-export function validate({ contentItems, config }: ContentValidationOptions): ContentValidationResult {
+export function validateContentItems({ contentItems, config }: ContentValidationOptions): ContentValidationResult {
     const errors: ContentValidationError[] = [];
 
     const joiModelSchemas = joiSchemasForModels(config);

@@ -17,7 +17,7 @@ import {
     isModelListItems,
     getModelOfObject
 } from '../utils';
-import { validate } from './content-validator';
+import { validateContentItems } from './content-validator';
 import { DATA_FILE_EXTENSIONS, EXCLUDED_DATA_FILES, EXCLUDED_MARKDOWN_FILES, EXCLUDED_COMMON_FILES, MARKDOWN_FILE_EXTENSIONS } from '../consts';
 import { Config, ConfigModel, Field, FieldListItems, FieldModelProps, Model } from '../config/config-types';
 
@@ -73,7 +73,7 @@ export async function loadContent({ dirPath, config, skipUnmodeledContent }: Con
     const { contentItems: dataItems, errors: dataErrors } = await loadDataFiles({ dirPath, config, skipUnmodeledContent });
     const { contentItems: pageItems, errors: pageErrors } = await loadPageFiles({ dirPath, config, skipUnmodeledContent });
     const contentItems = _.concat(dataItems, pageItems);
-    const validationResult = validate({ contentItems, config });
+    const validationResult = validateContentItems({ contentItems, config });
     const errors = _.concat(dataErrors, pageErrors, validationResult.errors);
     return {
         valid: _.isEmpty(errors),

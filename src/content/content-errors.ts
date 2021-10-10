@@ -80,6 +80,7 @@ export class IllegalModelFieldError extends Error {
 }
 
 export class ContentValidationError extends Error {
+    name: 'ContentValidationError';
     type: string;
     modelName: string;
     filePath: string;
@@ -101,10 +102,13 @@ export class ContentValidationError extends Error {
         fieldPath: FieldPath;
     }) {
         super(message);
+        this.name = 'ContentValidationError';
         this.type = type;
         this.modelName = modelName;
         this.filePath = filePath;
         this.fieldPath = fieldPath;
         this.value = value;
+        // redefine "message" as enumerable, this helps seeing the provided and the expected message in failed Jest's toMatchObject calls
+        Object.defineProperty(this, 'message', { value: message, writable: true, enumerable: true, configurable: true });
     }
 }

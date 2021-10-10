@@ -346,15 +346,15 @@ function stylePropSizeSchema(styleConfig: any) {
                 directions.push(...dirMap[dirMatch]);
                 pattern = pattern.substring(1);
             }
-            let valueSchema: Joi.Schema;
+            let valueSchema = Joi.number();
             if (pattern) {
                 const parts = pattern.split(':');
                 if (parts.length === 1) {
-                    valueSchema = Joi.valid(parts[0]);
+                    valueSchema = valueSchema.valid(Number(parts[0]));
                 } else {
-                    valueSchema = Joi.number().min(parts[0]).max(parts[1]);
+                    valueSchema = valueSchema.min(Number(parts[0])).max(Number(parts[1]));
                     if (parts.length === 3) {
-                        valueSchema = (<Joi.NumberSchema>valueSchema).multiple(parts[3]);
+                        valueSchema = valueSchema.multiple(Number(parts[3]));
                     }
                 }
             }

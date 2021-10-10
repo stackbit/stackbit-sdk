@@ -4,6 +4,7 @@ const _ = require('lodash');
 const { expect } = require('@jest/globals');
 
 const { validateConfig } = require('../src/config/config-validator');
+const { validateContentItems } = require('../src/content/content-validator');
 const { loadConfig, validateAndNormalizeConfig } = require('../src/config/config-loader');
 
 const minimalValidConfig = {
@@ -11,6 +12,7 @@ const minimalValidConfig = {
 };
 
 module.exports = {
+    loadConfigFromObject,
     loadConfigFromFixturePath,
     inspectValidationResultErrors,
     getFieldOfModel,
@@ -29,12 +31,20 @@ module.exports = {
     expectValidationResultToIncludeSingleError,
     expectValidationResultToMatchAllErrors,
     expectModelValidationResultToMatchAllErrors,
-    expectArrayToIncludeObjectContaining
+    expectArrayToIncludeObjectContaining,
+
+    expectContentPassingValidation,
+    expectContentFailValidationAndMatchAllErrors
 };
 
 async function loadConfigFromFixturePath(fixturePath) {
     const stackbitYamlPath = path.join(__dirname, 'fixtures', fixturePath);
     return loadConfig({ dirPath: stackbitYamlPath });
+}
+
+function loadConfigFromObject(config) {
+    config = _.assign(config, minimalValidConfig);
+    return validateAndNormalizeConfig(config);
 }
 
 function expectConfigPassingValidation(validatedConfig) {
@@ -116,4 +126,30 @@ function getMinimalModel(model) {
             )
         }
     };
+}
+
+function expectContentPassingValidation(config, contentItems) {
+    const configResult = loadConfigFromObject(config);
+    expect(configResult.errors).toHaveLength(0);
+    expect(configResult.valid).toBeTruthy();
+
+    const contentValidationResult = validateContentItems({
+        contentItems: contentItems,
+        config: configResult.config
+    });
+    expect(contentValidationResult.errors).toHaveLength(0);
+    expect(contentValidationResult.valid).toBeTruthy();
+}
+
+function expectContentFailValidationAndMatchAllErrors(config, contentItems, expectedErrors) {
+    const configResult = loadConfigFromObject(config);
+    expect(configResult.errors).toHaveLength(0);
+    expect(configResult.valid).toBeTruthy();
+
+    const contentValidationResult = validateContentItems({
+        contentItems: contentItems,
+        config: configResult.config
+    });
+    expect(contentValidationResult.errors).toMatchObject(expectedErrors);
+    expect(contentValidationResult.valid).toBeFalsy();
 }

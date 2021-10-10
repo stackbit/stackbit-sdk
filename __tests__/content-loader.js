@@ -1,6 +1,6 @@
 const path = require('path');
 const _ = require('lodash');
-const { test, expect } = require('@jest/globals');
+const { describe, test, expect, beforeAll } = require('@jest/globals');
 
 const { loadConfig } = require('../src/config/config-loader');
 const { loadContent } = require('../src/content/content-loader');
@@ -27,7 +27,7 @@ describe('test errors of invalid content', () => {
     let contentResult;
 
     beforeAll(async () => {
-        const dirPath = path.join(__dirname, `./fixtures/content-with-errors`);
+        const dirPath = path.join(__dirname, './fixtures/content-with-errors');
         configResult = await loadConfig({ dirPath: dirPath });
         contentResult = await loadContent({
             dirPath: dirPath,
