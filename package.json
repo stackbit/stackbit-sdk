@@ -11,7 +11,7 @@
     "scripts": {
         "test": "jest",
         "build": "rm -rf ./dist && tsc",
-        "prettier": "prettier --write src",
+        "prettier": "prettier --write src \"__tests__/**/*.js\"",
         "prepack": "npm test && npm run build",
         "version-minor": "npm version minor -m \"bumped version to v%s\"",
         "version-patch": "npm version patch -m \"bumped version to v%s\""

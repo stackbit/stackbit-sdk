@@ -1,7 +1,7 @@
 const path = require('path');
 const fse = require('fs-extra');
 const yaml = require('js-yaml');
-const { test, expect } = require('@jest/globals');
+const { test, expect, afterAll } = require('@jest/globals');
 
 const { loadConfig } = require('../src/config/config-loader');
 const { writeConfig } = require('../src/config/config-writer');
@@ -9,7 +9,7 @@ const { writeConfig } = require('../src/config/config-writer');
 const tempStackbitYamlPath = path.join(__dirname, 'stackbit.yaml');
 
 afterAll(async () => {
-    await fse.remove(tempStackbitYamlPath)
+    await fse.remove(tempStackbitYamlPath);
 });
 
 // TODO: prepare another set of example that will pass the test.

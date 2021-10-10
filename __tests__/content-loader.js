@@ -49,7 +49,9 @@ describe('test errors of invalid content', () => {
             modelName: 'config',
             filePath: 'data/config.json'
         };
-        const errors = _.filter(contentResult.errors, ['modelName', 'config']).map((error) => _.pick(error, ['message', 'type', 'modelName', 'filePath', 'fieldPath']));
+        const errors = _.filter(contentResult.errors, ['modelName', 'config']).map((error) =>
+            _.pick(error, ['message', 'type', 'modelName', 'filePath', 'fieldPath'])
+        );
         expect(errors).toMatchObject([
             { ...commonErrorFields, fieldPath: ['title'] },
             { ...commonErrorFields, fieldPath: ['action', 'label'] },
@@ -75,37 +77,35 @@ describe('test errors of invalid content', () => {
         expect(errors).toMatchObject([
             { ...commonErrorFields, fieldPath: ['poly_model_list', 0], value: { __metadata: { modelName: null } } },
             { ...commonErrorFields, fieldPath: ['poly_model_list', 1], value: { __metadata: { modelName: null } } },
-            { ...commonErrorFields, fieldPath: ['poly_model_list', 2, 'object_model_2_string'], type: 'string.base', value: 1 },
+            { ...commonErrorFields, fieldPath: ['poly_model_list', 2, 'object_model_2_string'], type: 'string.base', value: 1 }
         ]);
-    })
+    });
 
     test('modelName is returned in metadata of invalid objects', async () => {
         const configItem = _.find(contentResult.contentItems, ['__metadata.modelName', 'config']);
-        expect(configItem).toMatchObject(
-            {
-                __metadata: { modelName: 'config' },
-                action: {
+        expect(configItem).toMatchObject({
+            __metadata: { modelName: 'config' },
+            action: {
+                __metadata: { modelName: 'action' },
+                icon: { __metadata: { modelName: 'icon' } }
+            },
+            actions: [
+                {
                     __metadata: { modelName: 'action' },
                     icon: { __metadata: { modelName: 'icon' } }
                 },
-                actions: [
-                    {
-                        __metadata: { modelName: 'action' },
-                        icon: { __metadata: { modelName: 'icon' } }
-                    },
-                    {
-                        __metadata: { modelName: 'action' },
-                        icon: { __metadata: { modelName: 'icon' } }
-                    }
-                ],
-                section: {
-                    action: {
-                        __metadata: { modelName: 'action' },
-                        icon: { __metadata: { modelName: 'icon' } }
-                    }
+                {
+                    __metadata: { modelName: 'action' },
+                    icon: { __metadata: { modelName: 'icon' } }
+                }
+            ],
+            section: {
+                action: {
+                    __metadata: { modelName: 'action' },
+                    icon: { __metadata: { modelName: 'icon' } }
                 }
             }
-        );
+        });
     });
 });
 
@@ -129,9 +129,14 @@ test('invalid models should not affect loading and matching content to valid mod
     ]);
 
     // const [modeledItems, unmodeledItems] = _.partition(contentResult.contentItems, (contentItem) => _.get(contentItem, '__metadata.modelName') !== null);
-    expect(_.sortBy(contentResult.contentItems, '__metadata.filePath')).toMatchObject(_.sortBy([
-        { __metadata: { filePath: 'content/about.md', modelName: 'about' } },
-        { __metadata: { filePath: 'content/index.md', modelName: 'home' } },
-        { __metadata: { filePath: 'content/contact.md', modelName: null } }
-    ], '__metadata.filePath'));
+    expect(_.sortBy(contentResult.contentItems, '__metadata.filePath')).toMatchObject(
+        _.sortBy(
+            [
+                { __metadata: { filePath: 'content/about.md', modelName: 'about' } },
+                { __metadata: { filePath: 'content/index.md', modelName: 'home' } },
+                { __metadata: { filePath: 'content/contact.md', modelName: null } }
+            ],
+            '__metadata.filePath'
+        )
+    );
 });

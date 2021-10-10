@@ -52,7 +52,7 @@ describe('styleObjectModelName', () => {
         expectPassingValidation({
             styleObjectModelName: 'model_1',
             models: {
-                model_1: { type: 'data', label: 'model_1' },
+                model_1: { type: 'data', label: 'model_1' }
             }
         });
     });
@@ -62,7 +62,7 @@ describe('styleObjectModelName', () => {
             {
                 styleObjectModelName: 'invalid',
                 models: {
-                    model_1: { type: 'page', label: 'model_1' },
+                    model_1: { type: 'page', label: 'model_1' }
                 }
             },
             {

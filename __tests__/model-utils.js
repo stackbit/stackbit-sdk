@@ -5,7 +5,6 @@ const modelUtils = require('../src/utils/model-utils');
 const { loadConfig } = require('../src/config/config-loader');
 
 describe('test model utils', () => {
-
     let result;
     beforeAll(async () => {
         const stackbitYamlPath = path.join(__dirname, 'fixtures/stackbit-v0.3.0');
@@ -96,5 +95,4 @@ describe('test model utils', () => {
         const modelListField = _.find(pageModel.fields, ['name', 'model_list']);
         expect(modelUtils.getListItemsField(modelListField)).toMatchObject(modelListField.items);
     });
-
 });

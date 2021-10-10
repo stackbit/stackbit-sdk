@@ -29,24 +29,24 @@ describe('generate schema', () => {
                     match: '**/*',
                     fields: [
                         {
-                            "type": "string",
-                            "name": "title",
-                            "label": "Title"
+                            type: 'string',
+                            name: 'title',
+                            label: 'Title'
                         },
                         {
-                            "type": "datetime",
-                            "name": "date",
-                            "label": "Date"
+                            type: 'datetime',
+                            name: 'date',
+                            label: 'Date'
                         },
                         {
-                            "type": "string",
-                            "name": "description",
-                            "label": "Description"
+                            type: 'string',
+                            name: 'description',
+                            label: 'Description'
                         },
                         {
-                            "type": "markdown",
-                            "name": "markdown_content",
-                            "label": "Markdown Content"
+                            type: 'markdown',
+                            name: 'markdown_content',
+                            label: 'Markdown Content'
                         }
                     ]
                 }

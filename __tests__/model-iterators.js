@@ -51,7 +51,10 @@ test('iterateModelFieldsRecursively should iterate all model fields recursively'
         { fieldPath: ['fields', 'object_field'], field: model.fields[4] },
         { fieldPath: ['fields', 'object_field', 'fields', 'object_string_field'], field: model.fields[4].fields[0] },
         { fieldPath: ['fields', 'object_field', 'fields', 'object_object_field'], field: model.fields[4].fields[1] },
-        { fieldPath: ['fields', 'object_field', 'fields', 'object_object_field', 'fields', 'object_object_string_field'], field: model.fields[4].fields[1].fields[0] },
+        {
+            fieldPath: ['fields', 'object_field', 'fields', 'object_object_field', 'fields', 'object_object_string_field'],
+            field: model.fields[4].fields[1].fields[0]
+        },
         { fieldPath: ['fields', 'object_field', 'fields', 'object_list_string_field'], field: model.fields[4].fields[2] },
         { fieldPath: ['fields', 'object_field', 'fields', 'object_list_object_field'], field: model.fields[4].fields[3] },
         {

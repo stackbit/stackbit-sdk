@@ -13,7 +13,7 @@ test('test gatsby matcher', async () => {
         publishDir: 'public',
         staticDir: 'static',
         ssgDir: '',
-        contentDirs: [ 'content/blog', 'src/images' ],
+        contentDirs: ['content/blog', 'src/images'],
         nodeVersion: '12'
     });
 });

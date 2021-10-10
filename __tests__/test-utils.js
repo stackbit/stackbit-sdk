@@ -29,7 +29,7 @@ module.exports = {
     expectValidationResultToIncludeSingleError,
     expectValidationResultToMatchAllErrors,
     expectModelValidationResultToMatchAllErrors,
-    expectArrayToIncludeObjectContaining,
+    expectArrayToIncludeObjectContaining
 };
 
 async function loadConfigFromFixturePath(fixturePath) {

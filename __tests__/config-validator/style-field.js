@@ -111,53 +111,56 @@ describe('test "style" field', () => {
     });
 
     test('should fail validation for style attributes that can not have catch all "*" string', () => {
-        expectConfigFailValidationAndMatchAllErrors({
-            models: {
-                model_1: {
-                    type: 'object',
-                    label: 'Model 1',
-                    fields: [
-                        {
-                            type: 'string',
-                            name: 'title'
-                        },
-                        {
-                            type: 'style',
-                            name: 'styles',
-                            styles: {
-                                title: {
-                                    fontFamily: '*',
-                                    textColor: '*',
-                                    backgroundColor: '*',
-                                    borderColor: '*'
+        expectConfigFailValidationAndMatchAllErrors(
+            {
+                models: {
+                    model_1: {
+                        type: 'object',
+                        label: 'Model 1',
+                        fields: [
+                            {
+                                type: 'string',
+                                name: 'title'
+                            },
+                            {
+                                type: 'style',
+                                name: 'styles',
+                                styles: {
+                                    title: {
+                                        fontFamily: '*',
+                                        textColor: '*',
+                                        backgroundColor: '*',
+                                        borderColor: '*'
+                                    }
                                 }
                             }
-                        }
-                    ]
+                        ]
+                    }
                 }
-            }
-        }, [
-            {
-                type: 'array.base',
-                fieldPath: ['models', 'model_1', 'fields', 1, 'styles', 'title', 'fontFamily'],
-                message: 'models.model_1.fields[1].styles.title.fontFamily must be an array'
             },
-            {
-                type: 'array.base',
-                fieldPath: ['models', 'model_1', 'fields', 1, 'styles', 'title', 'textColor'],
-                message: 'models.model_1.fields[1].styles.title.textColor must be an array'
-            },
-            {
-                type: 'array.base',
-                fieldPath: ['models', 'model_1', 'fields', 1, 'styles', 'title', 'backgroundColor'],
-                message: 'models.model_1.fields[1].styles.title.backgroundColor must be an array'
-            },
-            {
-                type: 'array.base',
-                fieldPath: ['models', 'model_1', 'fields', 1, 'styles', 'title', 'borderColor'],
-                message: 'models.model_1.fields[1].styles.title.borderColor must be an array'
-            }
-        ]);
+            [
+                {
+                    type: 'array.base',
+                    fieldPath: ['models', 'model_1', 'fields', 1, 'styles', 'title', 'fontFamily'],
+                    message: 'models.model_1.fields[1].styles.title.fontFamily must be an array'
+                },
+                {
+                    type: 'array.base',
+                    fieldPath: ['models', 'model_1', 'fields', 1, 'styles', 'title', 'textColor'],
+                    message: 'models.model_1.fields[1].styles.title.textColor must be an array'
+                },
+                {
+                    type: 'array.base',
+                    fieldPath: ['models', 'model_1', 'fields', 1, 'styles', 'title', 'backgroundColor'],
+                    message: 'models.model_1.fields[1].styles.title.backgroundColor must be an array'
+                },
+                {
+                    type: 'array.base',
+                    fieldPath: ['models', 'model_1', 'fields', 1, 'styles', 'title', 'borderColor'],
+                    message: 'models.model_1.fields[1].styles.title.borderColor must be an array'
+                }
+            ]
+        );
     });
 
     test('should pass validation for style attributes that can have catch all "*" string', () => {
@@ -361,9 +364,7 @@ describe('test "style" field', () => {
                 {
                     type: 'string.pattern.base',
                     fieldPath: ['models', 'model_1', 'fields', 2, 'styles', 'subtitle', 'fontWeight'],
-                    message:
-                        'models.model_1.fields[2].styles.subtitle.fontWeight with value 100 ' +
-                        'fails to match the required pattern: /^[1-8]00:[2-9]00$/'
+                    message: 'models.model_1.fields[2].styles.subtitle.fontWeight with value 100 fails to match the required pattern: /^[1-8]00:[2-9]00$/'
                 },
                 {
                     type: 'alternatives.types',
