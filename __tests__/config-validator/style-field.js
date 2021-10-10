@@ -42,6 +42,9 @@ describe('test "style" field', () => {
                                 styles: {
                                     title: {
                                         textAlign: '*'
+                                    },
+                                    subtitle: {
+                                        textAlign: '*'
                                     }
                                 }
                             }
@@ -53,9 +56,12 @@ describe('test "style" field', () => {
                 {
                     type: 'style.field.not.found',
                     fieldPath: ['models', 'model_1', 'fields', 0, 'styles'],
-                    message:
-                        'models.model_1.fields[0].styles key names must match model field names or the "self" keyword, ' +
-                        'the keys: [title] do not match any field names'
+                    message: 'models.model_1.fields[0].styles.title does not match any model field name or the "self" keyword'
+                },
+                {
+                    type: 'style.field.not.found',
+                    fieldPath: ['models', 'model_1', 'fields', 0, 'styles'],
+                    message: 'models.model_1.fields[0].styles.subtitle does not match any model field name or the "self" keyword'
                 }
             ]
         );
@@ -102,6 +108,104 @@ describe('test "style" field', () => {
                 }
             ]
         );
+    });
+
+    test('should fail validation for style attributes that can not have catch all "*" string', () => {
+        expectConfigFailValidationAndMatchAllErrors({
+            models: {
+                model_1: {
+                    type: 'object',
+                    label: 'Model 1',
+                    fields: [
+                        {
+                            type: 'string',
+                            name: 'title'
+                        },
+                        {
+                            type: 'style',
+                            name: 'styles',
+                            styles: {
+                                title: {
+                                    fontFamily: '*',
+                                    textColor: '*',
+                                    backgroundColor: '*',
+                                    borderColor: '*'
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        }, [
+            {
+                type: 'array.base',
+                fieldPath: ['models', 'model_1', 'fields', 1, 'styles', 'title', 'fontFamily'],
+                message: 'models.model_1.fields[1].styles.title.fontFamily must be an array'
+            },
+            {
+                type: 'array.base',
+                fieldPath: ['models', 'model_1', 'fields', 1, 'styles', 'title', 'textColor'],
+                message: 'models.model_1.fields[1].styles.title.textColor must be an array'
+            },
+            {
+                type: 'array.base',
+                fieldPath: ['models', 'model_1', 'fields', 1, 'styles', 'title', 'backgroundColor'],
+                message: 'models.model_1.fields[1].styles.title.backgroundColor must be an array'
+            },
+            {
+                type: 'array.base',
+                fieldPath: ['models', 'model_1', 'fields', 1, 'styles', 'title', 'borderColor'],
+                message: 'models.model_1.fields[1].styles.title.borderColor must be an array'
+            }
+        ]);
+    });
+
+    test('should pass validation for style attributes that can have catch all "*" string', () => {
+        expectConfigPassingValidation({
+            models: {
+                model_1: {
+                    type: 'object',
+                    label: 'Model 1',
+                    fields: [
+                        {
+                            type: 'string',
+                            name: 'title'
+                        },
+                        {
+                            type: 'style',
+                            name: 'styles',
+                            styles: {
+                                title: {
+                                    objectFit: '*',
+                                    objectPosition: '*',
+                                    flexDirection: '*',
+                                    justifyItems: '*',
+                                    justifySelf: '*',
+                                    alignItems: '*',
+                                    alignSelf: '*',
+                                    padding: '*',
+                                    margin: '*',
+                                    width: '*',
+                                    height: '*',
+                                    fontSize: '*',
+                                    fontStyle: '*',
+                                    fontWeight: '*',
+                                    textAlign: '*',
+                                    textDecoration: '*',
+                                    backgroundPosition: '*',
+                                    backgroundSize: '*',
+                                    borderRadius: '*',
+                                    borderWidth: '*',
+                                    borderStyle: '*',
+                                    boxShadow: '*',
+                                    opacity: '*'
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        });
     });
 
     test('should fail when style attribute values have illegal values', () => {
@@ -180,17 +284,10 @@ describe('test "style" field', () => {
                                 name: 'title'
                             },
                             {
-                                type: 'string',
-                                name: 'subtitle'
-                            },
-                            {
                                 type: 'style',
                                 name: 'styles',
                                 styles: {
                                     title: {
-                                        fontFamily: '*'
-                                    },
-                                    subtitle: {
                                         fontFamily: ['*']
                                     },
                                     self: {
@@ -204,19 +301,14 @@ describe('test "style" field', () => {
             },
             [
                 {
-                    type: 'array.base',
-                    fieldPath: ['models', 'model_1', 'fields', 2, 'styles', 'title', 'fontFamily'],
-                    message: 'models.model_1.fields[2].styles.title.fontFamily must be an array'
-                },
-                {
                     type: 'object.base',
-                    fieldPath: ['models', 'model_1', 'fields', 2, 'styles', 'subtitle', 'fontFamily', 0],
-                    message: 'models.model_1.fields[2].styles.subtitle.fontFamily[0] must be of type object'
+                    fieldPath: ['models', 'model_1', 'fields', 1, 'styles', 'title', 'fontFamily', 0],
+                    message: 'models.model_1.fields[1].styles.title.fontFamily[0] must be of type object'
                 },
                 {
                     type: 'any.required',
-                    fieldPath: ['models', 'model_1', 'fields', 2, 'styles', 'self', 'fontFamily', 0, 'label'],
-                    message: 'models.model_1.fields[2].styles.self.fontFamily[0].label is required'
+                    fieldPath: ['models', 'model_1', 'fields', 1, 'styles', 'self', 'fontFamily', 0, 'label'],
+                    message: 'models.model_1.fields[1].styles.self.fontFamily[0].label is required'
                 }
             ]
         );
@@ -263,23 +355,22 @@ describe('test "style" field', () => {
                     fieldPath: ['models', 'model_1', 'fields', 2, 'styles', 'title', 'fontWeight'],
                     message:
                         'models.model_1.fields[2].styles.title.fontWeight must be one of ' +
-                        '["*", array of fontWeight pattern, array of valid fontWeight numeric values, ' +
+                        '["*", fontWeight pattern, array of fontWeight pattern, ' +
                         'array of ["100", "200", "300", "400", "500", "600", "700", "800", "900"]]'
                 },
                 {
-                    type: 'alternatives.types',
+                    type: 'string.pattern.base',
                     fieldPath: ['models', 'model_1', 'fields', 2, 'styles', 'subtitle', 'fontWeight'],
                     message:
-                        'models.model_1.fields[2].styles.subtitle.fontWeight must be one of ' +
-                        '["*", array of fontWeight pattern, array of valid fontWeight numeric values, ' +
-                        'array of ["100", "200", "300", "400", "500", "600", "700", "800", "900"]]'
+                        'models.model_1.fields[2].styles.subtitle.fontWeight with value 100 ' +
+                        'fails to match the required pattern: /^[1-8]00:[2-9]00$/'
                 },
                 {
                     type: 'alternatives.types',
                     fieldPath: ['models', 'model_1', 'fields', 2, 'styles', 'self', 'fontWeight'],
                     message:
                         'models.model_1.fields[2].styles.self.fontWeight must be one of ' +
-                        '["*", array of fontWeight pattern, array of valid fontWeight numeric values, ' +
+                        '["*", fontWeight pattern, array of fontWeight pattern, ' +
                         'array of ["100", "200", "300", "400", "500", "600", "700", "800", "900"]]'
                 }
             ]
@@ -299,17 +390,10 @@ describe('test "style" field', () => {
                                 name: 'title'
                             },
                             {
-                                type: 'string',
-                                name: 'subtitle'
-                            },
-                            {
                                 type: 'style',
                                 name: 'styles',
                                 styles: {
                                     title: {
-                                        textColor: '*'
-                                    },
-                                    subtitle: {
                                         textColor: ['*']
                                     },
                                     self: {
@@ -323,24 +407,19 @@ describe('test "style" field', () => {
             },
             [
                 {
-                    type: 'array.base',
-                    fieldPath: ['models', 'model_1', 'fields', 2, 'styles', 'title', 'textColor'],
-                    message: 'models.model_1.fields[2].styles.title.textColor must be an array'
-                },
-                {
                     type: 'object.base',
-                    fieldPath: ['models', 'model_1', 'fields', 2, 'styles', 'subtitle', 'textColor', 0],
-                    message: 'models.model_1.fields[2].styles.subtitle.textColor[0] must be of type object'
+                    fieldPath: ['models', 'model_1', 'fields', 1, 'styles', 'title', 'textColor', 0],
+                    message: 'models.model_1.fields[1].styles.title.textColor[0] must be of type object'
                 },
                 {
                     type: 'any.required',
-                    fieldPath: ['models', 'model_1', 'fields', 2, 'styles', 'self', 'textColor', 0, 'label'],
-                    message: 'models.model_1.fields[2].styles.self.textColor[0].label is required'
+                    fieldPath: ['models', 'model_1', 'fields', 1, 'styles', 'self', 'textColor', 0, 'label'],
+                    message: 'models.model_1.fields[1].styles.self.textColor[0].label is required'
                 },
                 {
                     type: 'any.required',
-                    fieldPath: ['models', 'model_1', 'fields', 2, 'styles', 'self', 'textColor', 0, 'color'],
-                    message: 'models.model_1.fields[2].styles.self.textColor[0].color is required'
+                    fieldPath: ['models', 'model_1', 'fields', 1, 'styles', 'self', 'textColor', 0, 'color'],
+                    message: 'models.model_1.fields[1].styles.self.textColor[0].color is required'
                 }
             ]
         );
@@ -383,25 +462,25 @@ describe('test "style" field', () => {
             },
             [
                 {
-                    type: 'alternatives.types',
+                    type: 'string.pattern.base',
                     fieldPath: ['models', 'model_1', 'fields', 2, 'styles', 'title', 'opacity'],
                     message:
-                        'models.model_1.fields[2].styles.title.opacity must be one of ' +
-                        '["*", array of valid opacity numeric values, array of opacity pattern]'
+                        'models.model_1.fields[2].styles.title.opacity with value 10 ' +
+                        'fails to match the required pattern: /^[1-9]?[05]:(?:5|[1-9][05]|100)$/'
                 },
                 {
                     type: 'alternatives.types',
                     fieldPath: ['models', 'model_1', 'fields', 2, 'styles', 'subtitle', 'opacity'],
                     message:
                         'models.model_1.fields[2].styles.subtitle.opacity must be one of ' +
-                        '["*", array of valid opacity numeric values, array of opacity pattern]'
+                        '["*", opacity pattern, array of opacity pattern, array of valid opacity numeric values]'
                 },
                 {
                     type: 'alternatives.types',
                     fieldPath: ['models', 'model_1', 'fields', 2, 'styles', 'self', 'opacity'],
                     message:
                         'models.model_1.fields[2].styles.self.opacity must be one of ' +
-                        '["*", array of valid opacity numeric values, array of opacity pattern]'
+                        '["*", opacity pattern, array of opacity pattern, array of valid opacity numeric values]'
                 }
             ]
         );
@@ -423,9 +502,9 @@ describe('test "style" field', () => {
                             name: 'styles',
                             styles: {
                                 title: {
-                                    textAlign: '*',
-                                    objectPosition: '*',
-                                    padding: '*',
+                                    textAlign: ['left', 'right'],
+                                    objectPosition: ['top', 'center', 'bottom'],
+                                    padding: 'x',
                                     margin: ['x', 'y'],
                                     fontFamily: [
                                         {
@@ -437,7 +516,7 @@ describe('test "style" field', () => {
                                             label: 'Font 2'
                                         }
                                     ],
-                                    fontWeight: '*',
+                                    fontWeight: ['100', '200', '400:800'],
                                     textColor: [
                                         {
                                             value: 'black',
@@ -450,14 +529,11 @@ describe('test "style" field', () => {
                                             color: '#ffffff'
                                         }
                                     ],
-                                    opacity: '*'
+                                    opacity: '10:50'
                                 },
                                 self: {
-                                    textAlign: ['left', 'right'],
-                                    objectPosition: ['top', 'center', 'bottom'],
-                                    padding: 'x',
+                                    padding: 'x4:10:2',
                                     margin: ['x0:10', 'y0:10:2'],
-                                    fontWeight: [100, '200', '400:800'],
                                     opacity: [0, 10, '20', '50:100']
                                 }
                             }

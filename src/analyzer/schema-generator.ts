@@ -21,7 +21,7 @@ import {
 } from './analyze-schema-types';
 
 type FieldPath = (string | number)[];
-type StringFieldTypes = Exclude<FieldType, 'number' | 'boolean' | 'enum' | 'object' | 'model' | 'reference' | 'list'>;
+type StringFieldTypes = Exclude<FieldType, 'number' | 'boolean' | 'enum' | 'object' | 'model' | 'reference' | 'style' | 'list'>;
 type PartialObjectModel = Omit<ObjectModel, 'label' | 'fields'> & { fields: FieldWithUnknown[]; refFieldPaths?: FieldPath[]; refFields?: FieldModelProps[] };
 type PartialPageModel = Omit<PageModel, 'label' | 'fields'> & { fields: FieldWithUnknown[]; filePaths: string[] };
 type PartialPageModelWithFilePaths = Omit<PageModel, 'label'> & { filePaths: string[] };

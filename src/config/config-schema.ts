@@ -314,10 +314,12 @@ const fieldCommonPropsSchema = Joi.object({
 
 const numberFieldPartialSchema = Joi.object({
     type: Joi.string().valid('number').required(),
+    controlType: Joi.string().valid('slider'),
     subtype: Joi.string().valid('int', 'float'),
     min: Joi.number(),
     max: Joi.number(),
-    step: Joi.number()
+    step: Joi.number(),
+    unit: Joi.string()
 });
 
 const enumFieldBaseOptionSchema = Joi.object({

@@ -1,7 +1,9 @@
 // SSGs Stackbit Studio supports
 export const SSG_NAMES = ['unibit', 'jekyll', 'hugo', 'gatsby', 'nextjs', 'custom', 'eleventy', 'vuepress', 'gridsome', 'nuxt', 'sapper', 'hexo'] as const;
+
 // CMSes Stackbit Studio supports
 export const CMS_NAMES = ['git', 'contentful', 'sanity', 'forestry', 'netlifycms'] as const;
+
 export const FIELD_TYPES = [
     'string',
     'url',
@@ -23,3 +25,54 @@ export const FIELD_TYPES = [
     'style',
     'list'
 ] as const;
+
+export const STYLE_PROPS = [
+    'objectFit',
+    'objectPosition',
+    'flexDirection',
+    'justifyItems',
+    'justifySelf',
+    'alignItems',
+    'alignSelf',
+    'padding',
+    'margin',
+    'width',
+    'height',
+    'fontFamily',
+    'fontSize',
+    'fontStyle',
+    'fontWeight',
+    'textAlign',
+    'textColor',
+    'textDecoration',
+    'backgroundColor',
+    'backgroundPosition',
+    'backgroundSize',
+    'borderRadius',
+    'borderWidth',
+    'borderColor',
+    'borderStyle',
+    'boxShadow',
+    'opacity'
+] as const;
+
+export const STYLE_PROPS_VALUES = {
+    nineRegions: ['top', 'center', 'bottom', 'left', 'left-top', 'left-bottom', 'right', 'right-top', 'right-bottom'],
+    objectFit: ['none', 'contain', 'cover', 'fill', 'scale-down'],
+    flexDirection: ['row', 'row-reverse', 'col', 'col-reverse'],
+    justifyItems: ['start', 'end', 'center', 'stretch'],
+    justifySelf: ['auto', 'start', 'end', 'center', 'stretch'],
+    alignItems: ['start', 'end', 'center', 'baseline', 'stretch'],
+    alignSelf: ['auto', 'start', 'end', 'center', 'baseline', 'stretch'],
+    width: ['auto', 'narrow', 'wide', 'full'],
+    height: ['auto', 'full', 'screen'],
+    fontSize: ['xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large', 'xxx-large'],
+    fontStyle: ['normal', 'italic'],
+    fontWeight: ['100', '200', '300', '400', '500', '600', '700', '800', '900'],
+    textAlign: ['left', 'center', 'right', 'justify'],
+    textDecoration: ['none', 'underline', 'line-through'],
+    backgroundSize: ['auto', 'cover', 'contain'],
+    borderRadius: ['xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large', 'full'],
+    borderStyle: ['solid', 'dashed', 'dotted', 'double', 'none'],
+    boxShadow: ['none', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large', 'inner']
+};

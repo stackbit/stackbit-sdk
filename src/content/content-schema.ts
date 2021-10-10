@@ -1,11 +1,15 @@
 import Joi from 'joi';
 import _ from 'lodash';
+import { append } from '@stackbit/utils';
 
+import { STYLE_PROPS_VALUES } from '../config/config-consts';
 import { isDataModel, isPageModel } from '../utils';
 import {
     Config,
     Field,
     FieldEnumOptionObject,
+    FieldEnumOptionPalette,
+    FieldEnumOptionThumbnails,
     FieldEnumOptionValue,
     FieldEnumProps,
     FieldListItems,
@@ -14,7 +18,9 @@ import {
     FieldNumberProps,
     FieldObjectProps,
     FieldReferenceProps,
-    Model
+    FieldStyleProps,
+    Model,
+    StyleProps
 } from '../config/config-types';
 
 type FieldPath = (string | number)[];
@@ -122,28 +128,25 @@ function joiSchemaForField(field: Field | FieldListItems, config: Config, fieldP
             fieldSchema = Joi.date();
             break;
         case 'enum':
-            fieldSchema = FieldSchemas.enum(field, config, fieldPath);
+            fieldSchema = enumFieldValueSchema(field);
             break;
         case 'number':
-            fieldSchema = FieldSchemas.number(field, config, fieldPath);
+            fieldSchema = numberFieldValueSchema(field);
             break;
         case 'object':
-            fieldSchema = FieldSchemas.object(field, config, fieldPath);
+            fieldSchema = objectFieldValueSchema(field, config, fieldPath);
             break;
         case 'model':
-            fieldSchema = FieldSchemas.model(field, config, fieldPath);
+            fieldSchema = modelFieldValueSchema(field, config);
             break;
         case 'reference':
-            fieldSchema = Joi.string();
+            fieldSchema = referenceFieldValueSchema(field);
             break;
         case 'style':
-            // TODO: validate the 'style' object:
-            //  - check that its keys match match field names of the parent object
-            //  - check that style properties and their values match the style field's schema
-            fieldSchema = Joi.object();
+            fieldSchema = styleFieldValueSchema(field);
             break;
         case 'list':
-            fieldSchema = FieldSchemas.list(field, config, fieldPath);
+            fieldSchema = listFieldValueSchema(field, config, fieldPath);
             break;
     }
     if ('const' in field) {
@@ -154,93 +157,284 @@ function joiSchemaForField(field: Field | FieldListItems, config: Config, fieldP
     return fieldSchema;
 }
 
-export type FieldPropsByType = {
-    enum: FieldEnumProps;
-    number: FieldNumberProps;
-    object: FieldObjectProps;
-    model: FieldModelProps;
-    reference: FieldReferenceProps;
-    list: FieldListProps;
+function enumFieldValueSchema(field: FieldEnumProps): Joi.Schema {
+    if (field.options) {
+        const values = field.options.map((option: FieldEnumOptionValue | FieldEnumOptionObject | FieldEnumOptionThumbnails | FieldEnumOptionPalette) => {
+            return typeof option === 'object' ? option.value : option;
+        });
+        return Joi.valid(...values);
+    }
+    return Joi.any().forbidden();
+}
+
+function numberFieldValueSchema(field: FieldNumberProps): Joi.Schema {
+    let result = Joi.number();
+    if (field.subtype !== 'float') {
+        result = result.integer();
+    }
+    if (field.min) {
+        result = result.min(field.min);
+    }
+    if (field.max) {
+        result = result.max(field.max);
+    }
+    if (field.step) {
+        result = result.multiple((field.min || 0) + field.step);
+    }
+    return result;
+}
+
+function objectFieldValueSchema(field: FieldObjectProps, config: Config, fieldPath: FieldPath): Joi.Schema {
+    const childFieldPath = fieldPath.concat('fields');
+    return joiSchemaForModelFields(field.fields, config, childFieldPath);
+}
+
+function modelFieldValueSchema(field: FieldModelProps, config: Config): Joi.Schema {
+    if (field.models.length === 0) {
+        return Joi.any().forbidden();
+    }
+    const objectTypeKey = config.objectTypeKey || 'type';
+    const typeSchema = Joi.string().valid(...field.models);
+    if (field.models.length === 1 && field.models[0]) {
+        const modelName = field.models[0];
+        return Joi.link()
+            .ref(`#${modelName}_model_schema`)
+            .concat(
+                Joi.object({
+                    __metadata: metadataSchema,
+                    [objectTypeKey]: typeSchema
+                })
+            );
+    } else {
+        // if there is more than one model in models, then 'type' field is
+        // required to identify the object
+        return Joi.alternatives()
+            .conditional(`.${objectTypeKey}`, {
+                switch: _.map(field.models, (modelName) => {
+                    return {
+                        is: modelName,
+                        then: Joi.link()
+                            .ref(`#${modelName}_model_schema`)
+                            .concat(
+                                Joi.object({
+                                    __metadata: metadataSchema,
+                                    [objectTypeKey]: Joi.string()
+                                })
+                            )
+                    };
+                })
+            })
+            .prefs({
+                messages: {
+                    'alternatives.any': `{{#label}}.${objectTypeKey} is required and must be one of [${field.models.join(', ')}].`
+                },
+                errors: { wrap: { label: false } }
+            });
+    }
+}
+
+function referenceFieldValueSchema(field: FieldReferenceProps): Joi.Schema {
+    // TODO: validate reference by looking if referenced filePath actually exists
+    //  and the stored object has the correct type
+    return Joi.string();
+}
+
+function listFieldValueSchema(field: FieldListProps, config: Config, fieldPath: FieldPath): Joi.Schema {
+    if (field.items) {
+        const childFieldPath = fieldPath.concat('items');
+        const itemsSchema = joiSchemaForField(field.items, config, childFieldPath);
+        return Joi.array().items(itemsSchema);
+    }
+    return Joi.array().items(Joi.string());
+}
+
+function styleFieldValueSchema(field: FieldStyleProps): Joi.Schema {
+    const styleFieldSchema = _.mapValues(field.styles, (fieldStyles) => {
+        const styleProps = _.keys(fieldStyles) as StyleProps[];
+        const objectSchema = _.reduce(
+            styleProps,
+            (schema: Partial<Record<StyleProps, Joi.Schema>>, styleProp) => {
+                const createSchema = StylePropContentSchemas[styleProp];
+                if (!createSchema) {
+                    return schema;
+                }
+                const styleConfig = fieldStyles[styleProp];
+                const valueSchema = createSchema(styleConfig);
+                if (!valueSchema) {
+                    return schema;
+                }
+                schema[styleProp] = valueSchema;
+                return schema;
+            },
+            {}
+        );
+        return Joi.object(objectSchema);
+    });
+    return Joi.object(styleFieldSchema);
+}
+
+const StylePropContentSchemas: Record<StyleProps, (styleConfig: any) => Joi.Schema | null> = {
+    objectFit: stylePropSchemaWithValidValues(STYLE_PROPS_VALUES.objectFit),
+    objectPosition: stylePropSchemaWithValidValues(STYLE_PROPS_VALUES.nineRegions),
+    flexDirection: stylePropSchemaWithValidValues(STYLE_PROPS_VALUES.flexDirection),
+    justifyItems: stylePropSchemaWithValidValues(STYLE_PROPS_VALUES.justifyItems),
+    justifySelf: stylePropSchemaWithValidValues(STYLE_PROPS_VALUES.justifySelf),
+    alignItems: stylePropSchemaWithValidValues(STYLE_PROPS_VALUES.alignItems),
+    alignSelf: stylePropSchemaWithValidValues(STYLE_PROPS_VALUES.alignSelf),
+    padding: stylePropSizeSchema,
+    margin: stylePropSizeSchema,
+    width: stylePropSchemaWithValidValues(STYLE_PROPS_VALUES.width),
+    height: stylePropSchemaWithValidValues(STYLE_PROPS_VALUES.height),
+    fontFamily: stylePropObjectValueSchema,
+    fontSize: stylePropSchemaWithValidValues(STYLE_PROPS_VALUES.fontSize),
+    fontStyle: stylePropSchemaWithValidValues(STYLE_PROPS_VALUES.fontStyle),
+    fontWeight: stylePropFontWeightSchema,
+    textAlign: stylePropSchemaWithValidValues(STYLE_PROPS_VALUES.textAlign),
+    textColor: stylePropObjectValueSchema,
+    textDecoration: stylePropSchemaWithValidValues(STYLE_PROPS_VALUES.textDecoration),
+    backgroundColor: stylePropObjectValueSchema,
+    backgroundPosition: stylePropSchemaWithValidValues(STYLE_PROPS_VALUES.nineRegions),
+    backgroundSize: stylePropSchemaWithValidValues(STYLE_PROPS_VALUES.backgroundSize),
+    borderRadius: stylePropSchemaWithValidValues(STYLE_PROPS_VALUES.borderRadius),
+    borderWidth: stylePropSizeSchema,
+    borderColor: stylePropObjectValueSchema,
+    borderStyle: stylePropSchemaWithValidValues(STYLE_PROPS_VALUES.borderStyle),
+    boxShadow: stylePropSchemaWithValidValues(STYLE_PROPS_VALUES.boxShadow),
+    opacity: stylePropOpacitySchema
 };
 
-const FieldSchemas: { [fieldType in keyof FieldPropsByType]: (field: FieldPropsByType[fieldType], config: Config, fieldPath: FieldPath) => Joi.Schema } = {
-    enum: (field) => {
-        if (field.options) {
-            const values = field.options.map((option: FieldEnumOptionValue | FieldEnumOptionObject) =>
-                typeof option === 'number' || typeof option === 'string' ? option : option.value
-            );
-            return Joi.valid(...values);
+function stylePropSchemaWithValidValues(validValues: any[]) {
+    return (styleConfig: any) => {
+        if (styleConfig === '*') {
+            return Joi.string().valid(...validValues);
         }
-        return Joi.any().forbidden();
-    },
-    number: (field) => {
-        let result = Joi.number();
-        if (field.subtype !== 'float') {
-            result = result.integer();
+        if (Array.isArray(styleConfig)) {
+            return Joi.string().valid(...styleConfig);
         }
-        if (field.min) {
-            result = result.min(field.min);
-        }
-        if (field.max) {
-            result = result.max(field.max);
-        }
-        return result;
-    },
-    object: (field, config, fieldPath: FieldPath) => {
-        const childFieldPath = fieldPath.concat('fields');
-        return joiSchemaForModelFields(field.fields, config, childFieldPath);
-    },
-    model: (field, config) => {
-        if (field.models.length === 0) {
-            return Joi.any().forbidden();
-        }
-        const objectTypeKey = config.objectTypeKey || 'type';
-        const typeSchema = Joi.string().valid(...field.models);
-        if (field.models.length === 1 && field.models[0]) {
-            const modelName = field.models[0];
-            return Joi.link()
-                .ref(`#${modelName}_model_schema`)
-                .concat(
-                    Joi.object({
-                        __metadata: metadataSchema,
-                        [objectTypeKey]: typeSchema
-                    })
-                );
-        } else {
-            // if there is more than one model in models, then 'type' field is
-            // required to identify the object
-            return Joi.alternatives()
-                .conditional(`.${objectTypeKey}`, {
-                    switch: _.map(field.models, (modelName) => {
-                        return {
-                            is: modelName,
-                            then: Joi.link()
-                                .ref(`#${modelName}_model_schema`)
-                                .concat(
-                                    Joi.object({
-                                        __metadata: metadataSchema,
-                                        [objectTypeKey]: Joi.string()
-                                    })
-                                )
-                        };
-                    })
-                })
-                .prefs({
-                    messages: {
-                        'alternatives.any': `{{#label}}.${objectTypeKey} is required and must be one of [${field.models.join(', ')}].`
-                    },
-                    errors: { wrap: { label: false } }
-                });
-        }
-    },
-    // TODO: validate reference by looking if referenced filePath actually exists
-    reference: () => Joi.string(),
-    list: (field, config, fieldPath: FieldPath) => {
-        if (field.items) {
-            const childFieldPath = fieldPath.concat('items');
-            const itemsSchema = joiSchemaForField(field.items, config, childFieldPath);
-            return Joi.array().items(itemsSchema);
-        }
-        return Joi.array().items(Joi.string());
+        return null;
+    };
+}
+
+function stylePropSizeSchema(styleConfig: any) {
+    if (styleConfig === '*') {
+        return Joi.object({
+            top: Joi.number(),
+            bottom: Joi.number(),
+            left: Joi.number(),
+            right: Joi.number()
+        });
     }
-};
+    // TODO: validate Tailwind paddings
+    styleConfig = _.castArray(styleConfig);
+    const dirSchemas = _.reduce(
+        styleConfig,
+        (dirSchemas: any, pattern) => {
+            const directionMatch = pattern.match(/^[xylrtb]/);
+            const directions = [];
+            if (!directionMatch) {
+                directions.push('top', 'bottom', 'left', 'right');
+            } else {
+                const dirMap = {
+                    x: ['left', 'right'],
+                    y: ['top', 'bottom'],
+                    l: ['left'],
+                    r: ['right'],
+                    t: ['top'],
+                    b: ['bottom']
+                };
+                const dirMatch: 'x' | 'y' | 'l' | 'r' | 't' | 'b' = directionMatch[0];
+                directions.push(...dirMap[dirMatch]);
+                pattern = pattern.substring(1);
+            }
+            let valueSchema: Joi.Schema;
+            if (pattern) {
+                const parts = pattern.split(':');
+                if (parts.length === 1) {
+                    valueSchema = Joi.valid(parts[0]);
+                } else {
+                    valueSchema = Joi.number().min(parts[0]).max(parts[1]);
+                    if (parts.length === 3) {
+                        valueSchema = (<Joi.NumberSchema>valueSchema).multiple(parts[3]);
+                    }
+                }
+            }
+            _.forEach(directions, (direction) => {
+                append(dirSchemas, direction, valueSchema);
+            });
+            return dirSchemas;
+        },
+        {}
+    );
+    const objectSchema = _.mapValues(dirSchemas, (schema) => Joi.alternatives(...schema));
+    return Joi.object(objectSchema);
+}
+
+function stylePropObjectValueSchema(styleConfig: any) {
+    return Joi.valid(..._.map(styleConfig, (object) => object.value));
+}
+
+function stylePropFontWeightSchema(styleConfig: any) {
+    if (styleConfig === '*') {
+        return Joi.string().valid(...STYLE_PROPS_VALUES.fontWeight);
+    }
+    styleConfig = _.castArray(styleConfig);
+    const validValues = _.reduce(
+        styleConfig,
+        (validValues, value) => {
+            if (_.isNumber(value)) {
+                return validValues.add(String(value));
+            }
+            if (!_.isString(value)) {
+                return validValues;
+            }
+            if (_.isEmpty(value)) {
+                return validValues;
+            }
+            const parts = value.split(':');
+            if (parts.length === 1) {
+                return validValues.add(parts[0]!);
+            }
+            const start = Number(parts[0]);
+            const end = Number(parts[1]);
+            for (let i = start; i <= end; i += 100) {
+                validValues.add(String(i));
+            }
+            return validValues;
+        },
+        new Set<string>()
+    );
+    return Joi.valid(...[...validValues]);
+}
+
+function stylePropOpacitySchema(styleConfig: any) {
+    if (styleConfig === '*') {
+        return Joi.number().integer().min(0).max(100).multiple(5);
+    }
+    styleConfig = _.castArray(styleConfig);
+    const validValues = _.reduce(
+        styleConfig,
+        (validValues, value) => {
+            if (_.isNumber(value)) {
+                return validValues.add(value);
+            }
+            if (!_.isString(value)) {
+                return validValues;
+            }
+            if (_.isEmpty(value)) {
+                return validValues;
+            }
+            const parts = value.split(':');
+            if (parts.length === 1) {
+                return validValues.add(Number(parts[0]!));
+            }
+            const start = Number(parts[0]);
+            const end = Number(parts[1]);
+            for (let i = start; i <= end; i += 5) {
+                validValues.add(i);
+            }
+            return validValues;
+        },
+        new Set<number>()
+    );
+    return Joi.valid(...[...validValues]);
+}

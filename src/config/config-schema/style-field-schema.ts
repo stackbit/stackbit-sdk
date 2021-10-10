@@ -1,28 +1,7 @@
-import Joi from 'joi';
+import Joi, { CustomHelpers, ErrorReport } from 'joi';
 import _ from 'lodash';
 import { Field } from '../config-types';
-
-const stylePropAllValues = Joi.string().valid('*');
-
-const styleNineRegionsSchema = stylePropArrayOfStringsWithAll(
-    'top',
-    'center',
-    'bottom',
-    'left',
-    'left-top',
-    'left-bottom',
-    'right',
-    'right-top',
-    'right-bottom'
-);
-
-const styleColorSchema = arrayItems(
-    Joi.object({
-        value: Joi.string().required(),
-        label: Joi.string().required(),
-        color: Joi.string().required()
-    })
-);
+import { STYLE_PROPS_VALUES } from '../config-consts';
 
 const sizePattern = /^[xylrtb](?:\d+(?::\d+(?::\d+)?)?)?|\d+(?::\d+(?::\d+)?)?|tw[xylrtb]?(?:\d+|\d\.5|px)?$/;
 const styleSizeSchema = stylePropWithAll(Joi.array().items(Joi.string().pattern(sizePattern)).single()).prefs({
@@ -34,47 +13,55 @@ const styleSizeSchema = stylePropWithAll(Joi.array().items(Joi.string().pattern(
     errors: { wrap: { label: false } }
 });
 
+const fontWeightPattern = /^[1-8]00:[2-9]00$/;
+const opacityPattern = /^[1-9]?[05]:(?:5|[1-9][05]|100)$/;
+
+const styleColorSchema = arrayOf(
+    Joi.object({
+        value: Joi.string().required(),
+        label: Joi.string().required(),
+        color: Joi.string().required()
+    })
+);
+
 const stylePropsSchema = Joi.object({
-    objectFit: stylePropArrayOfStringsWithAll('none', 'contain', 'cover', 'fill', 'scale-down'),
-    objectPosition: styleNineRegionsSchema,
-    flexDirection: stylePropArrayOfStringsWithAll('row', 'row-reverse', 'col', 'col-reverse'),
-    justifyItems: stylePropArrayOfStringsWithAll('start', 'end', 'center', 'stretch'),
-    justifySelf: stylePropArrayOfStringsWithAll('auto', 'start', 'end', 'center', 'stretch'),
-    alignItems: stylePropArrayOfStringsWithAll('start', 'end', 'center', 'baseline', 'stretch'),
-    alignSelf: stylePropArrayOfStringsWithAll('auto', 'start', 'end', 'center', 'baseline', 'stretch'),
+    objectFit: arrayOfStringsWithAll(...STYLE_PROPS_VALUES.objectFit),
+    objectPosition: arrayOfStringsWithAll(...STYLE_PROPS_VALUES.nineRegions),
+    flexDirection: arrayOfStringsWithAll(...STYLE_PROPS_VALUES.flexDirection),
+    justifyItems: arrayOfStringsWithAll(...STYLE_PROPS_VALUES.justifyItems),
+    justifySelf: arrayOfStringsWithAll(...STYLE_PROPS_VALUES.justifySelf),
+    alignItems: arrayOfStringsWithAll(...STYLE_PROPS_VALUES.alignItems),
+    alignSelf: arrayOfStringsWithAll(...STYLE_PROPS_VALUES.alignSelf),
     padding: styleSizeSchema,
     margin: styleSizeSchema,
-    width: stylePropArrayOfStringsWithAll('auto', 'narrow', 'wide', 'full'),
-    height: stylePropArrayOfStringsWithAll('auto', 'full', 'screen'),
-    fontFamily: arrayItems(Joi.object({
-        value: Joi.string().required(),
-        label: Joi.string().required()
-    })),
-    fontSize: stylePropArrayOfStringsWithAll('xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large', 'xxx-large'),
-    fontStyle: stylePropArrayOfStringsWithAll('normal', 'italic'),
-    fontWeight: stylePropWithAll(
-        arrayItems(
-            Joi.string().pattern(/^[1-9]00:[1-9]00$/),
-            Joi.string().valid('100', '200', '300', '400', '500', '600', '700', '800', '900'),
-            Joi.number().integer().min(100).max(900).multiple(100)
-        )
+    width: arrayOfStringsWithAll(...STYLE_PROPS_VALUES.width),
+    height: arrayOfStringsWithAll(...STYLE_PROPS_VALUES.height),
+    fontFamily: arrayOf(
+        Joi.object({
+            value: Joi.string().required(),
+            label: Joi.string().required()
+        })
     ),
-    textAlign: stylePropArrayOfStringsWithAll('left', 'center', 'right', 'justify'),
+    fontSize: arrayOfStringsWithAll(...STYLE_PROPS_VALUES.fontSize),
+    fontStyle: arrayOfStringsWithAll(...STYLE_PROPS_VALUES.fontStyle),
+    fontWeight: stylePropWithAll(
+        Joi.string().pattern(fontWeightPattern),
+        arrayOf(Joi.string().pattern(fontWeightPattern), Joi.string().valid(...STYLE_PROPS_VALUES.fontWeight))
+    ),
+    textAlign: arrayOfStringsWithAll(...STYLE_PROPS_VALUES.textAlign),
     textColor: styleColorSchema,
-    textDecoration: stylePropArrayOfStringsWithAll('none', 'underline', 'line-through'),
+    textDecoration: arrayOfStringsWithAll(...STYLE_PROPS_VALUES.textDecoration),
     backgroundColor: styleColorSchema,
-    backgroundPosition: styleNineRegionsSchema,
-    backgroundSize: stylePropArrayOfStringsWithAll('auto', 'cover', 'contain'),
-    borderRadius: stylePropArrayOfStringsWithAll('xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large', 'full'),
+    backgroundPosition: arrayOfStringsWithAll(...STYLE_PROPS_VALUES.nineRegions),
+    backgroundSize: arrayOfStringsWithAll(...STYLE_PROPS_VALUES.backgroundSize),
+    borderRadius: arrayOfStringsWithAll(...STYLE_PROPS_VALUES.borderRadius),
     borderWidth: styleSizeSchema,
     borderColor: styleColorSchema,
-    borderStyle: stylePropArrayOfStringsWithAll('solid', 'dashed', 'dotted', 'double', 'none'),
-    boxShadow: stylePropArrayOfStringsWithAll('none', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large', 'inner'),
+    borderStyle: arrayOfStringsWithAll(...STYLE_PROPS_VALUES.borderStyle),
+    boxShadow: arrayOfStringsWithAll(...STYLE_PROPS_VALUES.boxShadow),
     opacity: stylePropWithAll(
-        arrayItems(
-            Joi.number().integer().min(0).max(100).multiple(5),
-            Joi.string().pattern(/^[1-9]?[05]:(?:5|[1-9][05]|100)$/)
-        )
+        Joi.string().pattern(opacityPattern),
+        arrayOf(Joi.string().pattern(opacityPattern), Joi.number().integer().min(0).max(100).multiple(5))
     )
 });
 
@@ -84,26 +71,25 @@ export const styleFieldPartialSchema = Joi.object({
     type: Joi.string().valid('style').required(),
     styles: Joi.object()
         .pattern(Joi.string(), stylePropsSchema)
-        .custom((value, { error, state }) => {
+        .custom((value, { error, state, errorsArray }: CustomHelpers & { errorsArray?: () => ErrorReport[] }) => {
             const fields: Field[] = _.nth(state.ancestors, 1)!;
             const fieldsByName = _.keyBy(fields, 'name');
-            const illegalFieldNames: string[] = [];
+            const errors = errorsArray!();
             _.forEach(value, (styleProps, fieldName) => {
                 if (fieldName !== 'self' && !_.has(fieldsByName, fieldName)) {
-                    illegalFieldNames.push(fieldName);
+                    errors.push(error(styleFieldNotFound, { fieldName }));
                     return;
                 }
             });
-            if (illegalFieldNames.length > 0) {
-                return error(styleFieldNotFound, { illegalFieldNames: illegalFieldNames.join(', ') });
+            if (errors && errors.length) {
+                return errors;
             }
             return value;
         })
         .required()
         .prefs({
             messages: {
-                [styleFieldNotFound]:
-                    '{{#label}} key names must match model field names or the "self" keyword, the keys: [{{#illegalFieldNames}}] do not match any field names'
+                [styleFieldNotFound]: '{{#label}}.{{#fieldName}} does not match any model field name or the "self" keyword'
             },
             errors: { wrap: { label: false } }
         })
@@ -128,8 +114,12 @@ function stylePropError(errors: Joi.ErrorReport[]): Joi.ErrorReport[] {
                 const schema = _.get(match, 'schema');
                 const schemaType = _.get(schema, 'type');
                 if (schemaType === 'string') {
-                    const items: string[] = _.get(schema, 'allow', []);
-                    localTypes.singleItems.push(...items.map((value) => `"${value}"`));
+                    if (_.has(schema, 'allow')) {
+                        const items: string[] = _.get(schema, 'allow', []);
+                        localTypes.singleItems.push(...items.map((value) => `"${value}"`));
+                    } else if (_.has(schema, 'rules') && _.some(schema.rules, { name: 'pattern' })) {
+                        localTypes.singleItems.push(`${stylePropName} pattern`);
+                    }
                 } else if (schemaType === 'array') {
                     const schemaItems = _.get(schema, 'items');
                     _.forEach(schemaItems, (schemaItem) => {
@@ -155,16 +145,16 @@ function stylePropError(errors: Joi.ErrorReport[]): Joi.ErrorReport[] {
     });
 }
 
-function stylePropArrayOfStringsWithAll(...values: string[]) {
-    return stylePropWithAll(arrayItems(Joi.string().valid(...values)));
+function arrayOfStringsWithAll(...values: string[]) {
+    return stylePropWithAll(arrayOf(Joi.string().valid(...values)));
 }
 
 function stylePropWithAll(...items: Joi.Schema[]) {
     return Joi.alternatives()
-        .try(stylePropAllValues, ...items)
+        .try(Joi.string().valid('*'), ...items)
         .error(stylePropError as any);
 }
 
-function arrayItems(...items: Joi.Schema[]) {
+function arrayOf(...items: Joi.Schema[]): Joi.Schema {
     return Joi.array().items(...items);
 }

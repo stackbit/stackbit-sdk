@@ -1,5 +1,5 @@
 import { StricterUnion } from '../utils';
-import { CMS_NAMES, FIELD_TYPES, SSG_NAMES } from './config-consts';
+import { CMS_NAMES, FIELD_TYPES, SSG_NAMES, STYLE_PROPS } from './config-consts';
 
 export interface Config extends BaseConfig {
     models: Model[];
@@ -274,10 +274,12 @@ export interface FieldEnumOptionPalette extends FieldEnumOptionObject {
 
 export interface FieldNumberProps {
     type: 'number';
+    controlType?: 'slider';
     subtype?: 'int' | 'float';
     min?: number;
     max?: number;
     step?: number;
+    unit?: string;
 }
 
 export interface FieldObjectProps {
@@ -301,9 +303,11 @@ export interface FieldReferenceProps {
     groups?: string[];
 }
 
+export type StyleProps = typeof STYLE_PROPS[number];
+
 export interface FieldStyleProps {
     type: 'style';
-    styles: any;
+    styles: Record<string, Partial<Record<StyleProps, any>>>;
 }
 
 export interface FieldListProps {
