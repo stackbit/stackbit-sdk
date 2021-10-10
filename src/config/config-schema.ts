@@ -194,6 +194,29 @@ const variantFieldSchema = Joi.custom((value, { error, state }) => {
     errors: { wrap: { label: false } }
 });
 
+const styleObjectModelReferenceError = 'styleObjectModelName.model.missing';
+const styleObjectModelNotObject = 'styleObjectModelName.model.type';
+const styleObjectModelNameSchema = Joi.string()
+    .allow('', null)
+    .custom((value, { error, state }) => {
+        const models = getModelsFromValidationState(state);
+        const modelNames = Object.keys(models);
+        if (!modelNames.includes(value)) {
+            return error(styleObjectModelReferenceError);
+        }
+        if (models[value]!.type !== 'data') {
+            return error(styleObjectModelNotObject);
+        }
+        return value;
+    })
+    .prefs({
+        messages: {
+            [styleObjectModelReferenceError]: '{{#label}} must reference an existing model',
+            [styleObjectModelNotObject]: 'Model defined in {{#label}} must be of type data - {{#value}}'
+        },
+        errors: { wrap: { label: false } }
+    });
+
 const contentfulImportSchema = Joi.object<ContentfulImport>({
     type: Joi.string().valid('contentful').required(),
     contentFile: Joi.string().required(),
@@ -645,6 +668,7 @@ export const stackbitConfigSchema = Joi.object<YamlConfig>({
     dataDir: Joi.string().allow('', null),
     pageLayoutKey: Joi.string().allow(null),
     objectTypeKey: Joi.string(),
+    styleObjectModelName: styleObjectModelNameSchema,
     excludePages: Joi.array().items(Joi.string()).single(),
     logicFields: Joi.array().items(logicField),
     contentModels: Joi.any(),

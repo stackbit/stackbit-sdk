@@ -47,6 +47,49 @@ test('uploadDir is mutual exclusive with assets', () => {
     );
 });
 
+describe('styleObjectModelName', () => {
+    test('should pass validation when styleObjectModelName is set and refers to a valid model', () => {
+        expectPassingValidation({
+            styleObjectModelName: 'model_1',
+            models: {
+                model_1: { type: 'data', label: 'model_1' },
+            }
+        });
+    });
+
+    test('styleObjectModelName must reference an existing model', () => {
+        expectValidationResultToIncludeSingleError(
+            {
+                styleObjectModelName: 'invalid',
+                models: {
+                    model_1: { type: 'page', label: 'model_1' },
+                }
+            },
+            {
+                type: 'styleObjectModelName.model.missing',
+                fieldPath: ['styleObjectModelName'],
+                message: expect.stringMatching('styleObjectModelName must reference an existing model')
+            }
+        );
+    });
+
+    test('styleObjectModelName must reference a model of type "object"', () => {
+        expectValidationResultToIncludeSingleError(
+            {
+                styleObjectModelName: 'model_1',
+                models: {
+                    model_1: { type: 'page', label: 'model_1' }
+                }
+            },
+            {
+                type: 'styleObjectModelName.model.type',
+                fieldPath: ['styleObjectModelName'],
+                message: expect.stringMatching('Model defined in styleObjectModelName must be of type data - model_1')
+            }
+        );
+    });
+});
+
 describe('static assets', () => {
     test('should pass validation when "referenceType" is "static", and the "staticDir" and the "publicPath" properties are specified', () => {
         expectPassingValidation({
