@@ -88,9 +88,9 @@ export function validateAndNormalizeConfig(config: any): NormalizedValidationRes
     // the labelField will not work when validating models without extending them first
     config.models = extendModelMap(config?.models || {});
 
-    // extend config - backward compatibility updates, adding extra fields like "markdown_content", "type" and "layout",
+    // normalize config - backward compatibility updates, adding extra fields like "markdown_content", "type" and "layout",
     // and setting other default values.
-    config = extendConfig(config);
+    config = normalizeConfig(config);
 
     // validate config
     const configValidationResult = validateConfig(config);
@@ -225,7 +225,7 @@ async function loadConfigFromDotStackbit(dirPath: string) {
     return _.isEmpty(config) ? null : config;
 }
 
-function extendConfig(config: any): any {
+function normalizeConfig(config: any): any {
     const pageLayoutKey = _.get(config, 'pageLayoutKey', 'layout');
     const objectTypeKey = _.get(config, 'objectTypeKey', 'type');
     const stackbitYamlVersion = String(_.get(config, 'stackbitVersion', ''));
@@ -471,7 +471,7 @@ function validateAndExtendContentModels(config: any): ConfigValidationResult {
             return {
                 type: 'data',
                 ...(contentModel.newFilePath ? { filePath: contentModel.newFilePath } : {}),
-                ..._.omit(contentModel, ['newFilePath']),
+                ..._.omit(contentModel, ['isPage', 'newFilePath']),
                 ..._.omit(model, 'type')
             };
         } else {

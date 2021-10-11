@@ -1,3 +1,5 @@
+const { test, expect } = require('@jest/globals');
+
 const { iterateModelFieldsRecursively } = require('../src/utils');
 
 test('iterateModelFieldsRecursively should iterate all model fields recursively', () => {

@@ -51,6 +51,10 @@ function extendModel(model: YamlModel, modelName: string, modelsByName: Record<s
         copyIfNotSet(superModel, 'hideContent', model, 'hideContent');
         copyIfNotSet(superModel, 'singleInstance', model, 'singleInstance');
         copyIfNotSet(superModel, 'labelField', model, 'labelField');
+        copyIfNotSet(superModel, 'variantField', model, 'variantField');
+        if (Array.isArray(superModel.fieldGroups) && superModel.fieldGroups.length > 0) {
+            model.fieldGroups = _.uniqBy(_.concat(superModel.fieldGroups, _.get(model, 'fieldGroups', [])), 'name');
+        }
         let idx = 0;
         _.forEach(superModel.fields, (superField) => {
             const field = _.find(fields, { name: superField.name });

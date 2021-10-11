@@ -328,7 +328,10 @@ function stylePropSizeSchema(styleConfig: any) {
     styleConfig = _.castArray(styleConfig);
     const dirSchemas = _.reduce(
         styleConfig,
-        (dirSchemas: any, pattern) => {
+        (dirSchemas: any, pattern: any) => {
+            if (typeof pattern !== 'string') {
+                return dirSchemas;
+            }
             const directionMatch = pattern.match(/^[xylrtb]/);
             const directions = [];
             if (!directionMatch) {
@@ -342,19 +345,22 @@ function stylePropSizeSchema(styleConfig: any) {
                     t: ['top'],
                     b: ['bottom']
                 };
-                const dirMatch: 'x' | 'y' | 'l' | 'r' | 't' | 'b' = directionMatch[0];
+                const dirMatch = directionMatch[0] as 'x' | 'y' | 'l' | 'r' | 't' | 'b';
                 directions.push(...dirMap[dirMatch]);
                 pattern = pattern.substring(1);
             }
             let valueSchema = Joi.number();
             if (pattern) {
-                const parts = pattern.split(':');
+                const parts = pattern.split(':').map((value: string) => Number(value));
+                if (_.some(parts, _.isNaN)) {
+                    return dirSchemas;
+                }
                 if (parts.length === 1) {
-                    valueSchema = valueSchema.valid(Number(parts[0]));
+                    valueSchema = valueSchema.valid(parts[0]);
                 } else {
-                    valueSchema = valueSchema.min(Number(parts[0])).max(Number(parts[1]));
+                    valueSchema = valueSchema.min(parts[0]).max(parts[1]);
                     if (parts.length === 3) {
-                        valueSchema = valueSchema.multiple(Number(parts[3]));
+                        valueSchema = valueSchema.multiple(parts[3]);
                     }
                 }
             }
@@ -370,7 +376,7 @@ function stylePropSizeSchema(styleConfig: any) {
 }
 
 function stylePropObjectValueSchema(styleConfig: any) {
-    return Joi.valid(..._.map(styleConfig, (object) => object.value));
+    return Joi.valid(..._.map(styleConfig, (object) => _.get(object, 'value')));
 }
 
 function stylePropFontWeightSchema(styleConfig: any) {
@@ -390,12 +396,15 @@ function stylePropFontWeightSchema(styleConfig: any) {
             if (_.isEmpty(value)) {
                 return validValues;
             }
-            const parts = value.split(':');
-            if (parts.length === 1) {
-                return validValues.add(parts[0]!);
+            const parts = value.split(':').map((value) => Number(value));
+            if (_.some(parts, _.isNaN)) {
+                return validValues;
             }
-            const start = Number(parts[0]);
-            const end = Number(parts[1]);
+            if (parts.length === 1) {
+                return validValues.add(String(parts[0]!));
+            }
+            const start = parts[0]!;
+            const end = parts[1]!;
             for (let i = start; i <= end; i += 100) {
                 validValues.add(String(i));
             }
@@ -423,12 +432,15 @@ function stylePropOpacitySchema(styleConfig: any) {
             if (_.isEmpty(value)) {
                 return validValues;
             }
-            const parts = value.split(':');
-            if (parts.length === 1) {
-                return validValues.add(Number(parts[0]!));
+            const parts = value.split(':').map((value) => Number(value));
+            if (_.some(parts, _.isNaN)) {
+                return validValues;
             }
-            const start = Number(parts[0]);
-            const end = Number(parts[1]);
+            if (parts.length === 1) {
+                return validValues.add(parts[0]!);
+            }
+            const start = parts[0]!;
+            const end = parts[1]!;
             for (let i = start; i <= end; i += 5) {
                 validValues.add(i);
             }

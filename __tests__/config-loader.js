@@ -2,7 +2,7 @@ const path = require('path');
 const { describe, test, expect, beforeAll } = require('@jest/globals');
 const _ = require('lodash');
 
-const { getFieldOfModel } = require('./test-utils');
+const { getFieldOfModel, expectConfigPassingValidationAndMatchObject } = require('./test-utils');
 const { loadConfig } = require('../src/config/config-loader');
 
 test('normalized validation error should have normFieldPath with the normalized path', async () => {
@@ -510,5 +510,69 @@ describe('stackbit.yaml v0.2.0', () => {
                 models: ['object_2', 'object_3']
             }
         });
+    });
+});
+
+describe('model "extends" property', () => {
+    test('model should concat its own fieldGroups and fieldGroups of the extended model and produce unique fieldGroups names', () => {
+        expectConfigPassingValidationAndMatchObject(
+            {
+                models: {
+                    model_1: {
+                        type: 'object',
+                        label: 'Model 1',
+                        fieldGroups: [
+                            {
+                                name: 'group_1',
+                                label: 'Group 1'
+                            },
+                            {
+                                name: 'group_2',
+                                label: 'Group 2'
+                            }
+                        ],
+                        extends: 'model_2'
+                    },
+                    model_2: {
+                        type: 'object',
+                        label: 'Model 2',
+                        fieldGroups: [
+                            {
+                                name: 'group_2',
+                                label: 'Group 2 extended'
+                            },
+                            {
+                                name: 'group_3',
+                                label: 'Group 3 extended'
+                            }
+                        ]
+                    }
+                }
+            },
+            {
+                models: [
+                    {
+                        name: 'model_1',
+                        fieldGroups: [
+                            {
+                                name: 'group_2',
+                                label: 'Group 2 extended'
+                            },
+                            {
+                                name: 'group_3',
+                                label: 'Group 3 extended'
+                            },
+                            {
+                                name: 'group_1',
+                                label: 'Group 1'
+                            }
+                        ]
+                    },
+                    {
+                        name: 'model_2'
+                    }
+                ]
+            }
+        );
     });
 });
