@@ -2,31 +2,65 @@ import _ from 'lodash';
 import { copyIfNotSet } from '@stackbit/utils';
 
 import { Model, YamlModel, ModelMap } from '../config/config-types';
+import { ConfigValidationError } from '../config/config-errors';
 
-export function extendModels(models: Model[]): Model[] {
-    const memorized = _.memoize(extendModel, (model: YamlModel, modelName: string) => modelName);
+export function extendModelArray(models: Model[]): { models: Model[]; errors: ConfigValidationError[] } {
+    const memorized = _.memoize(extendModel, (model, modelName) => modelName);
     const modelsByName = _.keyBy(models, 'name');
-    return _.map(models, (model) => {
-        // YamlModel is the same as Model just without 'name' and '__metadata' properties
-        return memorized(model as YamlModel, model.name, modelsByName) as Model;
-    });
+    return _.reduce(
+        models,
+        (result: { models: Model[]; errors: ConfigValidationError[] }, model) => {
+            // YamlModel is the same as Model just without 'name' and '__metadata' properties
+            const { model: extendedModel, errors } = memorized(model, model.name, modelsByName);
+            return {
+                models: result.models.concat(extendedModel),
+                errors: result.errors.concat(errors)
+            };
+        },
+        { models: [], errors: [] }
+    );
 }
 
-export function extendModelMap(models: ModelMap): ModelMap {
-    const memorized = _.memoize(extendModel, (model: YamlModel, modelName: string) => modelName);
-    return _.mapValues(models, (model, modelName) => {
-        return memorized(model, modelName, models);
-    });
+export function extendModelMap(models: ModelMap): { models: ModelMap; errors: ConfigValidationError[] } {
+    const memorized = _.memoize(extendModel, (model, modelName) => modelName);
+    return _.reduce(
+        models,
+        (result: { models: ModelMap; errors: ConfigValidationError[] }, model, modelName) => {
+            const { model: extendedModel, errors } = memorized(model, modelName, models);
+            return {
+                models: _.assign(result.models, { [modelName]: extendedModel }),
+                errors: result.errors.concat(errors)
+            };
+        },
+        { models: {}, errors: [] }
+    );
 }
 
-function extendModel(model: YamlModel, modelName: string, modelsByName: Record<string, YamlModel>, _extendPath: string[] = []) {
-    assert(!_.includes(_extendPath, modelName), `cyclic dependency detected in model extend tree: ${_extendPath.join(' -> ')} -> ${modelName}`);
+function extendModel<T extends Model | YamlModel>(
+    model: T,
+    modelName: string,
+    modelsByName: ModelMap,
+    _extendPath: string[] = []
+): { model: T; errors: ConfigValidationError[] } {
+    if (_.includes(_extendPath, modelName)) {
+        return {
+            model,
+            errors: [
+                new ConfigValidationError({
+                    type: 'model.extends.circular',
+                    message: `cyclic dependency detected in model extend tree: ${_extendPath.join(' -> ')} -> ${modelName}`,
+                    fieldPath: [],
+                    value: null
+                })
+            ]
+        };
+    }
 
-    let _extends = _.get(model, 'extends');
+    let _extends: any = _.get(model, 'extends');
     let fields = _.get(model, 'fields');
 
     if (!_extends) {
-        return model;
+        return { model, errors: [] };
     }
 
     delete model['extends'];
@@ -40,23 +74,43 @@ function extendModel(model: YamlModel, modelName: string, modelsByName: Record<s
         model.fields = fields;
     }
 
+    let errors: ConfigValidationError[] = [];
+
     _.forEach(_extends, (superModelName) => {
-        let superModel = _.get(modelsByName, superModelName);
-        assert(superModel, `model '${modelName}' extends non existing model '${superModelName}'`);
-        assert(
-            superModel.type === 'object',
-            `model '${modelName}' extends models of type '${superModel.type}', only model of the 'object' type can be extended`
-        );
-        superModel = extendModel(superModel, superModelName, modelsByName, _extendPath.concat(modelName));
-        copyIfNotSet(superModel, 'hideContent', model, 'hideContent');
-        copyIfNotSet(superModel, 'singleInstance', model, 'singleInstance');
-        copyIfNotSet(superModel, 'labelField', model, 'labelField');
-        copyIfNotSet(superModel, 'variantField', model, 'variantField');
-        if (Array.isArray(superModel.fieldGroups) && superModel.fieldGroups.length > 0) {
-            model.fieldGroups = _.uniqBy(_.concat(superModel.fieldGroups, _.get(model, 'fieldGroups', [])), 'name');
+        const superModel = _.get(modelsByName, superModelName);
+        if (!superModel) {
+            errors.push(
+                new ConfigValidationError({
+                    type: 'model.extends.model.not.found',
+                    message: `model '${modelName}' extends non existing model '${superModelName}'`,
+                    fieldPath: [],
+                    value: null
+                })
+            );
+            return;
+        }
+        if (superModel.type !== 'object') {
+            errors.push(
+                new ConfigValidationError({
+                    type: 'model.extends.non.object.model',
+                    message: `model '${modelName}' extends models of type '${superModel.type}', only model of the 'object' type can be extended`,
+                    fieldPath: [],
+                    value: null
+                })
+            );
+            return;
+        }
+        const { model: extendedSuperModel, errors: nestedErrors } = extendModel(superModel, superModelName, modelsByName, _extendPath.concat(modelName));
+        errors = errors.concat(nestedErrors);
+        copyIfNotSet(extendedSuperModel, 'hideContent', model, 'hideContent');
+        copyIfNotSet(extendedSuperModel, 'singleInstance', model, 'singleInstance');
+        copyIfNotSet(extendedSuperModel, 'labelField', model, 'labelField');
+        copyIfNotSet(extendedSuperModel, 'variantField', model, 'variantField');
+        if (Array.isArray(extendedSuperModel.fieldGroups) && extendedSuperModel.fieldGroups.length > 0) {
+            model.fieldGroups = _.uniqBy(_.concat(extendedSuperModel.fieldGroups, _.get(model, 'fieldGroups', [])), 'name');
         }
         let idx = 0;
-        _.forEach(superModel.fields, (superField) => {
+        _.forEach(extendedSuperModel.fields, (superField) => {
             const field = _.find(fields, { name: superField.name });
             if (field) {
                 _.defaultsDeep(field, _.cloneDeep(superField));
@@ -66,11 +120,5 @@ function extendModel(model: YamlModel, modelName: string, modelsByName: Record<s
         });
     });
 
-    return model;
-}
-
-function assert(value: any, message: string) {
-    if (!value) {
-        throw new Error(message);
-    }
+    return { model, errors };
 }

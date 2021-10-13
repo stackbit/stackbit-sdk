@@ -87,7 +87,8 @@ export function validateAndNormalizeConfig(config: any): NormalizedValidationRes
     // extend config models having the "extends" property
     // this must be done before main config validation as some properties like
     // the labelField will not work when validating models without extending them first
-    config.models = extendModelMap(config?.models || {});
+    const { models, errors: extendModelErrors } = extendModelMap(config?.models || {});
+    config.models = models;
 
     // normalize config - backward compatibility updates, adding extra fields like "markdown_content", "type" and "layout",
     // and setting other default values.
@@ -96,7 +97,7 @@ export function validateAndNormalizeConfig(config: any): NormalizedValidationRes
     // validate config
     const configValidationResult = validateConfig(config);
 
-    const errors = [...contentModelsValidationResult.errors, ...configValidationResult.errors];
+    const errors = [...contentModelsValidationResult.errors, ...extendModelErrors, ...configValidationResult.errors];
     return normalizeValidationResult({
         valid: _.isEmpty(errors),
         value: configValidationResult.value,
