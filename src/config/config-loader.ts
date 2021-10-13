@@ -18,6 +18,7 @@ import {
     isObjectField,
     isObjectListItems,
     isPageModel,
+    isDataModel,
     isReferenceField,
     iterateModelFieldsRecursively
 } from '../utils';
@@ -234,7 +235,7 @@ function normalizeConfig(config: any): any {
     const models = config?.models || {};
     let referencedModelNames: string[] = [];
 
-    _.forEach(models, (model) => {
+    _.forEach(models, (model, modelName) => {
         if (!model) {
             return;
         }
@@ -247,6 +248,12 @@ function normalizeConfig(config: any): any {
 
             // TODO: update schema-editor to not show layout field
             addLayoutFieldToPageModel(model, pageLayoutKey);
+        }
+
+        if ((isPageModel(model) || isDataModel(model)) && !_.has(model, 'filePath')) {
+            const extension = isPageModel(model) ? 'md' : 'json';
+            const folder = _.trim(_.get(model, 'folder', modelName), '/');
+            model.filePath = _.trim(`${folder}/{slug}.${extension}`, '/');
         }
 
         if (isListDataModel(model)) {
