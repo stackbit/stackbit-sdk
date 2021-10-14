@@ -17,6 +17,19 @@ models:
         name: layout
         label: Layout
         const: custom_layout
+  page_3:
+    type: page
+    label: Page 3
+    layout: layout_3
+    file: custom-page.md
+    urlPath: '/custom-page'
+    hideContent: true
+  page_4:
+    type: page
+    label: Page 4
+    layout: layout_4
+    urlPath: '/team/{slug}'
+    filePath: 'authors/{slug}.md'
   object_1:
     type: object
     label: Object 1
@@ -53,7 +66,16 @@ models:
   object_3:
     type: data
     label: Object 3
+    folder: collection
     fields:
       - type: string
         name: custom_type
         const: custom_value
+  object_4:
+    type: data
+    label: Object 4
+    filePath: folder/{slug}.yaml
+  object_5:
+    type: data
+    label: Object 5
+    file: custom-data.json

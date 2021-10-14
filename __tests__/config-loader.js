@@ -356,6 +356,43 @@ describe('internal model fields', () => {
             filePath: 'content/pages/blog/{slug}.md'
         });
     });
+
+    test('page models with "filePath" should be prefixed with "pagesDir"', () => {
+        expect(_.find(result.config.models, ['name', 'page_4'])).toMatchObject({
+            name: 'page_4',
+            urlPath: '/team/{slug}',
+            filePath: 'content/pages/authors/{slug}.md'
+        });
+    });
+
+    test('singleton page models without "filePath" should not get a default value', () => {
+        expect(_.find(result.config.models, ['name', 'page_3'])).not.toHaveProperty('filePath');
+    });
+
+    test('data models without "filePath" should get a default value', () => {
+        expect(_.find(result.config.models, ['name', 'object_2'])).toMatchObject({
+            name: 'object_2',
+            filePath: 'content/data/{slug}.json'
+        });
+    });
+
+    test('data models without "filePath" and a "folder" should get a default value prefixed by a folder', () => {
+        expect(_.find(result.config.models, ['name', 'object_3'])).toMatchObject({
+            name: 'object_3',
+            filePath: 'content/data/collection/{slug}.json'
+        });
+    });
+
+    test('data models with "filePath" should be prefixed with "dataDir"', () => {
+        expect(_.find(result.config.models, ['name', 'object_4'])).toMatchObject({
+            name: 'object_4',
+            filePath: 'content/data/folder/{slug}.yaml'
+        });
+    });
+
+    test('data models without "filePath" and with "file" property should not get a default value', () => {
+        expect(_.find(result.config.models, ['name', 'object_5'])).not.toHaveProperty('filePath');
+    });
 });
 
 describe('default values for missing field properties', () => {
