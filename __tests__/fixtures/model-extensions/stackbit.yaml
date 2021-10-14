@@ -1,6 +1,6 @@
 stackbitVersion: 0.3.0
-pagesDir: null
-dataDir: null
+pagesDir: content/pages
+dataDir: content/data
 models:
   page_1:
     type: page
@@ -10,6 +10,7 @@ models:
     type: page
     label: Page 2
     layout: layout_2
+    urlPath: '/blog/{slug}'
     hideContent: true
     fields:
       - type: string

@@ -333,6 +333,29 @@ describe('internal model fields', () => {
             ])
         });
     });
+
+    test('page models without "urlPath" should get a default value', () => {
+        expect(_.find(result.config.models, ['name', 'page_1'])).toMatchObject({
+            name: 'page_1',
+            urlPath: '/{slug}'
+        });
+    });
+
+    test('page models without "filePath" should get a default value', () => {
+        expect(_.find(result.config.models, ['name', 'page_1'])).toMatchObject({
+            name: 'page_1',
+            urlPath: '/{slug}',
+            filePath: 'content/pages/{slug}.md'
+        });
+    });
+
+    test('page models without "filePath" should get a default value derived from "urlPath"', () => {
+        expect(_.find(result.config.models, ['name', 'page_2'])).toMatchObject({
+            name: 'page_2',
+            urlPath: '/blog/{slug}',
+            filePath: 'content/pages/blog/{slug}.md'
+        });
+    });
 });
 
 describe('default values for missing field properties', () => {

@@ -359,7 +359,7 @@ describe('contentModels property', () => {
                 name: 'model_1',
                 type: 'page',
                 urlPath: '/blog/{slug}',
-                filePath: 'blog/{slug}.md',
+                filePath: 'content/pages/blog/{slug}.md',
                 folder: 'blog',
                 match: ['**/*.md'],
                 exclude: ['index.md']
@@ -367,7 +367,7 @@ describe('contentModels property', () => {
             {
                 name: 'model_2',
                 type: 'data',
-                filePath: 'authors/{slug}.json',
+                filePath: 'content/data/authors/{slug}.json',
                 folder: 'authors'
             },
             {
