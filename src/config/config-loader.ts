@@ -345,6 +345,12 @@ function updatePageUrlPath(model: PageModel) {
     }
 }
 
+/**
+ * Sets the page model's filePath pattern.
+ * If the model has `filePath` property, it is prefixed with `pagesDir` and returned.
+ * If the model has no `filePath` property, then `filePath` is naively inferred by
+ * prefixing `urlPath` with `pagesDir` and appending the `.md` extension.
+ */
 function updatePageFilePath(model: PageModel, config: Config) {
     let filePath = model?.filePath;
     if (!filePath) {
