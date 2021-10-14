@@ -23,16 +23,7 @@ import {
     iterateModelFieldsRecursively
 } from '../utils';
 import { append, parseFile, readDirRecursively, reducePromise, rename } from '@stackbit/utils';
-import {
-    Config,
-    DataModel,
-    FieldEnum,
-    FieldModel,
-    FieldObjectProps,
-    Model,
-    PageModel,
-    YamlModel
-} from './config-types';
+import { Config, DataModel, FieldEnum, FieldModel, FieldObjectProps, Model, PageModel, YamlModel } from './config-types';
 import { loadPresets } from './presets-loader';
 
 export interface ConfigLoaderOptions {
