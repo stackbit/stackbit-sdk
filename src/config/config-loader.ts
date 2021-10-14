@@ -23,7 +23,16 @@ import {
     iterateModelFieldsRecursively
 } from '../utils';
 import { append, parseFile, readDirRecursively, reducePromise, rename } from '@stackbit/utils';
-import { Config, FieldEnum, FieldModel, FieldObjectProps, Model, PageModel, YamlModel } from './config-types';
+import {
+    Config,
+    DataModel,
+    FieldEnum,
+    FieldModel,
+    FieldObjectProps,
+    Model,
+    PageModel,
+    YamlModel
+} from './config-types';
 import { loadPresets } from './presets-loader';
 
 export interface ConfigLoaderOptions {
@@ -236,7 +245,7 @@ function normalizeConfig(config: any): any {
     const models = config?.models || {};
     let referencedModelNames: string[] = [];
 
-    _.forEach(models, (model, modelName) => {
+    _.forEach(models, (model) => {
         if (!model) {
             return;
         }
@@ -245,16 +254,15 @@ function normalizeConfig(config: any): any {
             // rename old 'template' property to 'layout'
             rename(model, 'template', 'layout');
 
+            updatePageUrlPath(model);
+            updatePageFilePath(model, config);
+
             addMarkdownContentField(model);
 
             // TODO: update schema-editor to not show layout field
             addLayoutFieldToPageModel(model, pageLayoutKey);
-        }
-
-        if ((isPageModel(model) || isDataModel(model)) && !_.has(model, 'filePath')) {
-            const extension = isPageModel(model) ? 'md' : 'json';
-            const folder = _.trim(_.get(model, 'folder', modelName), '/');
-            model.filePath = _.trim(`${folder}/{slug}.${extension}`, '/');
+        } else if (isDataModel(model)) {
+            updateDataFilePath(model, config);
         }
 
         if (isListDataModel(model)) {
@@ -337,6 +345,39 @@ function normalizeConfig(config: any): any {
     });
 
     return config;
+}
+
+function updatePageUrlPath(model: PageModel) {
+    // set default urlPath if not set
+    if (!model.urlPath) {
+        model.urlPath = '/{slug}';
+    }
+}
+
+function updatePageFilePath(model: PageModel, config: Config) {
+    let filePath = model?.filePath;
+    if (!filePath) {
+        const urlPath = model.urlPath;
+        if (urlPath === '/') {
+            filePath = 'index.md';
+        } else if (_.trim(urlPath, '/') === 'posts/{slug}' && config.ssgName === 'jekyll') {
+            filePath = '_posts/{moment_format("YYYY-MM-DD")}-{slug}.md';
+        } else {
+            filePath = _.trim(urlPath, '/') + '.md';
+        }
+    }
+    const parentDir = _.trim(config.pagesDir ?? '', '/');
+    model.filePath = path.join(parentDir, filePath);
+}
+
+function updateDataFilePath(model: DataModel, config: Config) {
+    let filePath = model?.filePath;
+    if (!filePath) {
+        const folder = _.trim(_.get(model, 'folder'), '/');
+        filePath = _.trim(`${folder}/{slug}.json`, '/');
+    }
+    const parentDir = _.trim(config.dataDir ?? '', '/');
+    model.filePath = path.join(parentDir, filePath);
 }
 
 function addMarkdownContentField(model: PageModel) {
