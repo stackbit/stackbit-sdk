@@ -352,12 +352,12 @@ function updatePageUrlPath(model: PageModel) {
  * prefixing `urlPath` with `pagesDir` and appending the `.md` extension.
  */
 function updatePageFilePath(model: PageModel, config: Config) {
-    // do not define filePath for singleton pages
-    if (model.file) {
-        return;
-    }
-    let filePath = model?.filePath;
-    if (!filePath) {
+    let filePath;
+    if (model.filePath) {
+        filePath = model.filePath;
+    } else if (model.file) {
+        filePath = model.file;
+    } else {
         const urlPath = model.urlPath;
         if (urlPath === '/') {
             filePath = 'index.md';
@@ -372,12 +372,12 @@ function updatePageFilePath(model: PageModel, config: Config) {
 }
 
 function updateDataFilePath(model: DataModel, config: Config) {
-    // do not define filePath for singleton files
-    if (model.file) {
-        return;
-    }
-    let filePath = model?.filePath;
-    if (!filePath) {
+    let filePath;
+    if (model.filePath) {
+        filePath = model.filePath;
+    } else if (model.file) {
+        filePath = model.file;
+    } else {
         const folder = _.trim(_.get(model, 'folder'), '/');
         filePath = _.trim(`${folder}/{slug}.json`, '/');
     }

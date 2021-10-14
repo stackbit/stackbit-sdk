@@ -365,8 +365,11 @@ describe('internal model fields', () => {
         });
     });
 
-    test('singleton page models without "filePath" should not get a default value', () => {
-        expect(_.find(result.config.models, ['name', 'page_3'])).not.toHaveProperty('filePath');
+    test('singleton page models without "filePath" and with "file" property should derive "filePath" from "file" property', () => {
+        expect(_.find(result.config.models, ['name', 'page_3'])).toMatchObject({
+            name: 'page_3',
+            filePath: 'content/pages/custom-page.md'
+        });
     });
 
     test('data models without "filePath" should get a default value', () => {
@@ -390,8 +393,11 @@ describe('internal model fields', () => {
         });
     });
 
-    test('data models without "filePath" and with "file" property should not get a default value', () => {
-        expect(_.find(result.config.models, ['name', 'object_5'])).not.toHaveProperty('filePath');
+    test('singleton data models without "filePath" and with "file" property should derive "filePath" from "file" property', () => {
+        expect(_.find(result.config.models, ['name', 'object_5'])).toMatchObject({
+            name: 'object_5',
+            filePath: 'content/data/custom-data.json'
+        });
     });
 });
 
