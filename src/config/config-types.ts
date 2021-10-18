@@ -78,15 +78,11 @@ export type LogicField = string;
 
 export type ContentModelMap = Record<string, ContentModel>;
 
-export interface ContentModel {
+export interface ContentModel extends BaseMatch {
     isPage?: boolean;
     urlPath?: string;
     hideContent?: boolean;
     newFilePath?: string;
-    file?: string;
-    folder?: string;
-    match?: string;
-    exclude?: string;
 }
 
 export interface ModelsSource {
@@ -131,16 +127,24 @@ export interface YamlBaseModel {
     fields?: Field[];
 }
 
+interface BaseMatch {
+    singleInstance?: boolean;
+    file?: string;
+    folder?: string;
+    match?: string | string[];
+    exclude?: string | string[];
+}
+
 export interface YamlObjectModel extends YamlBaseModel {
     type: 'object';
 }
 
-export interface BaseDataModel extends YamlBaseModel {
+export interface BaseDataModel extends YamlBaseModel, BaseMatch {
     type: 'data';
     filePath?: string;
 }
 
-export interface BasePageModel extends YamlBaseModel {
+export interface YamlPageModel extends YamlBaseModel, BaseMatch {
     type: 'page';
     layout?: string;
     urlPath?: string;
@@ -153,43 +157,15 @@ export interface YamlConfigModel extends YamlBaseModel {
     file?: string;
 }
 
-interface BaseMatch {
-    folder?: string;
-    match?: string | string[];
-    exclude?: string | string[];
-}
+export type YamlDataModel = StricterUnion<BaseDataModelFields | BaseDataModeList>;
 
-export type YamlDataModel = StricterUnion<BaseDataModelFileSingle | BaseDataModelFileList | BaseDataModelMatchSingle | BaseDataModelMatchList>;
-
-export interface BaseDataModelFileSingle extends BaseDataModel {
-    file: string;
+export interface BaseDataModelFields extends BaseDataModel {
     isList?: false;
 }
 
-export interface BaseDataModelFileList extends Omit<BaseDataModel, 'fields'> {
-    file: string;
+export interface BaseDataModeList extends Omit<BaseDataModel, 'fields'> {
     isList: true;
     items: FieldListItems;
-}
-
-export interface BaseDataModelMatchSingle extends BaseDataModel, BaseMatch {
-    isList?: false;
-}
-
-export interface BaseDataModelMatchList extends Omit<BaseDataModel, 'fields'>, BaseMatch {
-    isList: true;
-    items: FieldListItems;
-}
-
-export type YamlPageModel = StricterUnion<PageModelSingle | PageModelMatch>;
-
-export interface PageModelSingle extends BasePageModel {
-    singleInstance: true;
-    file: string;
-}
-
-export interface PageModelMatch extends BasePageModel, BaseMatch {
-    singleInstance?: false;
 }
 
 export interface FieldGroupItem {

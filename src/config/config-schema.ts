@@ -431,6 +431,7 @@ const contentModelTypeNotData = 'contentModel.type.not.data';
 const contentModelSchema = Joi.object<ContentModel>({
     isPage: Joi.boolean(),
     newFilePath: Joi.string(),
+    singleInstance: Joi.boolean(),
     file: Joi.string(),
     folder: Joi.string(),
     match: Joi.array().items(Joi.string()).single(),
@@ -509,6 +510,7 @@ const dataModelSchema: Joi.ObjectSchema<YamlDataModel> = baseModelSchema
         Joi.object({
             type: Joi.string().valid('data').required(),
             filePath: Joi.string(),
+            singleInstance: Joi.boolean(),
             file: Joi.string(),
             folder: Joi.string(),
             match: Joi.array().items(Joi.string()).single(),
@@ -678,7 +680,7 @@ export const stackbitConfigSchema = Joi.object<YamlConfig>({
     styleObjectModelName: styleObjectModelNameSchema,
     excludePages: Joi.array().items(Joi.string()).single(),
     logicFields: Joi.array().items(logicField),
-    contentModels: Joi.any(),
+    contentModels: Joi.any(), // contentModels should have been already validated by now
     modelsSource: modelsSourceSchema,
     models: modelsSchema
 })

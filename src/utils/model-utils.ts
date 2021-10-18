@@ -50,7 +50,7 @@ export function isSingleInstanceModel(model: Model): boolean {
     if (model.type === 'config') {
         return true;
     } else if (model.type === 'data') {
-        return _.has(model, 'file');
+        return _.has(model, 'file') || _.get(model, 'singleInstance', false);
     } else if (model.type === 'page') {
         return _.has(model, 'file') || _.get(model, 'singleInstance', false);
     }
