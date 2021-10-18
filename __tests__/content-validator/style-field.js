@@ -18,8 +18,10 @@ describe('test content validation for "style" field', () => {
                                         objectFit: '*',
                                         objectPosition: '*',
                                         flexDirection: '*',
+                                        justifyContent: '*',
                                         justifyItems: '*',
                                         justifySelf: '*',
+                                        alignContent: '*',
                                         alignItems: '*',
                                         alignSelf: '*',
                                         padding: '*',
@@ -56,10 +58,12 @@ describe('test content validation for "style" field', () => {
                             objectFit: 'contain',
                             objectPosition: 'center',
                             flexDirection: 'row',
+                            justifyContent: 'flex-start',
                             justifyItems: 'start',
                             justifySelf: 'start',
-                            alignItems: 'start',
-                            alignSelf: 'start',
+                            alignContent: 'stretch',
+                            alignItems: 'flex-start',
+                            alignSelf: 'flex-start',
                             padding: { left: 10, right: 10 },
                             margin: { top: 10, bottom: 10 },
                             width: 'auto',
@@ -103,10 +107,12 @@ describe('test content validation for "style" field', () => {
                                         objectFit: ['contain', 'cover', 'fill'],
                                         objectPosition: ['top', 'center', 'bottom'],
                                         flexDirection: ['row', 'row-reverse'],
+                                        justifyContent: ['space-between', 'space-around', 'space-evenly'],
                                         justifyItems: ['start', 'end'],
                                         justifySelf: ['start', 'end'],
-                                        alignItems: ['start', 'end'],
-                                        alignSelf: ['start', 'end'],
+                                        alignContent: ['center', 'stretch'],
+                                        alignItems: ['flex-start', 'flex-end'],
+                                        alignSelf: ['flex-start', 'flex-end'],
                                         padding: 'x',
                                         margin: ['y0:10', 'x0:4'],
                                         width: ['narrow', 'wide'],
@@ -148,10 +154,12 @@ describe('test content validation for "style" field', () => {
                             objectFit: 'contain',
                             objectPosition: 'center',
                             flexDirection: 'row',
+                            justifyContent: 'space-between',
                             justifyItems: 'start',
                             justifySelf: 'end',
-                            alignItems: 'start',
-                            alignSelf: 'end',
+                            alignContent: 'stretch',
+                            alignItems: 'flex-start',
+                            alignSelf: 'flex-end',
                             padding: { left: 10, right: 20 },
                             margin: { left: 2, right: 4, top: 6, bottom: 4 },
                             width: 'narrow',
@@ -199,8 +207,10 @@ describe('test content validation for "style" field', () => {
                                         objectFit: '*',
                                         objectPosition: '*',
                                         flexDirection: '*',
+                                        justifyContent: '*',
                                         justifyItems: '*',
                                         justifySelf: '*',
+                                        alignContent: '*',
                                         alignItems: '*',
                                         alignSelf: '*',
                                         padding: '*',
@@ -244,9 +254,11 @@ describe('test content validation for "style" field', () => {
                             objectFit: 'illegal',
                             objectPosition: 'illegal',
                             flexDirection: 'illegal',
+                            justifyContent: 'illegal',
                             justifyItems: 'illegal',
                             justifySelf: 'illegal',
                             alignItems: 'illegal',
+                            alignContent: 'illegal',
                             alignSelf: 'illegal',
                             padding: 'illegal',
                             margin: 10,
@@ -290,6 +302,11 @@ describe('test content validation for "style" field', () => {
                 },
                 {
                     type: 'any.only',
+                    fieldPath: ['styles', 'self', 'justifyContent'],
+                    message: '"styles.self.justifyContent" must be one of [flex-start, flex-end, center, space-between, space-around, space-evenly]'
+                },
+                {
+                    type: 'any.only',
                     fieldPath: ['styles', 'self', 'justifyItems'],
                     message: '"styles.self.justifyItems" must be one of [start, end, center, stretch]'
                 },
@@ -300,13 +317,18 @@ describe('test content validation for "style" field', () => {
                 },
                 {
                     type: 'any.only',
+                    fieldPath: ['styles', 'self', 'alignContent'],
+                    message: '"styles.self.alignContent" must be one of [flex-start, flex-end, center, space-between, space-around, space-evenly, stretch]'
+                },
+                {
+                    type: 'any.only',
                     fieldPath: ['styles', 'self', 'alignItems'],
-                    message: '"styles.self.alignItems" must be one of [start, end, center, baseline, stretch]'
+                    message: '"styles.self.alignItems" must be one of [flex-start, flex-end, center, baseline, stretch]'
                 },
                 {
                     type: 'any.only',
                     fieldPath: ['styles', 'self', 'alignSelf'],
-                    message: '"styles.self.alignSelf" must be one of [auto, start, end, center, baseline, stretch]'
+                    message: '"styles.self.alignSelf" must be one of [auto, flex-start, flex-end, center, baseline, stretch]'
                 },
                 {
                     type: 'object.base',
@@ -433,10 +455,12 @@ describe('test content validation for "style" field', () => {
                                         objectFit: ['contain', 'cover', 'fill'],
                                         objectPosition: ['top', 'center', 'bottom'],
                                         flexDirection: ['row', 'row-reverse'],
+                                        justifyContent: ['flex-start', 'flex-end'],
                                         justifyItems: ['start', 'end'],
                                         justifySelf: ['start', 'end'],
-                                        alignItems: ['start', 'end'],
-                                        alignSelf: ['start', 'end'],
+                                        alignContent: ['flex-start', 'flex-end'],
+                                        alignItems: ['flex-start', 'flex-end'],
+                                        alignSelf: ['flex-start', 'flex-end'],
                                         padding: 'x',
                                         margin: 'y0:10',
                                         width: ['narrow', 'wide'],
@@ -478,8 +502,10 @@ describe('test content validation for "style" field', () => {
                             objectFit: 'scale-down',
                             objectPosition: 'left-top',
                             flexDirection: 'col',
+                            justifyContent: 'center',
                             justifyItems: 'center',
                             justifySelf: 'center',
+                            alignContent: 'center',
                             alignItems: 'center',
                             alignSelf: 'center',
                             padding: { top: 10 },
@@ -527,6 +553,12 @@ describe('test content validation for "style" field', () => {
                 },
                 {
                     type: 'any.only',
+                    fieldPath: ['styles', 'self', 'justifyContent'],
+                    message: '"styles.self.justifyContent" must be one of [flex-start, flex-end]',
+                    value: 'center'
+                },
+                {
+                    type: 'any.only',
                     fieldPath: ['styles', 'self', 'justifyItems'],
                     message: '"styles.self.justifyItems" must be one of [start, end]',
                     value: 'center'
@@ -539,14 +571,20 @@ describe('test content validation for "style" field', () => {
                 },
                 {
                     type: 'any.only',
+                    fieldPath: ['styles', 'self', 'alignContent'],
+                    message: '"styles.self.alignContent" must be one of [flex-start, flex-end]',
+                    value: 'center'
+                },
+                {
+                    type: 'any.only',
                     fieldPath: ['styles', 'self', 'alignItems'],
-                    message: '"styles.self.alignItems" must be one of [start, end]',
+                    message: '"styles.self.alignItems" must be one of [flex-start, flex-end]',
                     value: 'center'
                 },
                 {
                     type: 'any.only',
                     fieldPath: ['styles', 'self', 'alignSelf'],
-                    message: '"styles.self.alignSelf" must be one of [start, end]',
+                    message: '"styles.self.alignSelf" must be one of [flex-start, flex-end]',
                     value: 'center'
                 },
                 {
