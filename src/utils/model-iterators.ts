@@ -348,7 +348,7 @@ export function getModelOfObject({
     } else {
         // we don't know if the object at hand belongs to a model of type "page" or type "data"
         // so we try to get the model using both pageLayoutKey and objectTypeKey keys
-        if (!_.has(object, pageLayoutKey) || !_.has(object, objectTypeKey)) {
+        if (!_.has(object, pageLayoutKey) && !_.has(object, objectTypeKey)) {
             return { error: `cannot identify the model of an object, no '${pageLayoutKey}' or '${objectTypeKey}' field exist at ${valueKeyPath.join('.')}` };
         }
         modelName = object[pageLayoutKey] || object[objectTypeKey];
