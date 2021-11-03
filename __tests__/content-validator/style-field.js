@@ -76,7 +76,7 @@ describe('test content validation for "style" field', () => {
                             backgroundPosition: 'left-top',
                             backgroundSize: 'cover',
                             borderRadius: 'small',
-                            borderWidth: { top: 10, bottom: 10 },
+                            borderWidth: 10,
                             borderStyle: 'solid',
                             boxShadow: 'small',
                             opacity: 10
@@ -175,7 +175,7 @@ describe('test content validation for "style" field', () => {
                             backgroundPosition: 'left',
                             backgroundSize: 'auto',
                             borderRadius: 'small',
-                            borderWidth: { top: 6 },
+                            borderWidth: 6,
                             borderColor: 'color-2',
                             borderStyle: 'solid',
                             boxShadow: 'none',
@@ -275,7 +275,7 @@ describe('test content validation for "style" field', () => {
                             backgroundPosition: 'illegal',
                             backgroundSize: 'illegal',
                             borderRadius: 'illegal',
-                            borderWidth: { illegal: 10 },
+                            borderWidth: 'illegal',
                             borderColor: 'illegal',
                             borderStyle: 'illegal',
                             boxShadow: 'illegal',
@@ -404,12 +404,12 @@ describe('test content validation for "style" field', () => {
                 {
                     type: 'any.only',
                     fieldPath: ['styles', 'self', 'borderRadius'],
-                    message: '"styles.self.borderRadius" must be one of [xx-small, x-small, small, medium, large, x-large, xx-large, full]'
+                    message: '"styles.self.borderRadius" must be one of [none, xx-small, x-small, small, medium, large, x-large, xx-large, full]'
                 },
                 {
-                    type: 'object.unknown',
-                    fieldPath: ['styles', 'self', 'borderWidth', 'illegal'],
-                    message: '"styles.self.borderWidth.illegal" is not allowed'
+                    type: 'number.base',
+                    fieldPath: ['styles', 'self', 'borderWidth'],
+                    message: '"styles.self.borderWidth" must be a number'
                 },
                 {
                     type: 'any.only',
@@ -523,7 +523,7 @@ describe('test content validation for "style" field', () => {
                             backgroundPosition: 'top',
                             backgroundSize: 'contain',
                             borderRadius: 'large',
-                            borderWidth: { top: 12 },
+                            borderWidth: 12,
                             borderColor: 'color-3',
                             borderStyle: 'double',
                             boxShadow: 'large',
@@ -679,8 +679,8 @@ describe('test content validation for "style" field', () => {
                 },
                 {
                     type: 'number.max',
-                    fieldPath: ['styles', 'self', 'borderWidth', 'top'],
-                    message: '"styles.self.borderWidth.top" must be less than or equal to 10',
+                    fieldPath: ['styles', 'self', 'borderWidth'],
+                    message: '"styles.self.borderWidth" must be less than or equal to 10',
                     value: 12
                 },
                 {

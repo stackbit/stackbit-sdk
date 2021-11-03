@@ -3,12 +3,22 @@ import _ from 'lodash';
 import { Field } from '../config-types';
 import { STYLE_PROPS_VALUES } from '../config-consts';
 
-const sizePattern = /^[xylrtb](?:\d+(?::\d+(?::\d+)?)?)?|\d+(?::\d+(?::\d+)?)?|tw[xylrtb]?(?:\d+|\d\.5|px)?$/;
-const styleSizeSchema = stylePropWithAll(Joi.array().items(Joi.string().pattern(sizePattern)).single()).prefs({
+const sizePattern = /^[xylrtb](?:\d+(?::\d+(?::\d+)?)?)?|\d+(?::\d+(?::\d+)?)?$/;
+const sizeTailwindPattern = /^tw[xylrtb]?(?:\d+|\d\.5|px)?$/;
+const styleSizeSchema = stylePropWithAll(
+    Joi.array().items(Joi.string().pattern(sizePattern).meta({ errorDesc: 'size pattern' })).single(),
+    Joi.array().items(Joi.string().pattern(sizeTailwindPattern).meta({ errorDesc: 'tailwind size pattern' })).single()
+).prefs({
     messages: {
-        'string.pattern.base':
-            'Invalid field name "{{#value}}" at "{{#label}}". A field name must contain only alphanumeric characters, ' +
-            'hyphens and underscores, must start and end with an alphanumeric character.'
+        'string.pattern.base': 'Illegal definition "{{#value}}" of style field "{{#label}}". This field must match "padding" or "margin" style pattern'
+    },
+    errors: { wrap: { label: false } }
+});
+
+const borderWidthPattern = /^\d+(?::\d+(?::\d+)?)?$/;
+const borderWidthSchema = stylePropWithAll(Joi.array().items(Joi.string().pattern(borderWidthPattern)).single()).prefs({
+    messages: {
+        'string.pattern.base': 'Illegal definition "{{#value}}" of style field "{{#label}}". This field must match "borderWidth" style pattern'
     },
     errors: { wrap: { label: false } }
 });
@@ -57,7 +67,7 @@ const stylePropsSchema = Joi.object({
     backgroundPosition: arrayOfStringsWithAll(...STYLE_PROPS_VALUES.nineRegions),
     backgroundSize: arrayOfStringsWithAll(...STYLE_PROPS_VALUES.backgroundSize),
     borderRadius: arrayOfStringsWithAll(...STYLE_PROPS_VALUES.borderRadius),
-    borderWidth: styleSizeSchema,
+    borderWidth: borderWidthSchema,
     borderColor: styleColorSchema,
     borderStyle: arrayOfStringsWithAll(...STYLE_PROPS_VALUES.borderStyle),
     boxShadow: arrayOfStringsWithAll(...STYLE_PROPS_VALUES.boxShadow),
@@ -130,7 +140,8 @@ function stylePropError(errors: Joi.ErrorReport[]): Joi.ErrorReport[] {
                                 const items: string[] = _.get(schemaItem, 'allow', []);
                                 localTypes.arrayItems.push(...items.map((value) => `"${value}"`));
                             } else if (_.has(schemaItem, 'rules') && _.some(schemaItem.rules, { name: 'pattern' })) {
-                                localTypes.singleItems.push(`array of ${stylePropName} pattern`);
+                                const errorDesc = _.get(schemaItem, ['metas', 0, 'errorDesc'], 'pattern');
+                                localTypes.singleItems.push(`array of ${stylePropName} ${errorDesc}`);
                             }
                         } else if (schemaItem.type === 'number') {
                             localTypes.singleItems.push(`array of valid ${stylePropName} numeric values`);

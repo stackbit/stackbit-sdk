@@ -298,7 +298,7 @@ const StylePropContentSchemas: Record<StyleProps, (styleConfig: any) => Joi.Sche
     backgroundPosition: stylePropSchemaWithValidValues(STYLE_PROPS_VALUES.nineRegions),
     backgroundSize: stylePropSchemaWithValidValues(STYLE_PROPS_VALUES.backgroundSize),
     borderRadius: stylePropSchemaWithValidValues(STYLE_PROPS_VALUES.borderRadius),
-    borderWidth: stylePropSizeSchema,
+    borderWidth: stylePropBorderWidthSchema,
     borderColor: stylePropObjectValueSchema,
     borderStyle: stylePropSchemaWithValidValues(STYLE_PROPS_VALUES.borderStyle),
     boxShadow: stylePropSchemaWithValidValues(STYLE_PROPS_VALUES.boxShadow),
@@ -326,8 +326,10 @@ function stylePropSizeSchema(styleConfig: any) {
             right: Joi.number()
         });
     }
-    // TODO: validate Tailwind paddings
     styleConfig = _.castArray(styleConfig);
+    if (_.some(styleConfig, (style) => _.startsWith(style, 'tw'))) {
+        return Joi.array().items(Joi.string());
+    }
     const dirSchemas = _.reduce(
         styleConfig,
         (dirSchemas: any, pattern: any) => {
@@ -362,7 +364,7 @@ function stylePropSizeSchema(styleConfig: any) {
                 } else {
                     valueSchema = valueSchema.min(parts[0]).max(parts[1]);
                     if (parts.length === 3) {
-                        valueSchema = valueSchema.multiple(parts[3]);
+                        valueSchema = valueSchema.multiple(parts[2]);
                     }
                 }
             }
@@ -375,6 +377,45 @@ function stylePropSizeSchema(styleConfig: any) {
     );
     const objectSchema = _.mapValues(dirSchemas, (schema) => Joi.alternatives(...schema));
     return Joi.object(objectSchema);
+}
+
+function stylePropBorderWidthSchema(styleConfig: any) {
+    if (styleConfig === '*') {
+        return Joi.number();
+    }
+    styleConfig = _.castArray(styleConfig);
+    const alternativeSchemas = _.reduce(
+        styleConfig,
+        (alternativeSchemas: Joi.Schema[], value) => {
+            let valueSchema = Joi.number();
+            if (_.isNumber(value)) {
+                return alternativeSchemas.concat(valueSchema.valid(value));
+            }
+            if (!_.isString(value)) {
+                return alternativeSchemas;
+            }
+            if (_.isEmpty(value)) {
+                return alternativeSchemas;
+            }
+            const parts = value.split(':').map((value) => Number(value));
+            if (_.some(parts, _.isNaN)) {
+                return alternativeSchemas;
+            }
+            if (parts.length === 1) {
+                return alternativeSchemas.concat(valueSchema.valid(value));
+            }
+            const start = parts[0]!;
+            const end = parts[1]!;
+            valueSchema = valueSchema.min(start).max(end);
+            if (parts.length === 3) {
+                valueSchema = valueSchema.multiple(parts[2]!);
+            }
+            return alternativeSchemas.concat(valueSchema);
+        },
+        []
+    );
+
+    return Joi.alternatives(...alternativeSchemas);
 }
 
 function stylePropObjectValueSchema(styleConfig: any) {

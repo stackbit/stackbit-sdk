@@ -230,7 +230,8 @@ describe('test "style" field', () => {
                                     title: {
                                         textAlign: 'left',
                                         objectPosition: ['top-left'],
-                                        padding: ['*']
+                                        padding: ['*'],
+                                        borderWidth: ['*']
                                     },
                                     self: {
                                         textAlign: ['*'],
@@ -253,7 +254,9 @@ describe('test "style" field', () => {
                 {
                     type: 'alternatives.types',
                     fieldPath: ['models', 'model_1', 'fields', 1, 'styles', 'title', 'padding'],
-                    message: 'models.model_1.fields[1].styles.title.padding must be one of ["*", array of padding pattern]'
+                    message:
+                        'models.model_1.fields[1].styles.title.padding must be one of ' +
+                        '["*", array of padding size pattern, array of padding tailwind size pattern]'
                 },
                 {
                     type: 'alternatives.types',
@@ -262,8 +265,14 @@ describe('test "style" field', () => {
                 },
                 {
                     type: 'alternatives.types',
+                    fieldPath: ['models', 'model_1', 'fields', 1, 'styles', 'title', 'borderWidth'],
+                    message: 'models.model_1.fields[1].styles.title.borderWidth must be one of ["*", array of borderWidth pattern]'
+                },
+                {
+                    type: 'alternatives.types',
                     fieldPath: ['models', 'model_1', 'fields', 1, 'styles', 'self', 'margin'],
-                    message: 'models.model_1.fields[1].styles.self.margin must be one of ["*", array of margin pattern]'
+                    message:
+                        'models.model_1.fields[1].styles.self.margin must be one of ["*", array of margin size pattern, array of margin tailwind size pattern]'
                 },
                 {
                     type: 'alternatives.types',

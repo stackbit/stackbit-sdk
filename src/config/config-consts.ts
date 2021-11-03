@@ -76,7 +76,7 @@ export const STYLE_PROPS_VALUES = {
     textAlign: ['left', 'center', 'right', 'justify'],
     textDecoration: ['none', 'underline', 'line-through'],
     backgroundSize: ['auto', 'cover', 'contain'],
-    borderRadius: ['xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large', 'full'],
+    borderRadius: ['none', 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large', 'full'],
     borderStyle: ['solid', 'dashed', 'dotted', 'double', 'none'],
     boxShadow: ['none', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large', 'inner']
 };
