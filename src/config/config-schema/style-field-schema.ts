@@ -6,8 +6,12 @@ import { STYLE_PROPS_VALUES } from '../config-consts';
 const sizePattern = /^[xylrtb](?:\d+(?::\d+(?::\d+)?)?)?|\d+(?::\d+(?::\d+)?)?$/;
 const sizeTailwindPattern = /^tw[xylrtb]?(?:\d+|\d\.5|px)?$/;
 const styleSizeSchema = stylePropWithAll(
-    Joi.array().items(Joi.string().pattern(sizePattern).meta({ errorDesc: 'size pattern' })).single(),
-    Joi.array().items(Joi.string().pattern(sizeTailwindPattern).meta({ errorDesc: 'tailwind size pattern' })).single()
+    Joi.array()
+        .items(Joi.string().pattern(sizePattern).meta({ errorDesc: 'size pattern' }))
+        .single(),
+    Joi.array()
+        .items(Joi.string().pattern(sizeTailwindPattern).meta({ errorDesc: 'tailwind size pattern' }))
+        .single()
 ).prefs({
     messages: {
         'string.pattern.base': 'Illegal definition "{{#value}}" of style field "{{#label}}". This field must match "padding" or "margin" style pattern'
@@ -30,8 +34,9 @@ const styleColorSchema = arrayOf(
     Joi.object({
         value: Joi.string().required(),
         label: Joi.string().required(),
-        color: Joi.string().required()
-    })
+        color: Joi.string(),
+        styleObjectColor: Joi.string()
+    }).xor('color', 'styleObjectColor')
 );
 
 const stylePropsSchema = Joi.object({

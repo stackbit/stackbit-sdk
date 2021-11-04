@@ -427,9 +427,9 @@ describe('test "style" field', () => {
                     message: 'models.model_1.fields[1].styles.self.textColor[0].label is required'
                 },
                 {
-                    type: 'any.required',
-                    fieldPath: ['models', 'model_1', 'fields', 1, 'styles', 'self', 'textColor', 0, 'color'],
-                    message: 'models.model_1.fields[1].styles.self.textColor[0].color is required'
+                    type: 'object.missing',
+                    fieldPath: ['models', 'model_1', 'fields', 1, 'styles', 'self', 'textColor', 0],
+                    message: 'models.model_1.fields[1].styles.self.textColor[0] must contain at least one of [color, styleObjectColor]'
                 }
             ]
         );
