@@ -492,6 +492,7 @@ const baseModelSchema = Joi.object<YamlBaseModel>({
     description: Joi.string(),
     thumbnail: Joi.string(),
     extends: Joi.array().items(validObjectModelNames).single(),
+    readOnly: Joi.boolean(),
     labelField: labelFieldSchema,
     variantField: variantFieldSchema,
     groups: Joi.array().items(Joi.string()),

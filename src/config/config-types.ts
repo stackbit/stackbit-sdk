@@ -120,6 +120,7 @@ export interface YamlBaseModel {
     description?: string;
     thumbnail?: string;
     extends?: string | string[];
+    readOnly?: boolean;
     labelField?: string;
     variantField?: string;
     groups?: string[];
