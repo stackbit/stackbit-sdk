@@ -36,7 +36,7 @@ export async function loadPresets(dirPath: string, config: Config): Promise<Pres
         try {
             presetData = await parseFile(presetPath);
         } catch (err: any) {
-            errors.push(new ConfigPresetsError(`Error parsing ${presetFile} (${err.message})`));
+            errors.push(new ConfigPresetsError(`Error parsing ${presetFile} (${err?.message})`));
             continue;
         }
         _.forEach(_.get(presetData, 'presets', []), (preset, i) => {
