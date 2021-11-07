@@ -27,11 +27,18 @@ export async function loadPresets(dirPath: string, config: Config): Promise<Pres
 
     const presets: any = {};
     const presetsByModel: any = {};
+    const errors: ConfigPresetsError[] = [];
 
     for (const presetFile of presetFiles) {
         const presetsRelDir = path.dirname(presetFile);
         const presetPath = path.join(dirPath, presetFile);
-        const presetData = await parseFile(presetPath);
+        let presetData: any;
+        try {
+            presetData = await parseFile(presetPath);
+        } catch (err) {
+            errors.push(new ConfigPresetsError(`Error parsing ${presetFile}`));
+            continue;
+        }
         _.forEach(_.get(presetData, 'presets', []), (preset, i) => {
             const presetId = `${presetFile}:presets[${i}]`;
             presets[presetId] = preset;
@@ -54,7 +61,7 @@ export async function loadPresets(dirPath: string, config: Config): Promise<Pres
 
     return {
         config,
-        errors: []
+        errors
     };
 }
 

@@ -81,4 +81,8 @@ describe('presets loader - model-files', () => {
     test('presets only where needed', () => {
         expect(_.find(result.config.models, (model) => model.name === 'model_stackbit_2').presets).toBeFalsy();
     });
+
+    test('report parsing error', () => {
+        expect(result.errors.length).toEqual(1);
+    });
 });
