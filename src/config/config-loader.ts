@@ -241,6 +241,10 @@ function normalizeConfig(config: any): any {
             return;
         }
 
+        if (_.has(model, 'fields') && !Array.isArray(model.fields)) {
+            model.fields = [];
+        }
+
         if (isPageModel(model)) {
             // rename old 'template' property to 'layout'
             rename(model, 'template', 'layout');
