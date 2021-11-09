@@ -166,7 +166,7 @@ async function loadExternalModels(dirPath: string, config: any) {
                         errors: result.errors.concat(new ConfigLoadError(`error parsing model, file: ${modelFile}`))
                     };
                 }
-                const modelName = model.name;
+                const modelName = model?.name;
                 if (!modelName) {
                     return {
                         models: result.models,
