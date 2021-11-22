@@ -188,7 +188,8 @@ async function loadExternalModels(dirPath: string, config: any) {
 async function readModelFilesFromDir(modelsDir: string) {
     return await readDirRecursively(modelsDir, {
         filter: (filePath, stats) => {
-            return stats.isFile() && path.extname(filePath) === '.yaml';
+            const extension = path.extname(filePath).substring(1);
+            return stats.isFile() && ['yaml', 'yml'].includes(extension);
         }
     });
 }
