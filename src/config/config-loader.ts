@@ -391,14 +391,19 @@ function updateDataFilePath(model: DataModel, config: Config) {
 }
 
 function addMarkdownContentField(model: PageModel) {
-    if (!model.hideContent) {
-        append(model, 'fields', {
-            type: 'markdown',
-            name: 'markdown_content',
-            label: 'Content',
-            description: 'Page content'
-        });
+    if (model.hideContent) {
+        return;
     }
+    const hasMarkdownContent = _.find(_.get(model, 'fields'), { name: 'markdown_content' });
+    if (hasMarkdownContent) {
+        return;
+    }
+    append(model, 'fields', {
+        type: 'markdown',
+        name: 'markdown_content',
+        label: 'Content',
+        description: 'Page content'
+    });
 }
 
 function addLayoutFieldToPageModel(model: any, pageLayoutKey: any) {
