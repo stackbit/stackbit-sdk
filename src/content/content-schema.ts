@@ -178,9 +178,10 @@ function numberFieldValueSchema(field: FieldNumberProps): Joi.Schema {
     if (field.max) {
         result = result.max(field.max);
     }
-    if (field.step) {
-        result = result.multiple((field.min || 0) + field.step);
-    }
+    // TODO: fix step validation, multiple of non 0 minimum is wrong
+    // if (field.step) {
+    //     result = result.multiple((field.min || 0) + field.step);
+    // }
     return result;
 }
 
