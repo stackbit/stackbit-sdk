@@ -89,17 +89,6 @@ function extendModel<T extends Model | YamlModel>(
             );
             return;
         }
-        if (superModel.type !== 'object') {
-            errors.push(
-                new ConfigValidationError({
-                    type: 'model.extends.non.object.model',
-                    message: `model '${modelName}' extends models of type '${superModel.type}', only model of the 'object' type can be extended`,
-                    fieldPath: [],
-                    value: null
-                })
-            );
-            return;
-        }
         const { model: extendedSuperModel, errors: nestedErrors } = extendModel(superModel, superModelName, modelsByName, _extendPath.concat(modelName));
         errors = errors.concat(nestedErrors);
         copyIfNotSet(extendedSuperModel, 'hideContent', model, 'hideContent');
