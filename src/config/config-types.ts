@@ -264,7 +264,7 @@ export interface FieldObjectProps {
     labelField?: string;
     thumbnail?: string;
     variantField?: string;
-    fieldGroups?: string;
+    fieldGroups?: FieldGroupItem[];
     fields: Field[];
 }
 
