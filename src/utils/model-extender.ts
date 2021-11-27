@@ -101,10 +101,11 @@ function extendModel<T extends Model | YamlModel>(
         let idx = 0;
         _.forEach(extendedSuperModel.fields, (superField) => {
             const field = _.find(fields, { name: superField.name });
+            superField = _.cloneDeep(superField);
             if (field) {
-                _.defaultsDeep(field, _.cloneDeep(superField));
+                _.defaults(field, superField);
             } else {
-                fields!.splice(idx++, 0, _.cloneDeep(superField));
+                fields!.splice(idx++, 0, superField);
             }
         });
     });
