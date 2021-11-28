@@ -461,6 +461,9 @@ function resolveThumbnailPathForEnumField(enumField: FieldEnum, modelFilePath: s
 }
 
 function resolveThumbnailPath(thumbnail: string, modelDirPath: string) {
+    if (thumbnail.startsWith('//') || /https?:\/\//.test(thumbnail)) {
+        return thumbnail;
+    }
     if (thumbnail.startsWith('/')) {
         if (modelDirPath.endsWith('@stackbit/components/models')) {
             modelDirPath = modelDirPath.replace(/\/models$/, '');
