@@ -240,9 +240,14 @@ function normalizeConfig(config: any): any {
     const models = config?.models || {};
     let referencedModelNames: string[] = [];
 
-    _.forEach(models, (model) => {
+    _.forEach(models, (model, modelName) => {
         if (!model) {
             return;
+        }
+
+        // add model label if not set
+        if (!_.has(model, 'label')) {
+            model.label = _.startCase(modelName);
         }
 
         if (_.has(model, 'fields') && !Array.isArray(model.fields)) {

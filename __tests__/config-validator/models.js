@@ -52,8 +52,8 @@ describe('model "type" property', () => {
 });
 
 describe('model "label" property', () => {
-    test('should fail validation if not defined', () => {
-        expectValidationResultToMatchAllErrors(
+    test('should set "label" property if not defined based on model "name", author => Author', () => {
+        expectConfigPassingValidationAndMatchObject(
             {
                 models: {
                     author: {
@@ -61,25 +61,37 @@ describe('model "label" property', () => {
                     }
                 }
             },
-            [
-                {
-                    type: 'any.required',
-                    fieldPath: ['models', 'author', 'label'],
-                    message: 'models.author.label is required'
-                }
-            ]
+            {
+                models: [
+                    {
+                        type: 'object',
+                        name: 'author',
+                        label: 'Author'
+                    }
+                ]
+            }
         );
     });
 
-    test('should pass validation if defined', () => {
-        expectPassingValidation({
-            models: {
-                author: {
-                    type: 'object',
-                    label: 'Author'
+    test('should set "label" property if not defined based on model "name", heroSection => Hero Section', () => {
+        expectConfigPassingValidationAndMatchObject(
+            {
+                models: {
+                    heroSection: {
+                        type: 'object'
+                    }
                 }
+            },
+            {
+                models: [
+                    {
+                        type: 'object',
+                        name: 'heroSection',
+                        label: 'Hero Section'
+                    }
+                ]
             }
-        });
+        );
     });
 });
 

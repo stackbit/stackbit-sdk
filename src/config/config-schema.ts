@@ -485,10 +485,7 @@ const baseModelSchema = Joi.object<YamlBaseModel>({
         filePath: Joi.string()
     }),
     type: Joi.string().valid('page', 'data', 'config', 'object').required(),
-    label: Joi.string().required().when(Joi.ref('/import'), {
-        is: Joi.exist(),
-        then: Joi.optional()
-    }),
+    label: Joi.string(),
     description: Joi.string(),
     thumbnail: Joi.string(),
     extends: Joi.array().items(validObjectModelNames).single(),

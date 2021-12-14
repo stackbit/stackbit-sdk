@@ -116,7 +116,7 @@ export interface YamlBaseModel {
         filePath?: string;
         invalid?: boolean;
     };
-    label: string;
+    label?: string;
     description?: string;
     thumbnail?: string;
     extends?: string | string[];
