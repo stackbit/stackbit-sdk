@@ -24,6 +24,7 @@ describe('presets loader - model-files', () => {
                 '.stackbit/presets/model1.json:presets[0]': {
                     label: 'my preset 1',
                     thumbnail: '.stackbit/presets/path/to/preset-thumbnail1.png',
+                    modelName: 'model_1',
                     data: {
                         enum_field: 'thumbnail_1'
                     }
