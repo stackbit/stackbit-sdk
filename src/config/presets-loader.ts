@@ -45,7 +45,7 @@ export async function loadPresets(dirPath: string, config: Config): Promise<Pres
             if (preset.thumbnail) {
                 preset.thumbnail = resolveThumbnailPath(preset.thumbnail, presetsRelDir);
             }
-            preset.modelName = presetData.model;
+            _.set(preset, 'modelName', presetData.model);
             append(presetsByModel, presetData.model, presetId);
         });
     }
