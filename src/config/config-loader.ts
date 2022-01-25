@@ -245,6 +245,10 @@ function normalizeConfig(config: any): any {
             return;
         }
 
+        if (!_.has(model, 'type')) {
+            model.type = 'object';
+        }
+
         // add model label if not set
         if (!_.has(model, 'label')) {
             model.label = _.startCase(modelName);
@@ -509,7 +513,10 @@ function validateAndExtendContentModels(config: any): ConfigValidationResult {
     const contentModels = config.contentModels ?? {};
     const models = config.models ?? {};
 
-    if (_.isEmpty(contentModels)) {
+    const externalModels = ['contentful', 'sanity'].includes(config.cmsName);
+    const emptyContentModels = _.isEmpty(contentModels);
+
+    if (externalModels || emptyContentModels) {
         return {
             valid: true,
             value: config,
@@ -520,17 +527,17 @@ function validateAndExtendContentModels(config: any): ConfigValidationResult {
     const validationResult = validateContentModels(contentModels, models);
 
     if (_.isEmpty(models)) {
-        return validationResult;
+        return {
+            valid: validationResult.valid,
+            value: config,
+            errors: validationResult.errors
+        };
     }
 
     const extendedModels = _.mapValues(models, (model, modelName) => {
         const contentModel = validationResult.value.contentModels[modelName];
         if (!contentModel) {
-            return {
-                // if a model does not define a type, use the default "object" type
-                type: model.type || 'object',
-                ..._.omit(model, 'type')
-            };
+            return model;
         }
         if (_.get(contentModel, '__metadata.invalid')) {
             return model;

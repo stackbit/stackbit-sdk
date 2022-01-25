@@ -85,9 +85,24 @@ export interface ContentModel extends BaseMatch {
     newFilePath?: string;
 }
 
-export interface ModelsSource {
+export type ModelsSource = ModelsSourceFiles | ModelsSourceContentful | ModelsSourceSanity;
+
+export interface ModelsSourceFiles {
     type: 'files';
     modelDirs: string[];
+}
+
+export interface ModelsSourceContentful {
+    type: 'contentful';
+    spaceIdEnvVar: string;
+    accessTokenEnvVar: string;
+    environment: string;
+}
+
+export interface ModelsSourceSanity {
+    type: 'sanity';
+    sanityStudioPath: string;
+    projectIdEnvVar: string;
 }
 
 /*******************

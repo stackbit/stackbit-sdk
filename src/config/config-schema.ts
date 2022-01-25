@@ -20,7 +20,10 @@ import {
     FieldGroupItem,
     YamlObjectModel,
     ContentModelMap,
-    ContentModel
+    ContentModel,
+    ModelsSourceFiles,
+    ModelsSourceContentful,
+    ModelsSourceSanity
 } from './config-types';
 
 function getConfigFromValidationState(state: Joi.State): YamlConfig {
@@ -200,6 +203,11 @@ const styleObjectModelNotObject = 'styleObjectModelName.model.type';
 const styleObjectModelNameSchema = Joi.string()
     .allow('', null)
     .custom((value, { error, state }) => {
+        const config = getConfigFromValidationState(state);
+        const externalModels = config.cmsName && ['contentful', 'sanity'].includes(config.cmsName);
+        if (externalModels) {
+            return value;
+        }
         const models = getModelsFromValidationState(state);
         const modelNames = Object.keys(models);
         if (!modelNames.includes(value)) {
@@ -245,9 +253,32 @@ const importSchema = Joi.alternatives().conditional('.type', {
     ]
 });
 
-const modelsSourceSchema = Joi.object<ModelsSource>({
-    type: 'files',
+const modelsSourceFilesSchema = Joi.object<ModelsSourceFiles>({
+    type: Joi.string().valid(Joi.override, 'files').required(),
     modelDirs: Joi.array().items(Joi.string()).required()
+});
+
+const modelsSourceContentfulSchema = Joi.object<ModelsSourceContentful>({
+    type: Joi.string().valid(Joi.override, 'contentful').required(),
+    environment: Joi.string().required(),
+    spaceIdEnvVar: Joi.string().required(),
+    accessTokenEnvVar: Joi.string().required()
+});
+
+const modelsSourceSanitySchema = Joi.object<ModelsSourceSanity>({
+    type: Joi.string().valid(Joi.override, 'sanity').required(),
+    sanityStudioPath: Joi.string().required(),
+    projectIdEnvVar: Joi.string().required()
+});
+
+const modelsSourceSchema = Joi.object<ModelsSource>({
+    type: Joi.string().valid('files', 'contentful', 'sanity').required()
+}).when('.type', {
+    switch: [
+        { is: 'files', then: modelsSourceFilesSchema },
+        { is: 'contentful', then: modelsSourceContentfulSchema },
+        { is: 'sanity', then: modelsSourceSanitySchema }
+    ]
 });
 
 const assetsSchema = Joi.object<Assets>({
