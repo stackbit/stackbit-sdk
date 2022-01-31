@@ -29,6 +29,9 @@ export function convertToYamlConfig({ config }: { config: Config }): YamlConfig 
         yamlConfig.models = _.reduce(
             config.models,
             (yamlModels: ModelMap, model: Model) => {
+                if (model.type === 'image') {
+                    return yamlModels;
+                }
                 const yamlModel = _.omit(model, ['name', '__metadata']) as YamlModel;
                 if (yamlModel.type === 'page' && !yamlModel.hideContent && yamlModel.fields) {
                     _.remove(yamlModel.fields, (field) => field.name === 'markdown_content');

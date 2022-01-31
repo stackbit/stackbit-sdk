@@ -260,15 +260,13 @@ const modelsSourceFilesSchema = Joi.object<ModelsSourceFiles>({
 
 const modelsSourceContentfulSchema = Joi.object<ModelsSourceContentful>({
     type: Joi.string().valid(Joi.override, 'contentful').required(),
-    environment: Joi.string().required(),
-    spaceIdEnvVar: Joi.string().required(),
-    accessTokenEnvVar: Joi.string().required()
+    module: Joi.string()
 });
 
 const modelsSourceSanitySchema = Joi.object<ModelsSourceSanity>({
     type: Joi.string().valid(Joi.override, 'sanity').required(),
     sanityStudioPath: Joi.string().required(),
-    projectIdEnvVar: Joi.string().required()
+    module: Joi.string()
 });
 
 const modelsSourceSchema = Joi.object<ModelsSource>({
@@ -340,7 +338,8 @@ const fieldCommonPropsSchema = Joi.object({
     group: inGroups,
     const: Joi.any(),
     hidden: Joi.boolean(),
-    readOnly: Joi.boolean()
+    readOnly: Joi.boolean(),
+    localized: Joi.boolean()
 }).oxor('const', 'default');
 
 const numberFieldPartialSchema = Joi.object({

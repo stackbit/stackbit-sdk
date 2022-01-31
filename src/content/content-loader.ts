@@ -10,7 +10,7 @@ import {
     isDataModel,
     isPageModel,
     getModelsByQuery,
-    getListItemsField,
+    getListFieldItems,
     isListField,
     isModelField,
     isListDataModel,
@@ -480,7 +480,7 @@ function addMetadataRecursively({
         } else if (_.isArray(value)) {
             let fieldListItems: FieldListItems;
             if (field && isListField(field)) {
-                fieldListItems = getListItemsField(field);
+                fieldListItems = getListFieldItems(field);
             } else if (model && isListDataModel(model)) {
                 fieldListItems = model.items;
             } else {

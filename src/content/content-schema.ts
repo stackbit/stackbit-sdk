@@ -106,6 +106,10 @@ function joiSchemaForModelFields(fields: Field[] | undefined, config: Config, fi
     );
 }
 
+function assertUnreachable(field: never): never {
+    throw new Error('Unhandled field.type case');
+}
+
 function joiSchemaForField(field: Field | FieldListItems, config: Config, fieldPath: FieldPath) {
     let fieldSchema;
     switch (field.type) {
@@ -148,6 +152,11 @@ function joiSchemaForField(field: Field | FieldListItems, config: Config, fieldP
         case 'list':
             fieldSchema = listFieldValueSchema(field, config, fieldPath);
             break;
+        case 'json':
+        case 'richText':
+            return Joi.any().forbidden();
+        default:
+            assertUnreachable(field);
     }
     if ('const' in field) {
         fieldSchema = fieldSchema.valid(field.const).invalid(null, '').required();

@@ -1,7 +1,7 @@
 import _ from 'lodash';
 
-import { getListItemsField, isListDataModel, isListField, isObjectListItems, isModelField, isObjectField, isModelListItems } from './model-utils';
-import { Field, FieldListItems, FieldModelProps, Model } from '../config/config-types';
+import { getListFieldItems, isListDataModel, isListField, isObjectListItems, isModelField, isObjectField, isModelListItems } from './model-utils';
+import { DataModel, Field, FieldList, FieldListItems, FieldModelProps, FieldObjectProps, Model } from '../config/config-types';
 
 /**
  * This function invokes the `iteratee` function for every field of the `model`.
@@ -39,24 +39,24 @@ import { Field, FieldListItems, FieldModelProps, Model } from '../config/config-
  * @param model The model to iterate fields
  * @param iteratee The callback function
  */
-export function iterateModelFieldsRecursively(model: Model, iteratee: (field: Field, fieldPath: string[]) => void) {
-    function _iterateDeep({ fields, fieldPath }: { fields: Field[]; fieldPath: string[] }) {
-        fieldPath = fieldPath.concat('fields');
+export function iterateModelFieldsRecursively(model: Model, iteratee: (field: Field, modelKeyPath: string[]) => void) {
+    function _iterateDeep({ fields, modelKeyPath }: { fields: Field[]; modelKeyPath: string[] }) {
+        modelKeyPath = modelKeyPath.concat('fields');
         _.forEach(fields, (field) => {
             if (!field) {
                 return;
             }
-            const childFieldPath = fieldPath.concat(field.name);
-            iteratee(field, childFieldPath);
+            const childModelKeyPath = modelKeyPath.concat(field.name);
+            iteratee(field, childModelKeyPath);
             if (isObjectField(field)) {
                 _iterateDeep({
                     fields: field.fields,
-                    fieldPath: childFieldPath
+                    modelKeyPath: childModelKeyPath
                 });
             } else if (isListField(field) && field.items && isObjectListItems(field.items)) {
                 _iterateDeep({
                     fields: field.items?.fields,
-                    fieldPath: childFieldPath.concat('items')
+                    modelKeyPath: childModelKeyPath.concat('items')
                 });
             }
         });
@@ -65,13 +65,61 @@ export function iterateModelFieldsRecursively(model: Model, iteratee: (field: Fi
     if (model && isListDataModel(model) && model.items && isObjectListItems(model.items)) {
         _iterateDeep({
             fields: model.items?.fields,
-            fieldPath: ['items']
+            modelKeyPath: ['items']
         });
     } else {
         _iterateDeep({
             fields: model?.fields || [],
-            fieldPath: []
+            modelKeyPath: []
         });
+    }
+}
+
+export function mapModelFieldsRecursively(model: Model, iteratee: (field: Field, modelKeyPath: string[]) => Field) {
+    function _mapField(field: Field, modelKeyPath: string[]): Field {
+        if (!field) {
+            return field;
+        }
+        modelKeyPath = modelKeyPath.concat(field.name);
+        field = iteratee(field, modelKeyPath);
+        if (isObjectField(field)) {
+            return _mapObjectField(field, modelKeyPath);
+        } else if (isListField(field)) {
+            return _mapListField(field, modelKeyPath);
+        } else {
+            return field;
+        }
+    }
+
+    function _mapObjectField<T extends FieldObjectProps | Model>(field: T, modelKeyPath: string[]): T {
+        const fields = field.fields;
+        if (!fields) {
+            return field;
+        }
+        modelKeyPath = modelKeyPath.concat('fields');
+        return {
+            ...field,
+            fields: _.map(fields, (field) => _mapField(field, modelKeyPath))
+        };
+    }
+
+    function _mapListField<T extends FieldList | (DataModel & { isList: true })>(field: T, modelKeyPath: string[]): T {
+        const items = field.items;
+        if (!items || !isObjectListItems(items)) {
+            return field;
+        }
+        return {
+            ...field,
+            items: _mapObjectField(items, modelKeyPath.concat('items'))
+        };
+    }
+
+    if (!model) {
+        return model;
+    } else if (isListDataModel(model)) {
+        return _mapListField(model, []);
+    } else {
+        return _mapObjectField(model, []);
     }
 }
 
@@ -165,7 +213,7 @@ export function iterateObjectFieldsWithModelRecursively(
         } else if (_.isArray(value)) {
             let fieldListItems: FieldListItems | null = null;
             if (field && isListField(field)) {
-                fieldListItems = getListItemsField(field);
+                fieldListItems = getListFieldItems(field);
             } else if (model && isListDataModel(model)) {
                 fieldListItems = model.items;
             }
@@ -287,7 +335,7 @@ export function mapObjectFieldsWithModelRecursively(
         } else if (_.isArray(value)) {
             let fieldListItems: FieldListItems | null = null;
             if (field && isListField(field)) {
-                fieldListItems = getListItemsField(field);
+                fieldListItems = getListFieldItems(field);
             } else if (model && isListDataModel(model)) {
                 fieldListItems = model.items;
             }

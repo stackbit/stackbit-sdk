@@ -9,7 +9,7 @@ import { ConfigError, ConfigLoadError, ConfigValidationError } from './config-er
 import {
     assignLabelFieldIfNeeded,
     extendModelMap,
-    getListItemsField,
+    getListFieldItems,
     isCustomModelField,
     isEnumField,
     isListDataModel,
@@ -20,13 +20,17 @@ import {
     isPageModel,
     isDataModel,
     isReferenceField,
-    iterateModelFieldsRecursively
+    iterateModelFieldsRecursively,
+    mapModelFieldsRecursively,
+    normalizeListFieldInPlace,
+    getModelFieldForModelKeyPath
 } from '../utils';
-import { append, parseFile, readDirRecursively, reducePromise, rename } from '@stackbit/utils';
+import { append, omitByNil, parseFile, readDirRecursively, reducePromise, rename } from '@stackbit/utils';
 import { Config, DataModel, FieldEnum, FieldModel, FieldObjectProps, Model, PageModel, YamlModel } from './config-types';
 import { loadPresets } from './presets-loader';
 
 export interface ConfigLoaderOptions {
+    [option: string]: any;
     dirPath: string;
 }
 
@@ -43,11 +47,11 @@ export interface NormalizedValidationResult {
 }
 
 export interface TempConfigLoaderResult {
-    config?: any;
+    config?: Record<string, unknown>;
     errors: ConfigLoadError[];
 }
 
-export async function loadConfig({ dirPath }: ConfigLoaderOptions): Promise<ConfigLoaderResult> {
+export async function loadConfig({ dirPath, ...options }: ConfigLoaderOptions): Promise<ConfigLoaderResult> {
     let configLoadResult: TempConfigLoaderResult;
     try {
         configLoadResult = await loadConfigFromDir(dirPath);
@@ -67,14 +71,18 @@ export async function loadConfig({ dirPath }: ConfigLoaderOptions): Promise<Conf
         };
     }
 
-    const normalizedResult = validateAndNormalizeConfig(configLoadResult.config);
+    const externalModelsResult = await loadModelsFromExternalSource(configLoadResult.config, options);
+
+    const mergedConfig = mergeConfigWithExternalModels(configLoadResult.config, externalModelsResult.models);
+
+    const normalizedResult = validateAndNormalizeConfig(mergedConfig);
 
     const presetsResult = await loadPresets(dirPath, normalizedResult.config);
 
     return {
         valid: normalizedResult.valid,
         config: presetsResult.config,
-        errors: [...configLoadResult.errors, ...normalizedResult.errors, ...presetsResult.errors]
+        errors: [...configLoadResult.errors, ...externalModelsResult.errors, ...normalizedResult.errors, ...presetsResult.errors]
     };
 }
 
@@ -110,14 +118,14 @@ async function loadConfigFromDir(dirPath: string): Promise<TempConfigLoaderResul
     if (error) {
         return { errors: [error] };
     }
-    const externalModelsResult = await loadExternalModels(dirPath, config);
-    config.models = _.assign(externalModelsResult.models, config.models);
-    return { config, errors: externalModelsResult.errors };
+    const modelsFromFileResult = await loadModelsFromFiles(dirPath, config);
+    const mergedConfig = mergeConfigModelsWithModelsFromFiles(config, modelsFromFileResult.models);
+    return { config: mergedConfig, errors: modelsFromFileResult.errors };
 }
 
-type LoadConfigFromStackbitYamlResult = { config: any; error?: undefined } | { config?: undefined; error: ConfigLoadError };
+type StackbitYamlConfigResult = { config: any; error?: undefined } | { config?: undefined; error: ConfigLoadError };
 
-async function loadConfigFromStackbitYaml(dirPath: string): Promise<LoadConfigFromStackbitYamlResult> {
+async function loadConfigFromStackbitYaml(dirPath: string): Promise<StackbitYamlConfigResult> {
     const stackbitYamlPath = path.join(dirPath, 'stackbit.yaml');
     const stackbitYamlExists = await fse.pathExists(stackbitYamlPath);
     if (!stackbitYamlExists) {
@@ -135,54 +143,56 @@ async function loadConfigFromStackbitYaml(dirPath: string): Promise<LoadConfigFr
     return { config };
 }
 
-async function loadExternalModels(dirPath: string, config: any) {
+async function loadModelsFromFiles(dirPath: string, config: any): Promise<{ models: Record<string, any>; errors: ConfigLoadError[] }> {
     const modelsSource = _.get(config, 'modelsSource', {});
     const sourceType = _.get(modelsSource, 'type', 'files');
-    if (sourceType === 'files') {
-        const defaultModelDirs = ['node_modules/@stackbit/components/models', '.stackbit/models'];
-        const modelDirs = _.castArray(_.get(modelsSource, 'modelDirs', defaultModelDirs)).map((modelDir: string) => _.trim(modelDir, '/'));
-        const modelFiles = await reducePromise(
-            modelDirs,
-            async (modelFiles: string[], modelDir) => {
-                const absModelsDir = path.join(dirPath, modelDir);
-                const dirExists = await fse.pathExists(absModelsDir);
-                if (!dirExists) {
-                    return modelFiles;
-                }
-                const files = await readModelFilesFromDir(absModelsDir);
-                return modelFiles.concat(files.map((filePath) => path.join(modelDir, filePath)));
-            },
-            []
-        );
-        return reducePromise(
-            modelFiles,
-            async (result: { models: any; errors: ConfigLoadError[] }, modelFile) => {
-                let model;
-                try {
-                    model = await parseFile(path.join(dirPath, modelFile));
-                } catch (error) {
-                    return {
-                        models: result.models,
-                        errors: result.errors.concat(new ConfigLoadError(`error parsing model, file: ${modelFile}`))
-                    };
-                }
-                const modelName = model?.name;
-                if (!modelName) {
-                    return {
-                        models: result.models,
-                        errors: result.errors.concat(new ConfigLoadError(`model does not have a name, file: ${modelFile}`))
-                    };
-                }
-                result.models[modelName] = _.omit(model, 'name');
-                result.models[modelName].__metadata = {
-                    filePath: modelFile
+    const defaultModelDirs = ['node_modules/@stackbit/components/models', '.stackbit/models'];
+    const modelDirs =
+        sourceType === 'files'
+            ? _.castArray(_.get(modelsSource, 'modelDirs', defaultModelDirs)).map((modelDir: string) => _.trim(modelDir, '/'))
+            : defaultModelDirs;
+
+    const modelFiles = await reducePromise(
+        modelDirs,
+        async (modelFiles: string[], modelDir) => {
+            const absModelsDir = path.join(dirPath, modelDir);
+            const dirExists = await fse.pathExists(absModelsDir);
+            if (!dirExists) {
+                return modelFiles;
+            }
+            const files = await readModelFilesFromDir(absModelsDir);
+            return modelFiles.concat(files.map((filePath) => path.join(modelDir, filePath)));
+        },
+        []
+    );
+
+    return reducePromise(
+        modelFiles,
+        async (result: { models: any; errors: ConfigLoadError[] }, modelFile) => {
+            let model;
+            try {
+                model = await parseFile(path.join(dirPath, modelFile));
+            } catch (error) {
+                return {
+                    models: result.models,
+                    errors: result.errors.concat(new ConfigLoadError(`error parsing model, file: ${modelFile}`))
                 };
-                return result;
-            },
-            { models: {}, errors: [] }
-        );
-    }
-    return { models: {}, errors: [] };
+            }
+            const modelName = model?.name;
+            if (!modelName) {
+                return {
+                    models: result.models,
+                    errors: result.errors.concat(new ConfigLoadError(`model does not have a name, file: ${modelFile}`))
+                };
+            }
+            result.models[modelName] = _.omit(model, 'name');
+            result.models[modelName].__metadata = {
+                filePath: modelFile
+            };
+            return result;
+        },
+        { models: {}, errors: [] }
+    );
 }
 
 async function readModelFilesFromDir(modelsDir: string) {
@@ -195,6 +205,33 @@ async function readModelFilesFromDir(modelsDir: string) {
             return stats.isFile() && ['yaml', 'yml'].includes(extension);
         }
     });
+}
+
+async function loadModelsFromExternalSource(config: any, options: any): Promise<{ models: Model[]; errors: ConfigLoadError[] }> {
+    const modelsSource = _.get(config, 'modelsSource', {});
+    const sourceType = _.get(modelsSource, 'type', 'files');
+    if (sourceType === 'files') {
+        return { models: [], errors: [] };
+    } else if (sourceType === 'contentful') {
+        const contentfulModule = _.get(modelsSource, 'module', '@stackbit/cms-contentful');
+        const module = await import(contentfulModule);
+        try {
+            const { models } = await module.fetchAndConvertSchema(options);
+            return {
+                models: models,
+                errors: []
+            };
+        } catch (error) {
+            return {
+                models: [],
+                errors: [new ConfigLoadError(`Error fetching and converting Contentful schema, error: ${error.message}`, { originalError: error })]
+            };
+        }
+    }
+    return {
+        models: [],
+        errors: [new ConfigLoadError(`modelsSource ${modelsSource} is unsupported`)]
+    };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -231,6 +268,101 @@ async function loadConfigFromDotStackbit(dirPath: string) {
     return _.isEmpty(config) ? null : config;
 }
 
+function mergeConfigModelsWithModelsFromFiles(config: any, modelsFromFiles: Record<string, any>) {
+    const configModels = config.models ?? {};
+    const mergedModels = _.mapValues(modelsFromFiles, (modelFromFile, modelName) => {
+        // resolve thumbnails of models loaded from files
+        const modelFilePath = modelFromFile.__metadata?.filePath;
+        resolveThumbnailPathForModel(modelFromFile, modelFilePath);
+        iterateModelFieldsRecursively(modelFromFile, (field: any) => {
+            if (isListField(field)) {
+                field = normalizeListFieldInPlace(field);
+                field = field.items;
+            }
+            if (isObjectField(field)) {
+                resolveThumbnailPathForModel(field, modelFilePath);
+            } else if (isEnumField(field)) {
+                resolveThumbnailPathForEnumField(field, modelFilePath);
+            }
+        });
+
+        const configModel = configModels[modelName];
+        if (!configModel) {
+            return modelFromFile;
+        }
+
+        return _.assign({}, modelFromFile, configModel, {
+            fields: _.unionBy(configModel?.fields ?? [], modelFromFile?.fields ?? [], 'name')
+        });
+    });
+    return {
+        ...config,
+        models: Object.assign({}, configModels, mergedModels)
+    };
+}
+
+function mergeConfigWithExternalModels(config: any, externalModels?: Model[]) {
+    if (!externalModels || externalModels.length === 0) {
+        return config;
+    }
+
+    const stackbitModels = config?.models ?? {};
+
+    externalModels = externalModels.map((externalModel) => {
+        const stackbitModel = stackbitModels[externalModel.name];
+        if (!stackbitModel) {
+            return externalModel;
+        }
+
+        const modelType = stackbitModel.type ? (stackbitModel.type === 'config' ? 'data' : stackbitModel.type) : 'object';
+        const urlPath = modelType === 'page' ? stackbitModel?.urlPath ?? '/{slug}' : null;
+        const fieldGroups = stackbitModel?.fieldGroups;
+
+        externalModel = Object.assign(
+            externalModel,
+            omitByNil({
+                __metadata: stackbitModel.__metadata,
+                type: modelType,
+                urlPath,
+                fieldGroups
+            })
+        );
+
+        return mapModelFieldsRecursively(externalModel, (field, modelKeyPath) => {
+            const stackbitField = getModelFieldForModelKeyPath(stackbitModel, modelKeyPath);
+            if (!stackbitField) {
+                return field;
+            }
+
+            const group = 'group' in stackbitField ? stackbitField.group : null;
+            const controlType = 'controlType' in stackbitField ? stackbitField.controlType : null;
+            let override = {};
+
+            if (stackbitField?.type === 'style') {
+                override = stackbitField;
+            }
+
+            return Object.assign(
+                {},
+                field,
+                omitByNil({
+                    group,
+                    controlType
+                }),
+                override
+            );
+        });
+    });
+
+    return {
+        ...config,
+        models: _.mapValues(_.keyBy(externalModels, 'name'), (model) => {
+            _.unset(model, 'name');
+            return model;
+        })
+    };
+}
+
 function normalizeConfig(config: any): any {
     const pageLayoutKey = _.get(config, 'pageLayoutKey', 'layout');
     const objectTypeKey = _.get(config, 'objectTypeKey', 'type');
@@ -238,6 +370,7 @@ function normalizeConfig(config: any): any {
     const ver = semver.coerce(stackbitYamlVersion);
     const isStackbitYamlV2 = ver ? semver.satisfies(ver, '<0.3.0') : false;
     const models = config?.models || {};
+    const gitCMS = isGitCMS(config);
     let referencedModelNames: string[] = [];
 
     _.forEach(models, (model, modelName) => {
@@ -263,13 +396,15 @@ function normalizeConfig(config: any): any {
             rename(model, 'template', 'layout');
 
             updatePageUrlPath(model);
-            updatePageFilePath(model, config);
 
-            addMarkdownContentField(model);
+            if (gitCMS) {
+                updatePageFilePath(model, config);
+                addMarkdownContentField(model);
 
-            // TODO: update schema-editor to not show layout field
-            addLayoutFieldToPageModel(model, pageLayoutKey);
-        } else if (isDataModel(model)) {
+                // TODO: update schema-editor to not show layout field
+                addLayoutFieldToPageModel(model, pageLayoutKey);
+            }
+        } else if (isDataModel(model) && gitCMS) {
             updateDataFilePath(model, config);
         }
 
@@ -285,8 +420,6 @@ function normalizeConfig(config: any): any {
             assignLabelFieldIfNeeded(model);
         }
 
-        resolveThumbnailPathForModel(model, model?.__metadata?.filePath);
-
         iterateModelFieldsRecursively(model, (field: any) => {
             // add field label if label is not set
             if (!_.has(field, 'label')) {
@@ -294,18 +427,12 @@ function normalizeConfig(config: any): any {
             }
 
             if (isListField(field)) {
-                // 'items.type' of list field default to 'string', set it explicitly
-                if (!_.has(field, 'items.type')) {
-                    _.set(field, 'items.type', 'string');
-                }
-                field = getListItemsField(field);
+                field = normalizeListFieldInPlace(field);
+                field = field.items;
             }
 
             if (isObjectField(field)) {
                 assignLabelFieldIfNeeded(field);
-                resolveThumbnailPathForModel(field, model?.__metadata?.filePath);
-            } else if (isEnumField(field)) {
-                resolveThumbnailPathForEnumField(field, model?.__metadata?.filePath);
             } else if (isCustomModelField(field, models)) {
                 // stackbit v0.2.0 compatibility
                 // convert the old custom model field type: { type: 'action' }
@@ -335,7 +462,9 @@ function normalizeConfig(config: any): any {
                 }
             }
 
-            referencedModelNames = _.union(referencedModelNames, getReferencedModelNames(field));
+            if (gitCMS) {
+                referencedModelNames = _.union(referencedModelNames, getReferencedModelNames(field));
+            }
         });
     });
 
@@ -492,7 +621,7 @@ function resolveThumbnailPath(thumbnail: string, modelDirPath: string) {
  */
 function getReferencedModelNames(field: any) {
     if (isListField(field)) {
-        field = getListItemsField(field);
+        field = getListFieldItems(field);
     }
     // TODO: add type field to model fields inside container update/create object logic rather adding type to schema
     // 'object' models referenced by 'model' fields should have 'type' field
@@ -513,7 +642,7 @@ function validateAndExtendContentModels(config: any): ConfigValidationResult {
     const contentModels = config.contentModels ?? {};
     const models = config.models ?? {};
 
-    const externalModels = ['contentful', 'sanity'].includes(config.cmsName);
+    const externalModels = !isGitCMS(config);
     const emptyContentModels = _.isEmpty(contentModels);
 
     if (externalModels || emptyContentModels) {
@@ -572,8 +701,41 @@ function validateAndExtendContentModels(config: any): ConfigValidationResult {
 }
 
 function normalizeValidationResult(validationResult: ConfigValidationResult): NormalizedValidationResult {
+    validationResult = filterAndOrderConfigFields(validationResult);
     convertModelGroupsToModelList(validationResult);
     return convertModelsToArray(validationResult);
+}
+
+function filterAndOrderConfigFields(validationResult: ConfigValidationResult): ConfigValidationResult {
+    // TODO: see if we move filtering and sorting to Joi
+    return {
+        ...validationResult,
+        value: _.pick(validationResult.value, [
+            'stackbitVersion',
+            'ssgName',
+            'ssgVersion',
+            'cmsName',
+            'import',
+            'buildCommand',
+            'publishDir',
+            'nodeVersion',
+            'devCommand',
+            'staticDir',
+            'uploadDir',
+            'assets',
+            'pagesDir',
+            'dataDir',
+            'pageLayoutKey',
+            'objectTypeKey',
+            'styleObjectModelName',
+            'excludePages',
+            'logicFields',
+            'contentModels',
+            'modelsSource',
+            'models',
+            'presets'
+        ])
+    };
 }
 
 function convertModelGroupsToModelList(validationResult: ConfigValidationResult) {
@@ -605,7 +767,7 @@ function convertModelGroupsToModelList(validationResult: ConfigValidationResult)
     _.forEach(models, (model) => {
         iterateModelFieldsRecursively(model, (field: any) => {
             if (isListField(field)) {
-                field = getListItemsField(field);
+                field = field.items;
             }
             if (field.groups) {
                 let key: string | null = null;
@@ -647,6 +809,10 @@ function convertModelsToArray(validationResult: ConfigValidationResult): Normali
         }
     );
 
+    if (!isGitCMS(config)) {
+        addImageModel(modelArray);
+    }
+
     const convertedErrors = _.map(validationResult.errors, (error: ConfigValidationError) => {
         if (error.fieldPath[0] === 'models' && typeof error.fieldPath[1] == 'string') {
             const modelName = error.fieldPath[1];
@@ -666,4 +832,21 @@ function convertModelsToArray(validationResult: ConfigValidationResult): Normali
         },
         errors: convertedErrors
     };
+}
+
+function addImageModel(models: Model[]) {
+    models.push({
+        type: 'image',
+        name: '__image_model',
+        label: 'Image',
+        labelField: 'title',
+        fields: [
+            { name: 'title', type: 'string' },
+            { name: 'url', type: 'string' }
+        ]
+    });
+}
+
+function isGitCMS(config: any) {
+    return !config.cmsName || config.cmsName === 'git';
 }

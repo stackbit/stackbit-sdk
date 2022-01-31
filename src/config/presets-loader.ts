@@ -20,13 +20,14 @@ export async function loadPresets(dirPath: string, config: Config): Promise<Pres
         if (!(await fse.pathExists(presetsDir))) {
             continue;
         }
-        presetFiles.push(
-            ...(await fse.readdir(presetsDir)).filter((fileName) => path.parse(fileName).ext === '.json').map((fileName) => path.join(presetsRelDir, fileName))
-        );
+        const files = (await fse.readdir(presetsDir))
+            .filter((fileName) => ['.json', '.yaml', '.yml'].includes(path.parse(fileName).ext))
+            .map((fileName) => path.join(presetsRelDir, fileName));
+        presetFiles.push(...files);
     }
 
-    const presets: any = {};
-    const presetsByModel: any = {};
+    const presets: Record<string, any> = {};
+    const presetsIdsByModel: Record<string, any> = {};
     const errors: ConfigPresetsError[] = [];
 
     for (const presetFile of presetFiles) {
@@ -46,22 +47,24 @@ export async function loadPresets(dirPath: string, config: Config): Promise<Pres
                 preset.thumbnail = resolveThumbnailPath(preset.thumbnail, presetsRelDir);
             }
             _.set(preset, 'modelName', presetData.model);
-            append(presetsByModel, presetData.model, presetId);
+            append(presetsIdsByModel, presetData.model, presetId);
         });
     }
 
-    // update config with presets
-    for (const model of config.models) {
-        const presetsForModel = presetsByModel[model.name];
-        if (presetsForModel) {
-            model.presets = presetsForModel;
+    // update models with presets IDs
+    const models = _.map(config.models, (model) => {
+        const presetIdsForModel = presetsIdsByModel[model.name];
+        if (!presetIdsForModel) {
+            return model;
         }
-    }
-
-    config.presets = presets;
+        return { ...model, presets: presetIdsForModel };
+    });
 
     return {
-        config,
+        config: Object.assign({}, config, {
+            models,
+            presets
+        }),
         errors
     };
 }

@@ -91,9 +91,9 @@ describe('test model utils', () => {
         expect(modelUtils.isSingleInstanceModel(pageModel)).toBeFalsy();
     });
 
-    test('getListItemsField returns list items field', () => {
+    test('getListFieldItems returns list items field', () => {
         const pageModel = modelUtils.getModelByName(result.config.models, 'page_model_1');
         const modelListField = _.find(pageModel.fields, ['name', 'model_list']);
-        expect(modelUtils.getListItemsField(modelListField)).toMatchObject(modelListField.items);
+        expect(modelUtils.getListFieldItems(modelListField)).toMatchObject(modelListField.items);
     });
 });

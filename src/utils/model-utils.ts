@@ -79,20 +79,20 @@ export function isEnumField(field: Field): field is FieldEnum {
 }
 
 export function isListOfObjectsField(field: Field): field is FieldListObject {
-    return isListField(field) && isObjectListItems(getListItemsField(field));
+    return isListField(field) && isObjectListItems(getListFieldItems(field));
 }
 
 export function isListOfModelsField(field: Field): field is FieldListModel {
-    return isListField(field) && isModelListItems(getListItemsField(field));
+    return isListField(field) && isModelListItems(getListFieldItems(field));
 }
 
 export function isListOfReferencesField(field: Field): field is FieldListReference {
-    return isListField(field) && isReferenceListItems(getListItemsField(field));
+    return isListField(field) && isReferenceListItems(getListFieldItems(field));
 }
 
 export function isListOfCustomModelsField(field: Field, modelsByName?: Record<string, Model>): field is FieldList {
     // custom model field types are deprecated
-    return isListField(field) && isCustomModelListItems(getListItemsField(field), modelsByName);
+    return isListField(field) && isCustomModelListItems(getListFieldItems(field), modelsByName);
 }
 
 export function isListField(field: Field): field is FieldList {
@@ -122,7 +122,7 @@ export function isCustomModelListItems(items: FieldListItems, modelsByName?: Rec
  * items field, the default field is string:
  *
  * @example
- * listItemField = getListItemsField({
+ * listItemField = getListFieldItems({
  *   type: 'list',
  *   name: '...',
  *   items: { type: 'object', fields: [] }
@@ -134,15 +134,36 @@ export function isCustomModelListItems(items: FieldListItems, modelsByName?: Rec
  * }
  *
  * // list field without `items`
- * listItemField = getListItemsField({ type: 'list', name: '...' }
+ * listItemField = getListFieldItems({ type: 'list', name: '...' }
  * listItemField => { type: 'string' }
  *
  * @param {Object} field
  * @return {Object}
  */
-export function getListItemsField(field: FieldList): FieldListItems {
+export function getListFieldItems(field: FieldList): FieldListItems {
     // items.type defaults to string
-    return _.defaults(field.items, { type: 'string' });
+    return Object.assign({ type: 'string' }, field.items);
+}
+
+export function normalizeListField(field: FieldList): FieldList {
+    if (field.items?.type) {
+        return field;
+    }
+    return {
+        ...field,
+        items: {
+            type: 'string',
+            ...(field.items ?? {})
+        }
+    };
+}
+
+export function normalizeListFieldInPlace(field: FieldList): FieldList {
+    // 'items.type' of list field default to 'string', set it explicitly
+    if (!_.has(field, 'items.type')) {
+        _.set(field, 'items.type', 'string');
+    }
+    return field;
 }
 
 export function assignLabelFieldIfNeeded(modelOrField: Model | FieldObjectProps) {
@@ -175,4 +196,66 @@ export function resolveLabelFieldForModel(modelOrField: Model | FieldObjectProps
         labelField = _.get(titleField, 'name');
     }
     return labelField || null;
+}
+
+export function getModelFieldForModelKeyPath(model: Model, modelKeyPath: string[]) {
+    function _getField(field: Field, modelKeyPath: string[]): Model | Field | FieldListItems | FieldObjectProps | null {
+        if (modelKeyPath.length === 0) {
+            return field;
+        } else if (isObjectField(field)) {
+            return _getObjectFields(field, modelKeyPath);
+        } else if (isListField(field)) {
+            return _getListItems(field, modelKeyPath);
+        } else {
+            return null;
+        }
+    }
+
+    function _getObjectFields<T extends FieldObjectProps | Model>(field: T, modelKeyPath: string[]): Model | Field | FieldListItems | FieldObjectProps | null {
+        if (modelKeyPath.length === 0) {
+            return field;
+        }
+        const key = modelKeyPath.shift();
+        if (key !== 'fields' || !field.fields) {
+            return null;
+        }
+        if (modelKeyPath.length === 0) {
+            return null;
+        }
+        const fieldName = modelKeyPath.shift();
+        const childField = _.find(field.fields, (field) => field.name === fieldName);
+        if (!childField) {
+            return null;
+        }
+        return _getField(childField, modelKeyPath);
+    }
+
+    function _getListItems<T extends FieldList | (DataModel & { isList: true })>(
+        field: T,
+        modelKeyPath: string[]
+    ): Model | Field | FieldListItems | FieldObjectProps | null {
+        if (modelKeyPath.length === 0) {
+            return field;
+        }
+        const key = modelKeyPath.shift();
+        if (key !== 'items' || !field.items) {
+            return null;
+        }
+        if (modelKeyPath.length === 0) {
+            return field.items;
+        }
+        if (!isObjectListItems(field.items)) {
+            return null;
+        }
+        return _getObjectFields(field.items, modelKeyPath);
+    }
+
+    modelKeyPath = modelKeyPath.slice();
+    if (!model) {
+        return null;
+    } else if (isListDataModel(model)) {
+        return _getListItems(model, modelKeyPath);
+    } else {
+        return _getObjectFields(model, modelKeyPath);
+    }
 }

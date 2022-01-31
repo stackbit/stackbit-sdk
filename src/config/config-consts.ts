@@ -19,6 +19,8 @@ export const FIELD_TYPES = [
     'color',
     'image',
     'file',
+    'json',
+    'richText',
     'object',
     'model',
     'reference',

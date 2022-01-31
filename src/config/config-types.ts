@@ -3,7 +3,7 @@ import { CMS_NAMES, FIELD_TYPES, SSG_NAMES, STYLE_PROPS } from './config-consts'
 
 export interface Config extends BaseConfig {
     models: Model[];
-    presets?: any;
+    presets?: Record<string, any>;
 }
 
 export interface YamlConfig extends BaseConfig {
@@ -94,22 +94,20 @@ export interface ModelsSourceFiles {
 
 export interface ModelsSourceContentful {
     type: 'contentful';
-    spaceIdEnvVar: string;
-    accessTokenEnvVar: string;
-    environment: string;
+    module?: string;
 }
 
 export interface ModelsSourceSanity {
     type: 'sanity';
     sanityStudioPath: string;
-    projectIdEnvVar: string;
+    module?: string;
 }
 
 /*******************
  *** Model Types ***
  *******************/
 
-export type Model = StricterUnion<ObjectModel | DataModel | PageModel | ConfigModel>;
+export type Model = StricterUnion<ObjectModel | DataModel | PageModel | ConfigModel | ImageModel>;
 
 export type ObjectModel = YamlObjectModel & BaseModel;
 export type DataModel = YamlDataModel & BaseModel;
@@ -189,6 +187,14 @@ export interface FieldGroupItem {
     label: string;
 }
 
+export interface ImageModel {
+    type: 'image';
+    name: '__image_model';
+    label?: string;
+    labelField?: string;
+    fields?: Field[];
+}
+
 /*******************
  *** Field Types ***
  *******************/
@@ -224,7 +230,7 @@ export interface FieldCommonProps {
 export type FieldType = typeof FIELD_TYPES[number];
 
 export interface FieldSimpleProps {
-    type: 'string' | 'url' | 'slug' | 'text' | 'markdown' | 'html' | 'boolean' | 'date' | 'datetime' | 'color' | 'image' | 'file';
+    type: 'string' | 'url' | 'slug' | 'text' | 'markdown' | 'html' | 'boolean' | 'date' | 'datetime' | 'color' | 'image' | 'file' | 'json' | 'richText';
 }
 
 export type FieldEnumProps = FieldEnumDropdownProps | FieldEnumThumbnailsProps | FieldEnumPaletteProps;

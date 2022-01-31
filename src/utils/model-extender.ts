@@ -11,7 +11,7 @@ export function extendModelArray(models: Model[]): { models: Model[]; errors: Co
         models,
         (result: { models: Model[]; errors: ConfigValidationError[] }, model) => {
             // YamlModel is the same as Model just without 'name' and '__metadata' properties
-            const { model: extendedModel, errors } = memorized(model, model.name, modelsByName);
+            const { model: extendedModel, errors } = memorized(model, model.name, modelsByName as ModelMap);
             return {
                 models: result.models.concat(extendedModel),
                 errors: result.errors.concat(errors)
