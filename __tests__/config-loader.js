@@ -635,7 +635,17 @@ describe('model "extends" property', () => {
                         ]
                     },
                     {
-                        name: 'model_2'
+                        name: 'model_2',
+                        fieldGroups: [
+                            {
+                                name: 'group_2',
+                                label: 'Group 2 extended'
+                            },
+                            {
+                                name: 'group_3',
+                                label: 'Group 3 extended'
+                            }
+                        ]
                     }
                 ]
             }

@@ -32,6 +32,7 @@ import { loadPresets } from './presets-loader';
 export interface ConfigLoaderOptions {
     [option: string]: any;
     dirPath: string;
+    modelsSource?: string;
 }
 
 export interface ConfigLoaderResult {
@@ -52,75 +53,84 @@ export interface TempConfigLoaderResult {
 }
 
 export async function loadConfig({ dirPath, ...options }: ConfigLoaderOptions): Promise<ConfigLoaderResult> {
-    let configLoadResult: TempConfigLoaderResult;
-    try {
-        configLoadResult = await loadConfigFromDir(dirPath);
-    } catch (error) {
+    const { config, errors: configLoadErrors } = await loadConfigFromDir(dirPath);
+
+    if (!config) {
         return {
             valid: false,
             config: null,
-            errors: [new ConfigLoadError(`Error loading Stackbit configuration: ${error.message}`, { originalError: error })]
+            errors: configLoadErrors
         };
     }
 
-    if (!configLoadResult.config) {
-        return {
-            valid: false,
-            config: null,
-            errors: configLoadResult.errors
-        };
-    }
+    const { models: externalModels, errors: externalModelsLoadErrors } = await loadModelsFromExternalSource(config, dirPath, options);
 
-    const externalModelsResult = await loadModelsFromExternalSource(configLoadResult.config, options);
-
-    const mergedConfig = mergeConfigWithExternalModels(configLoadResult.config, externalModelsResult.models);
-
-    const normalizedResult = validateAndNormalizeConfig(mergedConfig);
+    const normalizedResult = validateAndNormalizeConfig(config, externalModels);
 
     const presetsResult = await loadPresets(dirPath, normalizedResult.config);
 
     return {
         valid: normalizedResult.valid,
         config: presetsResult.config,
-        errors: [...configLoadResult.errors, ...externalModelsResult.errors, ...normalizedResult.errors, ...presetsResult.errors]
+        errors: [...configLoadErrors, ...externalModelsLoadErrors, ...normalizedResult.errors, ...presetsResult.errors]
     };
 }
 
-export function validateAndNormalizeConfig(config: any): NormalizedValidationResult {
+export function validateAndNormalizeConfig(config: any, externalModels?: Model[]): NormalizedValidationResult {
+    // extend config models having the "extends" property
+    // this must be done before any validation as some properties like
+    // the labelField will not work when validating models without extending them first
+    const { models: extendedModels, errors: extendModelErrors } = extendModelMap(config.models as any);
+    const extendedConfig = {
+        ...config,
+        models: extendedModels
+    };
+
+    const { config: mergedConfig, errors: externalModelsMergeErrors } = mergeConfigWithExternalModels(extendedConfig, externalModels);
+
     // validate the "contentModels" and extend config models with "contentModels"
     // this must be done before main config validation to make it independent of "contentModels".
-    const contentModelsValidationResult = validateAndExtendContentModels(config);
-    config = contentModelsValidationResult.value;
-
-    // extend config models having the "extends" property
-    // this must be done before main config validation as some properties like
-    // the labelField will not work when validating models without extending them first
-    const { models, errors: extendModelErrors } = extendModelMap(config?.models || {});
-    config.models = models;
+    const { value: configWithContentModels, errors: contentModelsErrors } = validateAndExtendContentModels(mergedConfig);
 
     // normalize config - backward compatibility updates, adding extra fields like "markdown_content", "type" and "layout",
     // and setting other default values.
-    config = normalizeConfig(config);
+    const normalizedConfig = normalizeConfig(configWithContentModels);
 
     // validate config
-    const configValidationResult = validateConfig(config);
+    const { value: validatedConfig, errors: validationErrors } = validateConfig(normalizedConfig);
 
-    const errors = [...contentModelsValidationResult.errors, ...extendModelErrors, ...configValidationResult.errors];
+    const errors = [...extendModelErrors, ...externalModelsMergeErrors, ...contentModelsErrors, ...validationErrors];
+
     return normalizeValidationResult({
         valid: _.isEmpty(errors),
-        value: configValidationResult.value,
+        value: validatedConfig,
         errors: errors
     });
 }
 
 async function loadConfigFromDir(dirPath: string): Promise<TempConfigLoaderResult> {
-    const { config, error } = await loadConfigFromStackbitYaml(dirPath);
-    if (error) {
-        return { errors: [error] };
+    try {
+        const { config, error } = await loadConfigFromStackbitYaml(dirPath);
+        if (error) {
+            return { errors: [error] };
+        }
+
+        const { models: modelsFromFiles, errors: fileModelsErrors } = await loadModelsFromFiles(dirPath, config);
+
+        const mergedModels = mergeConfigModelsWithModelsFromFiles(config.models ?? {}, modelsFromFiles);
+
+        return {
+            config: {
+                ...config,
+                models: mergedModels
+            },
+            errors: fileModelsErrors
+        };
+    } catch (error) {
+        return {
+            errors: [new ConfigLoadError(`Error loading Stackbit configuration: ${error.message}`, { originalError: error })]
+        };
     }
-    const modelsFromFileResult = await loadModelsFromFiles(dirPath, config);
-    const mergedConfig = mergeConfigModelsWithModelsFromFiles(config, modelsFromFileResult.models);
-    return { config: mergedConfig, errors: modelsFromFileResult.errors };
 }
 
 type StackbitYamlConfigResult = { config: any; error?: undefined } | { config?: undefined; error: ConfigLoadError };
@@ -207,14 +217,19 @@ async function readModelFilesFromDir(modelsDir: string) {
     });
 }
 
-async function loadModelsFromExternalSource(config: any, options: any): Promise<{ models: Model[]; errors: ConfigLoadError[] }> {
+async function loadModelsFromExternalSource(
+    config: any,
+    dirPath: string,
+    options: Omit<ConfigLoaderOptions, 'dirPath'>
+): Promise<{ models: Model[]; errors: ConfigLoadError[] }> {
     const modelsSource = _.get(config, 'modelsSource', {});
-    const sourceType = _.get(modelsSource, 'type', 'files');
+    const sourceType = options.modelsSource ?? _.get(modelsSource, 'type', 'files');
     if (sourceType === 'files') {
         return { models: [], errors: [] };
     } else if (sourceType === 'contentful') {
         const contentfulModule = _.get(modelsSource, 'module', '@stackbit/cms-contentful');
-        const module = await import(contentfulModule);
+        const modulePath = path.join(dirPath, 'node_modules', contentfulModule);
+        const module = await import(modulePath);
         try {
             const { models } = await module.fetchAndConvertSchema(options);
             return {
@@ -268,8 +283,7 @@ async function loadConfigFromDotStackbit(dirPath: string) {
     return _.isEmpty(config) ? null : config;
 }
 
-function mergeConfigModelsWithModelsFromFiles(config: any, modelsFromFiles: Record<string, any>) {
-    const configModels = config.models ?? {};
+function mergeConfigModelsWithModelsFromFiles(configModels: any, modelsFromFiles: Record<string, any>) {
     const mergedModels = _.mapValues(modelsFromFiles, (modelFromFile, modelName) => {
         // resolve thumbnails of models loaded from files
         const modelFilePath = modelFromFile.__metadata?.filePath;
@@ -286,7 +300,7 @@ function mergeConfigModelsWithModelsFromFiles(config: any, modelsFromFiles: Reco
             }
         });
 
-        const configModel = configModels[modelName];
+        const configModel = _.get(configModels, modelName);
         if (!configModel) {
             return modelFromFile;
         }
@@ -295,71 +309,84 @@ function mergeConfigModelsWithModelsFromFiles(config: any, modelsFromFiles: Reco
             fields: _.unionBy(configModel?.fields ?? [], modelFromFile?.fields ?? [], 'name')
         });
     });
-    return {
-        ...config,
-        models: Object.assign({}, configModels, mergedModels)
-    };
+    return Object.assign({}, configModels, mergedModels);
 }
 
-function mergeConfigWithExternalModels(config: any, externalModels?: Model[]) {
+function mergeConfigWithExternalModels(config: any, externalModels?: Model[]): { config: any; errors: ConfigValidationError[] } {
     if (!externalModels || externalModels.length === 0) {
-        return config;
+        return {
+            config,
+            errors: []
+        };
     }
 
     const stackbitModels = config?.models ?? {};
+    const errors: ConfigValidationError[] = [];
 
-    externalModels = externalModels.map((externalModel) => {
-        const stackbitModel = stackbitModels[externalModel.name];
-        if (!stackbitModel) {
-            return externalModel;
+    const models = _.reduce(
+        externalModels,
+        (modelMap: Record<string, YamlModel>, externalModel) => {
+            const { name, ...rest } = externalModel;
+            return Object.assign(modelMap, { [name]: rest });
+        },
+        {}
+    );
+
+    _.forEach(stackbitModels, (stackbitModel: any, modelName: any) => {
+        let externalModel = models[modelName];
+        if (!externalModel) {
+            return;
         }
 
-        const modelType = stackbitModel.type ? (stackbitModel.type === 'config' ? 'data' : stackbitModel.type) : 'object';
+        const modelType = stackbitModel.type ? (stackbitModel.type === 'config' ? 'data' : stackbitModel.type) : externalModel.type ?? 'object';
         const urlPath = modelType === 'page' ? stackbitModel?.urlPath ?? '/{slug}' : null;
-        const fieldGroups = stackbitModel?.fieldGroups;
 
         externalModel = Object.assign(
+            {},
             externalModel,
+            _.pick(stackbitModel, ['__metadata', 'label', 'description', 'thumbnail', 'singleInstance', 'readOnly', 'labelField', 'fieldGroups']),
             omitByNil({
-                __metadata: stackbitModel.__metadata,
                 type: modelType,
-                urlPath,
-                fieldGroups
+                urlPath
             })
         );
 
-        return mapModelFieldsRecursively(externalModel, (field, modelKeyPath) => {
+        externalModel = mapModelFieldsRecursively(externalModel as Model, (field, modelKeyPath) => {
             const stackbitField = getModelFieldForModelKeyPath(stackbitModel, modelKeyPath);
             if (!stackbitField) {
                 return field;
             }
 
-            const group = 'group' in stackbitField ? stackbitField.group : null;
-            const controlType = 'controlType' in stackbitField ? stackbitField.controlType : null;
             let override = {};
-
-            if (stackbitField?.type === 'style') {
+            if (stackbitField.type === 'style') {
                 override = stackbitField;
+            } else if (field.type === 'enum') {
+                override = _.pick(stackbitField, ['options']);
+            } else if (field.type === 'color') {
+                override = { type: 'color' };
+            } else if (field.type === 'number') {
+                override = _.pick(stackbitField, ['subtype', 'min', 'max', 'step', 'unit']);
+            } else if (field.type === 'object') {
+                override = _.pick(stackbitField, ['labelField', 'thumbnail', 'fieldGroups']);
             }
 
             return Object.assign(
                 {},
                 field,
-                omitByNil({
-                    group,
-                    controlType
-                }),
+                _.pick(stackbitField, ['label', 'description', 'required', 'default', 'group', 'const', 'hidden', 'readOnly', 'controlType']),
                 override
             );
-        });
+        }) as YamlModel;
+
+        models[modelName] = externalModel;
     });
 
     return {
-        ...config,
-        models: _.mapValues(_.keyBy(externalModels, 'name'), (model) => {
-            _.unset(model, 'name');
-            return model;
-        })
+        config: {
+            ...config,
+            models: models
+        },
+        errors: errors
     };
 }
 
