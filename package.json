@@ -1,6 +1,6 @@
 {
     "name": "@stackbit/sdk",
-    "version": "0.2.24",
+    "version": "0.2.25",
     "description": "Stackbit SDK",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
