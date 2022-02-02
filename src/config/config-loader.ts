@@ -26,13 +26,13 @@ import {
     getModelFieldForModelKeyPath
 } from '../utils';
 import { append, omitByNil, parseFile, readDirRecursively, reducePromise, rename } from '@stackbit/utils';
-import { Config, DataModel, FieldEnum, FieldModel, FieldObjectProps, Model, PageModel, YamlModel } from './config-types';
+import { Config, DataModel, FieldEnum, FieldModel, FieldObjectProps, Model, ModelsSource, PageModel, YamlModel } from './config-types';
 import { loadPresets } from './presets-loader';
 
 export interface ConfigLoaderOptions {
     [option: string]: any;
     dirPath: string;
-    modelsSource?: string;
+    modelsSource?: ModelsSource;
 }
 
 export interface ConfigLoaderResult {
@@ -220,18 +220,18 @@ async function readModelFilesFromDir(modelsDir: string) {
 async function loadModelsFromExternalSource(
     config: any,
     dirPath: string,
-    options: Omit<ConfigLoaderOptions, 'dirPath'>
+    options: Omit<ConfigLoaderOptions, 'dirPath'> = {}
 ): Promise<{ models: Model[]; errors: ConfigLoadError[] }> {
-    const modelsSource = _.get(config, 'modelsSource', {});
-    const sourceType = options.modelsSource ?? _.get(modelsSource, 'type', 'files');
+    const modelsSource = _.get(config, 'modelsSource', options.modelsSource);
+    const sourceType = _.get(modelsSource, 'type', 'files');
     if (sourceType === 'files') {
         return { models: [], errors: [] };
     } else if (sourceType === 'contentful') {
         const contentfulModule = _.get(modelsSource, 'module', '@stackbit/cms-contentful');
-        const modulePath = path.join(dirPath, 'node_modules', contentfulModule);
+        const modulePath = path.resolve(dirPath, 'node_modules', contentfulModule);
         const module = await import(modulePath);
         try {
-            const { models } = await module.fetchAndConvertSchema(options);
+            const { models } = await module.fetchAndConvertSchema(_.omit(options, 'modelsSource'));
             return {
                 models: models,
                 errors: []
