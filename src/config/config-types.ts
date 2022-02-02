@@ -95,12 +95,14 @@ export interface ModelsSourceFiles {
 export interface ModelsSourceContentful {
     type: 'contentful';
     module?: string;
+    [key: string]: any;
 }
 
 export interface ModelsSourceSanity {
     type: 'sanity';
     sanityStudioPath: string;
     module?: string;
+    [key: string]: any;
 }
 
 /*******************

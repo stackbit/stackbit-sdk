@@ -30,7 +30,6 @@ import { Config, DataModel, FieldEnum, FieldModel, FieldObjectProps, Model, Mode
 import { loadPresets } from './presets-loader';
 
 export interface ConfigLoaderOptions {
-    [option: string]: any;
     dirPath: string;
     modelsSource?: ModelsSource;
 }
@@ -52,7 +51,7 @@ export interface TempConfigLoaderResult {
     errors: ConfigLoadError[];
 }
 
-export async function loadConfig({ dirPath, ...options }: ConfigLoaderOptions): Promise<ConfigLoaderResult> {
+export async function loadConfig({ dirPath, modelsSource }: ConfigLoaderOptions): Promise<ConfigLoaderResult> {
     const { config, errors: configLoadErrors } = await loadConfigFromDir(dirPath);
 
     if (!config) {
@@ -63,7 +62,7 @@ export async function loadConfig({ dirPath, ...options }: ConfigLoaderOptions): 
         };
     }
 
-    const { models: externalModels, errors: externalModelsLoadErrors } = await loadModelsFromExternalSource(config, dirPath, options);
+    const { models: externalModels, errors: externalModelsLoadErrors } = await loadModelsFromExternalSource(config, dirPath, modelsSource);
 
     const normalizedResult = validateAndNormalizeConfig(config, externalModels);
 
@@ -220,9 +219,9 @@ async function readModelFilesFromDir(modelsDir: string) {
 async function loadModelsFromExternalSource(
     config: any,
     dirPath: string,
-    options: Omit<ConfigLoaderOptions, 'dirPath'> = {}
+    modelsSource?: ModelsSource
 ): Promise<{ models: Model[]; errors: ConfigLoadError[] }> {
-    const modelsSource = _.get(config, 'modelsSource', options.modelsSource);
+    modelsSource = _.get(config, 'modelsSource', modelsSource);
     const sourceType = _.get(modelsSource, 'type', 'files');
     if (sourceType === 'files') {
         return { models: [], errors: [] };
@@ -231,7 +230,7 @@ async function loadModelsFromExternalSource(
         const modulePath = path.resolve(dirPath, 'node_modules', contentfulModule);
         const module = await import(modulePath);
         try {
-            const { models } = await module.fetchAndConvertSchema(_.omit(options, 'modelsSource'));
+            const { models } = await module.fetchAndConvertSchema(_.omit(modelsSource, ['type', 'module']));
             return {
                 models: models,
                 errors: []
