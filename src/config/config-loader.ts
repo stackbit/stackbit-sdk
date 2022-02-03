@@ -47,7 +47,7 @@ export interface NormalizedValidationResult {
 }
 
 export interface TempConfigLoaderResult {
-    config?: Record<string, unknown>;
+    config?: Record<string, any>;
     errors: ConfigLoadError[];
 }
 
@@ -75,7 +75,7 @@ export async function loadConfig({ dirPath, modelsSource }: ConfigLoaderOptions)
     };
 }
 
-export function validateAndNormalizeConfig(config: any, externalModels?: Model[]): NormalizedValidationResult {
+export function validateAndNormalizeConfig(config: Record<string, any>, externalModels?: Model[]): NormalizedValidationResult {
     // extend config models having the "extends" property
     // this must be done before any validation as some properties like
     // the labelField will not work when validating models without extending them first
@@ -109,18 +109,18 @@ export function validateAndNormalizeConfig(config: any, externalModels?: Model[]
 
 async function loadConfigFromDir(dirPath: string): Promise<TempConfigLoaderResult> {
     try {
-        const { config, error } = await loadConfigFromStackbitYaml(dirPath);
-        if (error) {
-            return { errors: [error] };
+        const stackbitYamlResult = await loadConfigFromStackbitYaml(dirPath);
+        if (stackbitYamlResult.error) {
+            return { errors: [stackbitYamlResult.error] };
         }
 
-        const { models: modelsFromFiles, errors: fileModelsErrors } = await loadModelsFromFiles(dirPath, config);
+        const { models: modelsFromFiles, errors: fileModelsErrors } = await loadModelsFromFiles(dirPath, stackbitYamlResult.config);
 
-        const mergedModels = mergeConfigModelsWithModelsFromFiles(config.models ?? {}, modelsFromFiles);
+        const mergedModels = mergeConfigModelsWithModelsFromFiles(stackbitYamlResult.config.models ?? {}, modelsFromFiles);
 
         return {
             config: {
-                ...config,
+                ...stackbitYamlResult.config,
                 models: mergedModels
             },
             errors: fileModelsErrors
@@ -132,7 +132,7 @@ async function loadConfigFromDir(dirPath: string): Promise<TempConfigLoaderResul
     }
 }
 
-type StackbitYamlConfigResult = { config: any; error?: undefined } | { config?: undefined; error: ConfigLoadError };
+type StackbitYamlConfigResult = { config: Record<string, any>; error?: never } | { config?: never; error: ConfigLoadError };
 
 async function loadConfigFromStackbitYaml(dirPath: string): Promise<StackbitYamlConfigResult> {
     const stackbitYamlPath = path.join(dirPath, 'stackbit.yaml');
@@ -152,7 +152,7 @@ async function loadConfigFromStackbitYaml(dirPath: string): Promise<StackbitYaml
     return { config };
 }
 
-async function loadModelsFromFiles(dirPath: string, config: any): Promise<{ models: Record<string, any>; errors: ConfigLoadError[] }> {
+async function loadModelsFromFiles(dirPath: string, config: Record<string, any>): Promise<{ models: Record<string, any>; errors: ConfigLoadError[] }> {
     const modelsSource = _.get(config, 'modelsSource', {});
     const sourceType = _.get(modelsSource, 'type', 'files');
     const defaultModelDirs = ['node_modules/@stackbit/components/models', '.stackbit/models'];
@@ -217,13 +217,14 @@ async function readModelFilesFromDir(modelsDir: string) {
 }
 
 async function loadModelsFromExternalSource(
-    config: any,
+    config: Record<string, any>,
     dirPath: string,
     modelsSource?: ModelsSource
 ): Promise<{ models: Model[]; errors: ConfigLoadError[] }> {
-    modelsSource = _.get(config, 'modelsSource', modelsSource);
+    modelsSource = _.assign({}, modelsSource, config.modelSource);
     const sourceType = _.get(modelsSource, 'type', 'files');
     if (sourceType === 'files') {
+        // we already loaded models from files inside loadModelsFromFiles function
         return { models: [], errors: [] };
     } else if (sourceType === 'contentful') {
         const contentfulModule = _.get(modelsSource, 'module', '@stackbit/cms-contentful');
