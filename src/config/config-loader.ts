@@ -351,28 +351,28 @@ function mergeConfigWithExternalModels(config: any, externalModels?: Model[]): {
             })
         );
 
-        externalModel = mapModelFieldsRecursively(externalModel as Model, (field, modelKeyPath) => {
+        externalModel = mapModelFieldsRecursively(externalModel as Model, (externalField, modelKeyPath) => {
             const stackbitField = getModelFieldForModelKeyPath(stackbitModel, modelKeyPath);
             if (!stackbitField) {
-                return field;
+                return externalField;
             }
 
             let override = {};
-            if (stackbitField.type === 'style') {
+            if (externalField.type === 'json' && stackbitField.type === 'style') {
                 override = stackbitField;
-            } else if (field.type === 'enum') {
-                override = _.pick(stackbitField, ['options']);
-            } else if (field.type === 'color') {
+            } else if (externalField.type === 'string' && stackbitField.type === 'color') {
                 override = { type: 'color' };
-            } else if (field.type === 'number') {
+            } else if (externalField.type === 'enum') {
+                override = _.pick(stackbitField, ['options']);
+            } else if (externalField.type === 'number') {
                 override = _.pick(stackbitField, ['subtype', 'min', 'max', 'step', 'unit']);
-            } else if (field.type === 'object') {
+            } else if (externalField.type === 'object') {
                 override = _.pick(stackbitField, ['labelField', 'thumbnail', 'fieldGroups']);
             }
 
             return Object.assign(
                 {},
-                field,
+                externalField,
                 _.pick(stackbitField, ['label', 'description', 'required', 'default', 'group', 'const', 'hidden', 'readOnly', 'controlType']),
                 override
             );
