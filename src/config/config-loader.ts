@@ -429,7 +429,7 @@ function normalizeConfig(config: any): any {
                 addMarkdownContentField(model);
 
                 // TODO: update schema-editor to not show layout field
-                addLayoutFieldToPageModel(model, pageLayoutKey);
+                addLayoutFieldToPageModel(model, pageLayoutKey, modelName);
             }
         } else if (isDataModel(model) && gitCMS) {
             updateDataFilePath(model, config);
@@ -574,7 +574,10 @@ function addMarkdownContentField(model: PageModel) {
     });
 }
 
-function addLayoutFieldToPageModel(model: any, pageLayoutKey: any) {
+function addLayoutFieldToPageModel(model: any, pageLayoutKey: any, modelName: string) {
+    if (_.intersection(_.keys(model), ['file', 'folder', 'match', 'exclude']).length === 0 && !_.get(model, 'layout')) {
+        model.layout = modelName;
+    }
     const modelLayout = _.get(model, 'layout');
     if (!modelLayout) {
         return;

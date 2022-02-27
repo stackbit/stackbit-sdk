@@ -124,6 +124,7 @@ test('invalid models should not affect loading and matching content to valid mod
     expect(contentResult.valid).toBeFalsy();
     expect(errors).toMatchObject([
         {
+            message: 'file \'content/contact.md\' matches several models \'invalid_1, invalid_2, invalid_3, home, page\'',
             filePath: 'content/contact.md'
         }
     ]);

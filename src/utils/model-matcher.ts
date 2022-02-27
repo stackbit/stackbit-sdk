@@ -69,7 +69,7 @@ export function getModelsByQuery(query: ModelQuery, models: Model[]): Model[] {
         (
             modelGroups: {
                 byFile: Model[];
-                byLayout: Model[];
+                byType: Model[];
                 byGlob: Model[];
             },
             model
@@ -77,7 +77,7 @@ export function getModelsByQuery(query: ModelQuery, models: Model[]): Model[] {
             if (_.has(model, 'file')) {
                 modelGroups.byFile.push(model);
             } else if (objectType && _.has(model, modelTypeKeyPath)) {
-                modelGroups.byLayout.push(model);
+                modelGroups.byType.push(model);
             } else {
                 modelGroups.byGlob.push(model);
             }
@@ -85,7 +85,7 @@ export function getModelsByQuery(query: ModelQuery, models: Model[]): Model[] {
         },
         {
             byFile: [],
-            byLayout: [],
+            byType: [],
             byGlob: []
         }
     );
@@ -105,13 +105,13 @@ export function getModelsByQuery(query: ModelQuery, models: Model[]): Model[] {
         return fileMatchedModels;
     }
 
-    const layoutMatchedModels = _.filter(modelMatchGroups.byLayout, (model) => {
+    const typeMatchedModels = _.filter(modelMatchGroups.byType, (model) => {
         const modelType = _.get(model, modelTypeKeyPath);
         return objectType === modelType;
     });
 
-    if (!_.isEmpty(layoutMatchedModels)) {
-        return layoutMatchedModels;
+    if (!_.isEmpty(typeMatchedModels)) {
+        return typeMatchedModels;
     }
 
     return _.filter(modelMatchGroups.byGlob, (model) => {

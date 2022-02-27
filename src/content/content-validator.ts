@@ -56,7 +56,7 @@ export function validateContentItems({ contentItems, config }: ContentValidation
                         modelSchema = modelSchema.keys({ [pageLayoutKey]: Joi.string().valid(model.layout) });
                     }
                 } else if (isDataModel(model)) {
-                    const objectTypeKey = config.objectTypeKey || 'layout';
+                    const objectTypeKey = config.objectTypeKey || 'type';
                     if (!_.find(model.fields, { name: objectTypeKey })) {
                         modelSchema = modelSchema.keys({ [objectTypeKey]: Joi.string().valid(model.name) });
                     }
