@@ -4,6 +4,7 @@ const { describe, test, expect, beforeAll } = require('@jest/globals');
 
 const { loadConfig } = require('../src/config/config-loader');
 const { loadContent } = require('../src/content/content-loader');
+const { expectContentPassingValidation, expectContentFailValidationAndMatchAllErrors } = require('./test-utils');
 
 test.each(['azimuth', 'diy', 'starter'])('load %s stackbit.yaml', async (subfolder) => {
     const dirPath = path.join(__dirname, `./fixtures/${subfolder}`);
@@ -20,6 +21,337 @@ test.each(['azimuth', 'diy', 'starter'])('load %s stackbit.yaml', async (subfold
         expect(contentResult.valid).toBeTruthy();
         expect(contentResult.errors).toHaveLength(0);
     }
+});
+
+describe('test object types', () => {
+    const models = () => ({
+        page_model: {
+            type: 'page',
+            label: 'Page',
+            fields: [{ type: 'string', name: 'title' }]
+        },
+        data_model: {
+            type: 'data',
+            label: 'Data',
+            fields: [
+                { type: 'string', name: 'title' },
+                { type: 'model', name: 'single', models: ['object_1'] },
+                { type: 'model', name: 'multi', models: ['object_1', 'object_2'] },
+                { type: 'list', name: 'list_single', items: { type: 'model', models: ['object_1'] } },
+                { type: 'list', name: 'list_multi', items: { type: 'model', models: ['object_1', 'object_2'] } }
+            ]
+        },
+        object_1: {
+            type: 'object',
+            label: 'Object 1'
+        },
+        object_2: {
+            type: 'object',
+            label: 'Object 2'
+        }
+    });
+    const pageMetadata = {
+        modelName: 'page_model',
+        filePath: 'file.json'
+    };
+    const dataMetadata = {
+        modelName: 'data_model',
+        filePath: 'file.json'
+    };
+
+    test('page objects with default pageLayoutKey should pass validation', () => {
+        expectContentPassingValidation(
+            {
+                models: models()
+            },
+            [
+                {
+                    __metadata: pageMetadata,
+                    layout: 'page_model',
+                    title: 'hello'
+                }
+            ]
+        );
+    });
+
+    test('page objects with overridden pageLayoutKey should pass validation', () => {
+        expectContentPassingValidation(
+            {
+                pageLayoutKey: 'type',
+                models: models()
+            },
+            [
+                {
+                    __metadata: pageMetadata,
+                    type: 'page_model',
+                    title: 'hello'
+                }
+            ]
+        );
+    });
+
+    test('page objects without default pageLayoutKey should fail validation', () => {
+        expectContentFailValidationAndMatchAllErrors(
+            {
+                models: models()
+            },
+            [
+                {
+                    __metadata: pageMetadata,
+                    title: 'hello'
+                }
+            ],
+            [
+                {
+                    name: 'ContentValidationError',
+                    type: 'any.required',
+                    message: '"layout" is required',
+                    modelName: 'page_model',
+                    fieldPath: ['layout']
+                }
+            ]
+        );
+    });
+
+    test('page objects without overridden pageLayoutKey should fail validation', () => {
+        expectContentFailValidationAndMatchAllErrors(
+            {
+                pageLayoutKey: 'type',
+                models: models()
+            },
+            [
+                {
+                    __metadata: pageMetadata,
+                    title: 'hello'
+                }
+            ],
+            [
+                {
+                    name: 'ContentValidationError',
+                    type: 'any.required',
+                    message: '"type" is required',
+                    modelName: 'page_model',
+                    fieldPath: ['type']
+                }
+            ]
+        );
+    });
+
+    test('data objects with default objectTypeKey should pass validation', () => {
+        expectContentPassingValidation(
+            {
+                models: models()
+            },
+            [
+                {
+                    __metadata: dataMetadata,
+                    type: 'data_model',
+                    title: 'hello'
+                }
+            ]
+        );
+    });
+
+    test('data objects with overridden objectTypeKey should pass validation', () => {
+        expectContentPassingValidation(
+            {
+                objectTypeKey: 'kind',
+                models: models()
+            },
+            [
+                {
+                    __metadata: dataMetadata,
+                    kind: 'data_model',
+                    title: 'hello'
+                }
+            ]
+        );
+    });
+
+    test('data objects without default objectTypeKey should fail validation', () => {
+        expectContentFailValidationAndMatchAllErrors(
+            {
+                models: models()
+            },
+            [
+                {
+                    __metadata: dataMetadata,
+                    title: 'hello'
+                }
+            ],
+            [
+                {
+                    name: 'ContentValidationError',
+                    type: 'any.required',
+                    message: '"type" is required',
+                    modelName: 'data_model',
+                    fieldPath: ['type']
+                }
+            ]
+        );
+    });
+
+    test('data objects without overridden objectTypeKey should fail validation', () => {
+        expectContentFailValidationAndMatchAllErrors(
+            {
+                objectTypeKey: 'kind',
+                models: models()
+            },
+            [
+                {
+                    __metadata: dataMetadata,
+                    title: 'hello'
+                }
+            ],
+            [
+                {
+                    name: 'ContentValidationError',
+                    type: 'any.required',
+                    message: '"kind" is required',
+                    modelName: 'data_model',
+                    fieldPath: ['kind']
+                }
+            ]
+        );
+    });
+
+    test('model field with single model with objectTypeKey should pass validation', () => {
+        expectContentPassingValidation(
+            {
+                models: models()
+            },
+            [
+                {
+                    __metadata: dataMetadata,
+                    type: 'data_model',
+                    single: { type: 'object_1' }
+                }
+            ]
+        );
+    });
+
+    test('model field with single model without objectTypeKey should pass validation', () => {
+        expectContentPassingValidation(
+            {
+                models: models()
+            },
+            [
+                {
+                    __metadata: dataMetadata,
+                    type: 'data_model',
+                    single: {}
+                }
+            ]
+        );
+    });
+
+    test('model field with multiple models with objectTypeKey should pass validation', () => {
+        expectContentPassingValidation(
+            {
+                models: models()
+            },
+            [
+                {
+                    __metadata: dataMetadata,
+                    type: 'data_model',
+                    multi: { type: 'object_1' }
+                }
+            ]
+        );
+    });
+
+    test('model field with multiple models without objectTypeKey should fail validation', () => {
+        expectContentFailValidationAndMatchAllErrors(
+            {
+                models: models()
+            },
+            [
+                {
+                    __metadata: dataMetadata,
+                    type: 'data_model',
+                    multi: {}
+                }
+            ],
+            [
+                {
+                    name: 'ContentValidationError',
+                    type: 'alternatives.any',
+                    message: 'multi.type is required and must be one of [object_1, object_2].',
+                    modelName: 'data_model',
+                    fieldPath: ['multi']
+                }
+            ]
+        );
+    });
+
+    test('list of model field with single model with objectTypeKey should pass validation', () => {
+        expectContentPassingValidation(
+            {
+                models: models()
+            },
+            [
+                {
+                    __metadata: dataMetadata,
+                    type: 'data_model',
+                    list_single: [{ type: 'object_1' }]
+                }
+            ]
+        );
+    });
+
+    test('list of model field with single model without objectTypeKey should pass validation', () => {
+        expectContentPassingValidation(
+            {
+                models: models()
+            },
+            [
+                {
+                    __metadata: dataMetadata,
+                    type: 'data_model',
+                    list_single: [{}]
+                }
+            ]
+        );
+    });
+
+    test('list of model field with multiple models with objectTypeKey should pass validation', () => {
+        expectContentPassingValidation(
+            {
+                models: models()
+            },
+            [
+                {
+                    __metadata: dataMetadata,
+                    type: 'data_model',
+                    list_multi: [{ type: 'object_1' }]
+                }
+            ]
+        );
+    });
+
+    test('list of model field with multiple models without objectTypeKey should fail validation', () => {
+        expectContentFailValidationAndMatchAllErrors(
+            {
+                models: models()
+            },
+            [
+                {
+                    __metadata: dataMetadata,
+                    type: 'data_model',
+                    list_multi: [{}]
+                }
+            ],
+            [
+                {
+                    name: 'ContentValidationError',
+                    type: 'alternatives.any',
+                    message: 'list_multi[0].type is required and must be one of [object_1, object_2].',
+                    modelName: 'data_model',
+                    fieldPath: ['list_multi', 0]
+                }
+            ]
+        );
+    });
 });
 
 describe('test errors of invalid content', () => {
@@ -126,7 +458,7 @@ test('invalid models should not affect loading and matching content to valid mod
     expect(contentResult.valid).toBeFalsy();
     expect(errors).toMatchObject([
         {
-            message: 'file \'content/contact.md\' matches several models \'invalid_1, invalid_2, invalid_3, home, page\'',
+            message: "file 'content/contact.md' matches several models 'invalid_1, invalid_2, invalid_3, home, page'",
             filePath: 'content/contact.md'
         }
     ]);

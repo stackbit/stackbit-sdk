@@ -23,6 +23,9 @@ module.exports = {
     expectConfigPassingValidationAndMatchObject,
     expectConfigFailValidationAndMatchAllErrors,
 
+    expectContentPassingValidation,
+    expectContentFailValidationAndMatchAllErrors,
+
     // other validation methods are using the low-level "validateConfig" utility method
     // that only validate the passed config using the raw Joi schema.
     // TODO: refactor all these methods to use the high-level validation method
@@ -31,10 +34,7 @@ module.exports = {
     expectValidationResultToIncludeSingleError,
     expectValidationResultToMatchAllErrors,
     expectModelValidationResultToMatchAllErrors,
-    expectArrayToIncludeObjectContaining,
-
-    expectContentPassingValidation,
-    expectContentFailValidationAndMatchAllErrors
+    expectArrayToIncludeObjectContaining
 };
 
 async function loadConfigFromFixturePath(fixturePath) {
@@ -43,7 +43,7 @@ async function loadConfigFromFixturePath(fixturePath) {
 }
 
 function loadConfigFromObject(config) {
-    config = _.assign(config, minimalValidConfig);
+    config = _.assign({}, config, minimalValidConfig);
     return validateAndNormalizeConfig(config);
 }
 

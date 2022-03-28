@@ -26,7 +26,7 @@ export function validateContentItems({ contentItems, config }: ContentValidation
     const value = _.map(
         contentItems,
         (contentItem): ContentItem => {
-            const modelName = contentItem.__metadata.modelName;
+            const modelName = contentItem.__metadata?.modelName;
             if (!modelName) {
                 return contentItem;
             }
