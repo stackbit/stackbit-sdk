@@ -40,7 +40,7 @@ describe('test errors of invalid content', () => {
         expect(configResult.valid).toBeTruthy();
         expect(configResult.errors).toHaveLength(0);
         expect(contentResult.valid).toBeFalsy();
-        expect(contentResult.errors).toHaveLength(14);
+        expect(contentResult.errors).toHaveLength(16);
     });
 
     test('validation of model fields with invalid value type should fail', () => {
@@ -63,7 +63,8 @@ describe('test errors of invalid content', () => {
             { ...commonErrorFields, fieldPath: ['actions', 1, 'icon', 'icon_type'] },
             { ...commonErrorFields, fieldPath: ['section', 'title'] },
             { ...commonErrorFields, fieldPath: ['section', 'action', 'label'] },
-            { ...commonErrorFields, fieldPath: ['section', 'action', 'icon', 'icon_type'] }
+            { ...commonErrorFields, fieldPath: ['section', 'action', 'icon', 'icon_type'] },
+            { type: 'any.required', modelName: 'config', filePath: 'data/config.json', fieldPath: ['type'] }
         ]);
     });
 
@@ -77,7 +78,8 @@ describe('test errors of invalid content', () => {
         expect(errors).toMatchObject([
             { ...commonErrorFields, fieldPath: ['poly_model_list', 0], value: { __metadata: { modelName: null } } },
             { ...commonErrorFields, fieldPath: ['poly_model_list', 1], value: { __metadata: { modelName: null } } },
-            { ...commonErrorFields, fieldPath: ['poly_model_list', 2, 'object_model_2_string'], type: 'string.base', value: 1 }
+            { ...commonErrorFields, fieldPath: ['poly_model_list', 2, 'object_model_2_string'], type: 'string.base', value: 1 },
+            { type: 'any.required', modelName: 'data_model_1', filePath: 'data/poly-data.json', fieldPath: ['type'] }
         ]);
     });
 

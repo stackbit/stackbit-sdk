@@ -4,7 +4,7 @@ import _ from 'lodash';
 import { ContentItem } from './content-loader';
 import { joiSchemasForModels } from './content-schema';
 import { ContentValidationError } from './content-errors';
-import { getModelByName, isConfigModel, isDataModel, isPageModel } from '../utils';
+import { getModelByName, isConfigModel, isDataModel, isListDataModel, isPageModel } from '../utils';
 import { Config } from '../config/config-types';
 
 interface ContentValidationOptions {
@@ -55,7 +55,7 @@ export function validateContentItems({ contentItems, config }: ContentValidation
                     if (!_.find(model.fields, { name: pageLayoutKey })) {
                         modelSchema = modelSchema.keys({ [pageLayoutKey]: Joi.string().valid(model.layout) });
                     }
-                } else if (isDataModel(model)) {
+                } else if (isDataModel(model) && !isListDataModel(model)) {
                     const objectTypeKey = config.objectTypeKey || 'type';
                     if (!_.find(model.fields, { name: objectTypeKey })) {
                         modelSchema = modelSchema.keys({ [objectTypeKey]: Joi.string().valid(model.name) });

@@ -398,7 +398,6 @@ function normalizeConfig(config: any): any {
     const isStackbitYamlV2 = ver ? semver.satisfies(ver, '<0.3.0') : false;
     const models = config?.models || {};
     const gitCMS = isGitCMS(config);
-    let referencedModelNames: string[] = [];
 
     _.forEach(models, (model, modelName) => {
         if (!model) {
@@ -427,12 +426,20 @@ function normalizeConfig(config: any): any {
             if (gitCMS) {
                 updatePageFilePath(model, config);
                 addMarkdownContentField(model);
-
-                // TODO: update schema-editor to not show layout field
-                addLayoutFieldToPageModel(model, pageLayoutKey, modelName);
             }
         } else if (isDataModel(model) && gitCMS) {
             updateDataFilePath(model, config);
+        }
+
+        if (gitCMS) {
+            // TODO: do not add pageLayoutKey and objectTypeKey fields to models,
+            //  The content validator should always assume these fields.
+            //  And when new objects created from UI, it should add these fields automatically.
+            if (isPageModel(model)) {
+                addLayoutFieldToPageModel(model, pageLayoutKey, modelName);
+            } else if (isDataModel(model) && !isListDataModel(model)) {
+                addObjectTypeKeyField(model, objectTypeKey, modelName);
+            }
         }
 
         if (isListDataModel(model)) {
@@ -488,24 +495,7 @@ function normalizeConfig(config: any): any {
                     field.models = _.get(field, 'models', []);
                 }
             }
-
-            if (gitCMS) {
-                referencedModelNames = _.union(referencedModelNames, getReferencedModelNames(field));
-            }
         });
-    });
-
-    _.forEach(referencedModelNames, (modelName) => {
-        const model = models[modelName];
-        // don't add objectTypeKey to page models, they have pageLayoutKey
-        if (!model || model.type === 'page') {
-            return;
-        }
-
-        // TODO: update schema-editor to not show type field
-        // TODO: do not add objectTypeKey field to models, API/container should
-        //  be able to add it automatically when data object or polymorphic nested model is added
-        addObjectTypeKeyField(model, objectTypeKey, modelName);
     });
 
     return config;

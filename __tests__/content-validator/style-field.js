@@ -53,6 +53,7 @@ describe('test content validation for "style" field', () => {
                         modelName: 'model_1',
                         filePath: 'file.json'
                     },
+                    type: 'model_1',
                     styles: {
                         self: {
                             objectFit: 'contain',
@@ -149,6 +150,7 @@ describe('test content validation for "style" field', () => {
                         modelName: 'model_1',
                         filePath: 'file.json'
                     },
+                    type: 'model_1',
                     styles: {
                         self: {
                             objectFit: 'contain',
@@ -249,6 +251,7 @@ describe('test content validation for "style" field', () => {
                         modelName: 'model_1',
                         filePath: 'file.json'
                     },
+                    type: 'model_1',
                     styles: {
                         self: {
                             objectFit: 'illegal',
@@ -497,6 +500,7 @@ describe('test content validation for "style" field', () => {
                         modelName: 'model_1',
                         filePath: 'file.json'
                     },
+                    type: 'model_1',
                     styles: {
                         self: {
                             objectFit: 'scale-down',
